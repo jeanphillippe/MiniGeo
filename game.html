@@ -7,31 +7,62 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #2c3e50; overflow: hidden; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #2c3e50; overflow: hidden; }
         #gameCanvas { display: block; width: 100vw; height: 100vh; touch-action: none; cursor: grab; }
         #gameCanvas:active { cursor: grabbing; }
-        
         .ui-container { position: absolute; top: 10px; left: 10px; z-index: 100; }
         .toggle-btn { background: rgba(0,0,0,0.8); color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-bottom: 5px; }
         .toggle-btn:hover { background: rgba(0,0,0,0.9); }
         .toggle-btn.active { background: #4CAF50; }
-        
         .panel { color: white; background: rgba(0,0,0,0.8); padding: 12px; border-radius: 6px; font-size: 12px; margin-bottom: 5px; min-width: 200px; display: none; }
         .panel.visible { display: block; }
         .panel button { background: #4CAF50; color: white; border: none; padding: 6px 12px; border-radius: 3px; cursor: pointer; font-size: 11px; margin: 2px; }
         .panel button:hover { background: #45a049; }
-        .panel button.active { background: #ff6b6b; }
         .panel button:disabled { background: #666; cursor: not-allowed; }
-        
         .edit-indicator { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #ff6b6b; font-size: 16px; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); z-index: 99; pointer-events: none; display: none; }
         .edit-indicator.visible { display: block; }
-        
         .controls-text { font-size: 10px; color: #ccc; margin-top: 8px; line-height: 1.3; }
         
-        @media (max-width: 768px) { 
-            .panel { font-size: 10px; padding: 10px; min-width: 180px; } 
-            .toggle-btn { font-size: 11px; padding: 6px 10px; }
-        }
+        .tooltip-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 150;
+}
+
+.tooltip {
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.3s ease;
+}
+
+.tooltip.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.tooltip.interact {
+    border-color: #4CAF50;
+    background: rgba(76, 175, 80, 0.2);
+    backdrop-filter: blur(4px);
+}
+
+.interact-prompt {
+    color: #4CAF50;
+    font-size: 10px;
+    margin-top: 4px;
+}
     </style>
 </head>
 <body>
@@ -46,7 +77,6 @@
             <div>FPS: <span id="fps">60</span></div>
             <div>Camera: <span id="cameraPos">0, 0, 0</span></div>
             <div>Zoom: <span id="zoomLevel">1.0</span></div>
-            <div>Status: <span id="status">Initializing...</span></div>
             <div class="controls-text">
                 <div><strong>Desktop:</strong> WASD/Arrows=Move | Wheel=Zoom | Drag=Pan</div>
                 <div><strong>Mobile:</strong> Drag=Pan | Pinch=Zoom | Tap=Select</div>
@@ -55,13 +85,10 @@
         
         <div id="editPanel" class="panel">
             <div><strong>Tile Editor</strong></div>
-            <div style="margin: 8px 0;">
-                Selected: <span id="selectedTile">None</span> | Height: <span id="selectedHeight">-</span>
-            </div>
+            <div style="margin: 8px 0;">Selected: <span id="selectedTile">None</span> | Height: <span id="selectedHeight">-</span></div>
             <div>
                 <button id="raiseBtn" disabled>Raise (+)</button>
                 <button id="lowerBtn" disabled>Lower (-)</button>
-                <button id="undoBtn" disabled>Undo</button>
                 <button id="clearBtn">Clear</button>
             </div>
             <div class="controls-text">Click tiles to select | Shift+Click=Lower | Ctrl+Click=Reset</div>
@@ -69,52 +96,40 @@
     </div>
     
     <div id="editIndicator" class="edit-indicator">EDIT MODE ACTIVE</div>
+    <div id="tooltipContainer" class="tooltip-container"></div>
 
     <script>
+        const USE_SPRITE_PLAYER = false; // Set to false for cylinder player
+        
         class GameEngine {
             constructor() {
-                this.scene = null; this.camera = null; this.renderer = null; this.canvas = null; this.terrain = null;
                 this.gridSize = 16; this.tileSize = 2; this.heightLevels = 8;
-                this.spriteManager = new SpriteManager(this.scene);
-                this.cameraTarget = new THREE.Vector3(0, 0, 0); this.cameraOffset = new THREE.Vector3(10, 10, 10); this.zoomLevel = 1.0; this.minZoom = 0.3; this.maxZoom = 3.0;
-                this.editMode = false; this.selectedTile = null; this.raycaster = new THREE.Raycaster(); this.mouse = new THREE.Vector2(); this.editHistory = []; this.maxHistorySize = 20;
-                this.input = { keys: {}, mouse: { x: 0, y: 0, pressed: false }, touch: { active: false, start: null, current: null, pinchDistance: 0 } };
-                this.frameCount = 0; this.lastFpsUpdate = 0; this.currentFps = 60; this.isRunning = false; this.cloudSprites = [];
+                this.cameraTarget = new THREE.Vector3(); this.cameraOffset = new THREE.Vector3(10, 10, 10); this.zoomLevel = 1.0;
+                this.editMode = false; this.selectedTile = null; this.raycaster = new THREE.Raycaster(); this.mouse = new THREE.Vector2();
+                this.input = { keys: {}, mouse: { x: 0, y: 0, pressed: false }, touch: { active: false, pinchDistance: 0, moved: false } };
+                this.frameCount = 0; this.lastFpsUpdate = 0; this.cloudSprites = [];
+
+                this.interactables = [];
+                this.proximityRadius = 2.5;
+                this.activeTooltip = null;
                 this.init();
             }
 
             init() {
-    this.setupRenderer();
-    this.setupCamera();
-    this.setupScene();
-    this.spriteManager = new SpriteManager(this.scene); // ✅ moved here
-    this.setupLighting();
-    this.setupClouds();
-    this.setupTerrain();
-    this.setupInput();
-    this.setupUI();
-
-    const sheet = this.spriteManager.loadSpriteSheet(
-        'https://i.imgur.com/mYRt74O.png',
-        64, 64,
-        4, 4
-    );
-    this.player = new Player(this, sheet);
-
-    this.start();
-    this.updateDebugInfo();
-}
-
+                this.setupRenderer(); this.setupCamera(); this.setupScene(); this.setupLighting();
+                this.setupClouds(); this.setupTerrain(); this.setupInput(); this.setupUI();this.setupInteractables();
+                this.player = new Player(this); this.start(); this.updateDebugInfo();
+            }
 
             setupRenderer() {
                 this.canvas = document.getElementById('gameCanvas');
-                this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, alpha: false, powerPreference: "high-performance" });
-                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); this.renderer.setSize(window.innerWidth, window.innerHeight);
-                this.renderer.setClearColor(0x4FB3D9, 1); this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
+                this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); this.renderer.setSize(innerWidth, innerHeight);
+                this.renderer.setClearColor(0x4FB3D9); this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             }
 
             setupCamera() {
-                const aspect = window.innerWidth / window.innerHeight, frustumSize = 20;
+                const aspect = innerWidth / innerHeight, frustumSize = 20;
                 this.camera = new THREE.OrthographicCamera(frustumSize * aspect / -2, frustumSize * aspect / 2, frustumSize / 2, frustumSize / -2, -100, 1000);
                 this.updateCameraPosition();
             }
@@ -125,7 +140,7 @@
                 this.scene.add(new THREE.AmbientLight(0xffffff, 0.4));
                 const light = new THREE.DirectionalLight(0xfff6e0, 0.95);
                 light.position.set(50, 50, 25); light.castShadow = true;
-                light.shadow.mapSize.width = light.shadow.mapSize.height = 2048;
+                light.shadow.mapSize.setScalar(2048);
                 Object.assign(light.shadow.camera, { near: 0.1, far: 200, left: -50, right: 50, top: 50, bottom: -50 });
                 this.scene.add(light);
             }
@@ -134,65 +149,44 @@
                 const loader = new THREE.TextureLoader();
                 loader.load('https://i.imgur.com/mYRt74O.png', texture => {
                     for (let i = 0; i < 6; i++) {
-                        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-                            map: texture,
-                            color: 0xffffff,
-                            opacity: 0.7,
-                            transparent: true,
-                            depthWrite: false
-                        }));
-                        sprite.position.set(
-                            (Math.random() - 0.5) * this.gridSize * this.tileSize,
-                            8 + Math.random() * 2,
-                            (Math.random() - 0.5) * this.gridSize * this.tileSize
-                        );
+                        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, opacity: 0.7, transparent: true }));
+                        sprite.position.set((Math.random() - 0.5) * this.gridSize * this.tileSize, 8 + Math.random() * 2, (Math.random() - 0.5) * this.gridSize * this.tileSize);
                         sprite.scale.set(8 + Math.random() * 6, 4 + Math.random() * 2, 1);
-                        sprite.frustumCulled = false;
-                        // Assign a constant speed to each cloud
                         sprite.userData.speed = 0.01 * (0.5 + Math.random() * 0.2);
-
-                        this.scene.add(sprite);
-                        this.cloudSprites.push(sprite);
+                        this.scene.add(sprite); this.cloudSprites.push(sprite);
                     }
                 });
             }
 
-
             setupTerrain() { this.terrain = new TerrainSystem(this.gridSize, this.tileSize, this.heightLevels); this.terrain.generateTerrain(); this.scene.add(this.terrain.terrainGroup); }
 
             setupInput() {
-                ['keydown', 'keyup'].forEach(evt => document.addEventListener(evt, e => this.input.keys[e.code] = evt === 'keydown'));
+                ['keydown', 'keyup'].forEach(evt => addEventListener(evt, e => this.input.keys[e.code] = evt === 'keydown'));
                 ['mousedown', 'mousemove', 'mouseup'].forEach(evt => this.canvas.addEventListener(evt, e => this.handleMouse(evt, e)));
                 this.canvas.addEventListener('click', e => this.editMode && this.handleTileClick(e));
                 this.canvas.addEventListener('wheel', e => { e.preventDefault(); this.zoomCamera(e.deltaY > 0 ? 0.1 : -0.1); });
                 ['touchstart', 'touchmove', 'touchend'].forEach(evt => this.canvas.addEventListener(evt, e => { e.preventDefault(); this[`handleTouch${evt.slice(5)}`](e); }));
-                window.addEventListener('resize', () => this.handleResize());
+                addEventListener('resize', () => this.handleResize());
             }
 
             setupUI() {
-                document.getElementById('debugToggle').addEventListener('click', () => this.togglePanel('debug'));
-                document.getElementById('editToggle').addEventListener('click', () => this.togglePanel('edit'));
-                
-                const btns = { 
-                    raiseBtn: () => this.modifySelected(1), 
-                    lowerBtn: () => this.modifySelected(-1), 
-                    undoBtn: () => this.undoLastEdit(), 
-                    clearBtn: () => confirm('Clear all terrain?') && this.clearTerrain() 
-                };
-                Object.keys(btns).forEach(id => document.getElementById(id).addEventListener('click', btns[id]));
+                document.getElementById('debugToggle').onclick = () => this.togglePanel('debug');
+                document.getElementById('editToggle').onclick = () => this.togglePanel('edit');
+                document.getElementById('raiseBtn').onclick = () => this.modifySelected(1);
+                document.getElementById('lowerBtn').onclick = () => this.modifySelected(-1);
+                document.getElementById('clearBtn').onclick = () => confirm('Clear all terrain?') && this.clearTerrain();
             }
 
             togglePanel(type) {
                 if (type === 'debug') {
                     const panel = document.getElementById('debugPanel'), btn = document.getElementById('debugToggle');
-                    const isVisible = panel.classList.contains('visible');
-                    panel.classList.toggle('visible', !isVisible); btn.classList.toggle('active', !isVisible);
-                } else if (type === 'edit') {
+                    const isVisible = panel.classList.toggle('visible'); btn.classList.toggle('active', isVisible);
+                } else {
                     this.editMode = !this.editMode;
                     const panel = document.getElementById('editPanel'), btn = document.getElementById('editToggle'), ind = document.getElementById('editIndicator');
                     panel.classList.toggle('visible', this.editMode); btn.classList.toggle('active', this.editMode); ind.classList.toggle('visible', this.editMode);
                     this.canvas.style.cursor = this.editMode ? 'crosshair' : 'grab';
-                    !this.editMode && this.clearSelection();
+                    if (!this.editMode) this.clearSelection();
                 }
             }
 
@@ -220,7 +214,10 @@
 
             selectTile(x, z) {
                 const tile = this.terrain.getTile(x, z);
-                if (tile) { this.selectedTile = { x, z, height: tile.height }; this.updateEditUI(); this.highlightTile(tile.mesh); }
+                if (tile) { 
+                    this.selectedTile = { x, z, height: tile.height }; 
+                    this.updateEditUI(); this.highlightTile(tile.mesh); 
+                }
             }
 
             clearSelection() { this.selectedTile = null; this.updateEditUI(); this.removeHighlight(); }
@@ -233,7 +230,12 @@
             }
 
             removeHighlight() {
-                if (this.tileHighlight) { this.scene.remove(this.tileHighlight); this.tileHighlight.geometry.dispose(); this.tileHighlight.material.dispose(); this.tileHighlight = null; }
+                if (this.tileHighlight) { 
+                    this.scene.remove(this.tileHighlight); 
+                    this.tileHighlight.geometry.dispose(); 
+                    this.tileHighlight.material.dispose(); 
+                    this.tileHighlight = null; 
+                }
             }
 
             modifySelected(delta) { this.selectedTile && this.modifyTileHeight(this.selectedTile.x, this.selectedTile.z, delta); }
@@ -243,8 +245,12 @@
                 if (tile) {
                     const newHeight = Math.max(0, Math.min(this.heightLevels - 1, tile.height + delta));
                     if (newHeight !== tile.height) {
-                        this.addToHistory(x, z, tile.height, newHeight); this.terrain.updateTileHeight(x, z, newHeight);
-                        if (this.selectedTile?.x === x && this.selectedTile?.z === z) { this.selectedTile.height = newHeight; this.updateEditUI(); this.highlightTile(tile.mesh); }
+                        this.terrain.updateTileHeight(x, z, newHeight);
+                        if (this.selectedTile?.x === x && this.selectedTile?.z === z) { 
+                            this.selectedTile.height = newHeight; 
+                            this.updateEditUI(); 
+                            this.highlightTile(tile.mesh); 
+                        }
                     }
                 }
             }
@@ -252,38 +258,29 @@
             setTileHeight(x, z, height) {
                 const tile = this.terrain.getTile(x, z);
                 if (tile && tile.height !== height) {
-                    this.addToHistory(x, z, tile.height, height); this.terrain.updateTileHeight(x, z, height);
-                    if (this.selectedTile?.x === x && this.selectedTile?.z === z) { this.selectedTile.height = height; this.updateEditUI(); this.highlightTile(tile.mesh); }
-                }
-            }
-
-            addToHistory(x, z, oldHeight, newHeight) {
-                this.editHistory.push({ x, z, oldHeight, newHeight });
-                if (this.editHistory.length > this.maxHistorySize) this.editHistory.shift();
-                document.getElementById('undoBtn').disabled = false;
-            }
-
-            undoLastEdit() {
-                if (this.editHistory.length) {
-                    const action = this.editHistory.pop();
-                    this.terrain.updateTileHeight(action.x, action.z, action.oldHeight);
-                    if (this.selectedTile?.x === action.x && this.selectedTile?.z === action.z) { this.selectedTile.height = action.oldHeight; this.updateEditUI(); this.highlightTile(this.terrain.getTile(action.x, action.z).mesh); }
-                    document.getElementById('undoBtn').disabled = !this.editHistory.length;
+                    this.terrain.updateTileHeight(x, z, height);
+                    if (this.selectedTile?.x === x && this.selectedTile?.z === z) { 
+                        this.selectedTile.height = height; 
+                        this.updateEditUI(); 
+                        this.highlightTile(tile.mesh); 
+                    }
                 }
             }
 
             clearTerrain() {
-                this.editHistory = [];
-                for (let x = 0; x < this.gridSize; x++) for (let z = 0; z < this.gridSize; z++) this.terrain.updateTileHeight(x, z, 2);
-                this.clearSelection(); document.getElementById('undoBtn').disabled = true;
+                for (let x = 0; x < this.gridSize; x++) 
+                    for (let z = 0; z < this.gridSize; z++) 
+                        this.terrain.updateTileHeight(x, z, 2);
+                this.clearSelection();
             }
 
             updateEditUI() {
                 const elems = ['selectedTile', 'selectedHeight', 'raiseBtn', 'lowerBtn'].map(id => document.getElementById(id));
                 if (this.selectedTile) {
-                    elems[0].textContent = `${this.selectedTile.x},${this.selectedTile.z}`; elems[1].textContent = this.selectedTile.height;
-                    const atMax = this.selectedTile.height >= this.heightLevels - 1, atMin = this.selectedTile.height <= 0;
-                    elems[2].disabled = !this.editMode || atMax; elems[3].disabled = !this.editMode || atMin;
+                    elems[0].textContent = `${this.selectedTile.x},${this.selectedTile.z}`; 
+                    elems[1].textContent = this.selectedTile.height;
+                    elems[2].disabled = !this.editMode || this.selectedTile.height >= this.heightLevels - 1;
+                    elems[3].disabled = !this.editMode || this.selectedTile.height <= 0;
                 } else {
                     elems[0].textContent = 'None'; elems[1].textContent = '-';
                     elems.slice(2).forEach(btn => btn.disabled = true);
@@ -293,57 +290,49 @@
             handleTouchStart(e) {
                 const touches = e.touches;
                 if (touches.length === 1) {
-                    this.input.touch.active = true; this.input.touch.moved = false;
-                    this.input.touch.start = this.input.touch.current = { x: touches[0].clientX, y: touches[0].clientY };
+                    Object.assign(this.input.touch, { active: true, moved: false, start: { x: touches[0].clientX, y: touches[0].clientY } });
                 } else if (touches.length === 2) {
-                    this.input.touch.pinchDistance = this.getTouchDistance(touches[0], touches[1]); this.input.touch.moved = false;
+                    this.input.touch.pinchDistance = Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+                    this.input.touch.moved = false;
                 }
             }
 
             handleTouchMove(e) {
                 const touches = e.touches;
                 if (touches.length === 1 && this.input.touch.active) {
-                    const delta = { x: touches[0].clientX - this.input.touch.current.x, y: touches[0].clientY - this.input.touch.current.y };
-                    const dist = Math.sqrt(delta.x * delta.x + delta.y * delta.y);
-                    if (dist > 5) { this.input.touch.moved = true; !this.editMode && this.panCamera(delta.x, delta.y); }
-                    this.input.touch.current = { x: touches[0].clientX, y: touches[0].clientY };
+                    const delta = { x: touches[0].clientX - this.input.touch.start.x, y: touches[0].clientY - this.input.touch.start.y };
+                    if (Math.hypot(delta.x, delta.y) > 5) {
+                        this.input.touch.moved = true;
+                        if (!this.editMode) this.panCamera(delta.x, delta.y);
+                    }
                 } else if (touches.length === 2) {
-                    const currentDist = this.getTouchDistance(touches[0], touches[1]);
+                    const currentDist = Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
                     this.zoomCamera((this.input.touch.pinchDistance - currentDist) * 0.01);
                     this.input.touch.pinchDistance = currentDist; this.input.touch.moved = true;
                 }
             }
 
             handleTouchEnd(e) {
-                const wasTap = this.input.touch.active && !this.input.touch.moved && e.changedTouches.length === 1;
-                if (wasTap && this.editMode) {
+                if (this.input.touch.active && !this.input.touch.moved && e.changedTouches.length === 1 && this.editMode) {
                     const touch = e.changedTouches[0];
                     this.handleTileClick({ clientX: touch.clientX, clientY: touch.clientY, shiftKey: false, ctrlKey: false, metaKey: false });
                 }
-                Object.assign(this.input.touch, { active: false, start: null, current: null, moved: false });
+                Object.assign(this.input.touch, { active: false, start: null, moved: false });
             }
-
-            getTouchDistance(t1, t2) { const dx = t1.clientX - t2.clientX, dy = t1.clientY - t2.clientY; return Math.sqrt(dx * dx + dy * dy); }
 
             panCamera(deltaX, deltaY) {
                 const speed = 0.02 * this.zoomLevel;
-
-                // Match isometric movement
-                const moveX = new THREE.Vector3(1, 0, -1).normalize();  // right in isometric
-                const moveY = new THREE.Vector3(1, 0, 1).normalize();   // down in isometric
-
+                const moveX = new THREE.Vector3(1, 0, -1).normalize(), moveY = new THREE.Vector3(1, 0, 1).normalize();
                 this.cameraTarget.add(moveX.clone().multiplyScalar(-deltaX * speed));
                 this.cameraTarget.add(moveY.clone().multiplyScalar(deltaY * speed));
-
                 const maxBounds = this.gridSize * this.tileSize / 2;
                 this.cameraTarget.x = Math.max(-maxBounds, Math.min(maxBounds, this.cameraTarget.x));
                 this.cameraTarget.z = Math.max(-maxBounds, Math.min(maxBounds, this.cameraTarget.z));
             }
 
-
             zoomCamera(delta) {
-                this.zoomLevel = Math.max(this.minZoom, Math.min(this.maxZoom, this.zoomLevel + delta));
-                const aspect = window.innerWidth / window.innerHeight, frustumSize = 20 * this.zoomLevel;
+                this.zoomLevel = Math.max(0.3, Math.min(3, this.zoomLevel + delta));
+                const aspect = innerWidth / innerHeight, frustumSize = 20 * this.zoomLevel;
                 Object.assign(this.camera, { left: frustumSize * aspect / -2, right: frustumSize * aspect / 2, top: frustumSize / 2, bottom: frustumSize / -2 });
                 this.camera.updateProjectionMatrix();
             }
@@ -351,52 +340,51 @@
             updateCameraPosition() { this.camera.position.copy(this.cameraTarget.clone().add(this.cameraOffset)); this.camera.lookAt(this.cameraTarget); }
 
             handleKeyboardInput() {
-                const speed = 0.3, keys = this.input.keys;
-                const direction = new THREE.Vector3();
-
-                if (keys['KeyW'] || keys['ArrowUp']) direction.add(new THREE.Vector3(-1, 0, -1)); // up
-                if (keys['KeyS'] || keys['ArrowDown']) direction.add(new THREE.Vector3(1, 0, 1));  // down
-                if (keys['KeyA'] || keys['ArrowLeft']) direction.add(new THREE.Vector3(-1, 0, 1)); // left
-                if (keys['KeyD'] || keys['ArrowRight']) direction.add(new THREE.Vector3(1, 0, -1)); // right
-
+                const speed = 0.3, keys = this.input.keys, direction = new THREE.Vector3();
+                if (keys['KeyW'] || keys['ArrowUp']) direction.add(new THREE.Vector3(-1, 0, -1));
+                if (keys['KeyS'] || keys['ArrowDown']) direction.add(new THREE.Vector3(1, 0, 1));
+                if (keys['KeyA'] || keys['ArrowLeft']) direction.add(new THREE.Vector3(-1, 0, 1));
+                if (keys['KeyD'] || keys['ArrowRight']) direction.add(new THREE.Vector3(1, 0, -1));
                 if (direction.lengthSq() > 0) {
                     direction.normalize().multiplyScalar(speed);
                     this.cameraTarget.add(direction);
                 }
-
                 if (keys['KeyQ']) this.zoomCamera(0.02); if (keys['KeyE']) this.zoomCamera(-0.02);
                 const maxBounds = this.gridSize * this.tileSize / 2;
-                this.cameraTarget.x = Math.max(-maxBounds, Math.min(maxBounds, this.cameraTarget.x));
-                this.cameraTarget.z = Math.max(-maxBounds, Math.min(maxBounds, this.cameraTarget.z));
+                this.cameraTarget.clamp(new THREE.Vector3(-maxBounds, 0, -maxBounds), new THREE.Vector3(maxBounds, 0, maxBounds));
+                if (this.input.keys['KeyE'] && !this.input.keys._ePressed) {
+                    this.input.keys._ePressed = true;
+                    this.handleInteraction();
+                } else if (!this.input.keys['KeyE']) {
+                    this.input.keys._ePressed = false;
+                }
             }
 
             handleResize() {
-                const aspect = window.innerWidth / window.innerHeight, frustumSize = 20 * this.zoomLevel;
+                const aspect = innerWidth / innerHeight, frustumSize = 20 * this.zoomLevel;
                 Object.assign(this.camera, { left: frustumSize * aspect / -2, right: frustumSize * aspect / 2, top: frustumSize / 2, bottom: frustumSize / -2 });
-                this.camera.updateProjectionMatrix(); this.renderer.setSize(window.innerWidth, window.innerHeight); this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                this.camera.updateProjectionMatrix(); this.renderer.setSize(innerWidth, innerHeight); this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
             }
 
-            start() { this.isRunning = true; this.animate(); document.getElementById('status').textContent = 'Running'; }
+            start() { this.animate(); }
 
-            animate() { if (!this.isRunning) return; requestAnimationFrame(() => this.animate()); this.update(); this.render(); this.updatePerformanceStats(); }
+            animate() { 
+                requestAnimationFrame(() => this.animate()); 
+                this.update(); this.render(); this.updatePerformanceStats(); 
+            }
 
             update() {
                 this.handleKeyboardInput(); this.updateCameraPosition();
+                this.checkProximityInteractions();
                 this.cloudSprites.forEach(c => {
-                        c.position.x += c.userData.speed;
-                        if (c.position.x > this.gridSize * this.tileSize)
-                            c.position.x = -this.gridSize * this.tileSize;
-                    });
-
+                    c.position.x += c.userData.speed;
+                    if (c.position.x > this.gridSize * this.tileSize) c.position.x = -this.gridSize * this.tileSize;
+                });
                 if (this.selectedTile && this.tileHighlight) {
                     const tile = this.terrain.getTile(this.selectedTile.x, this.selectedTile.z);
                     if (tile) { this.tileHighlight.position.copy(tile.mesh.position); this.tileHighlight.position.y += 0.01; }
                 }
                 if (this.player) this.player.update();
-                const delta = 0.016; // Approximate 60 FPS
-                this.spriteManager.update(delta);
-
-
             }
 
             render() { this.renderer.render(this.scene, this.camera); }
@@ -405,14 +393,13 @@
                 this.frameCount++;
                 const now = performance.now();
                 if (now - this.lastFpsUpdate >= 1000) {
-                    this.currentFps = Math.round((this.frameCount * 1000) / (now - this.lastFpsUpdate));
-                    this.frameCount = 0; this.lastFpsUpdate = now; document.getElementById('fps').textContent = this.currentFps;
+                    const fps = Math.round((this.frameCount * 1000) / (now - this.lastFpsUpdate));
+                    this.frameCount = 0; this.lastFpsUpdate = now; document.getElementById('fps').textContent = fps;
                 }
             }
 
             updateDebugInfo() {
                 const update = () => {
-                    if (!this.isRunning) return;
                     const pos = this.cameraTarget;
                     document.getElementById('cameraPos').textContent = `${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)}`;
                     document.getElementById('zoomLevel').textContent = this.zoomLevel.toFixed(1);
@@ -420,188 +407,410 @@
                 };
                 update();
             }
-        }
-class Player {
-    constructor(game, sheet) {
-        this.game = game;
-        this.speed = 0.05;
-        this.path = [];
-        this._vA = new THREE.Vector3();
-        this._vB = new THREE.Vector3();
-        this.progress = 0;
 
-        this.sprite = game.spriteManager.createAnimatedSprite(sheet, {
-            position: new THREE.Vector3(),
-            scale: 1,
-            frameSpeed: 0.15
-        });
+            // Add new methods to GameEngine class
+setupInteractables() {
+    // Create some interactive objects
+    const interactableData = [
+        { x: 3, z: 3, type: 'chest', message: 'Ancient Chest', interact: 'Press E to open' },
+        { x: 12, z: 5, type: 'tree', message: 'Old Oak Tree', interact: 'Press E to examine' },
+        { x: 7, z: 11, type: 'crystal', message: 'Magic Crystal', interact: 'Press E to collect' },
+        { x: 14, z: 14, type: 'shrine', message: 'Mysterious Shrine', interact: 'Press E to pray' }
+    ];
 
-        this.game.scene.add(this.sprite);
-        this.pos = { x: 8, z: 8 };
-        this.setPosition(this.pos.x, this.pos.z);
-        this.initInput();
-    }
-
-    setPosition(x, z) {
-        const tile = this.game.terrain.getTile(x, z);
+    interactableData.forEach(data => {
+        const tile = this.terrain.getTile(data.x, data.z);
         if (!tile) return;
-        const meshPos = tile.mesh.position;
-        const height = 0.5 + tile.height * 0.5;
-        this.sprite.position.set(meshPos.x, height, meshPos.z);
-        this.pos = { x, z };
+
+        const obj = this.createInteractableObject(data.type, data.x, data.z);
+        if (obj) {
+            this.scene.add(obj);
+            this.interactables.push({
+                mesh: obj,
+                x: data.x,
+                z: data.z,
+                type: data.type,
+                message: data.message,
+                interact: data.interact,
+                inRange: false
+            });
+        }
+    });
+}
+
+createInteractableObject(type, x, z) {
+    const tile = this.terrain.getTile(x, z);
+    if (!tile) return null;
+
+    let geometry, material, obj;
+    const height = 0.5 + tile.height * 0.5;
+
+    switch (type) {
+        case 'chest':
+            geometry = new THREE.BoxGeometry(0.8, 0.6, 0.6);
+            material = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+            obj = new THREE.Mesh(geometry, material);
+            obj.position.set(tile.mesh.position.x, height + 0.3, tile.mesh.position.z);
+            break;
+
+        case 'tree':
+            const trunk = new THREE.CylinderGeometry(0.15, 0.2, 1.5, 8);
+            const leaves = new THREE.SphereGeometry(0.8, 8, 6);
+            obj = new THREE.Group();
+            
+            const trunkMesh = new THREE.Mesh(trunk, new THREE.MeshLambertMaterial({ color: 0x8B4513 }));
+            const leavesMesh = new THREE.Mesh(leaves, new THREE.MeshLambertMaterial({ color: 0x228B22 }));
+            
+            trunkMesh.position.y = 0.75;
+            leavesMesh.position.y = 1.3;
+            
+            obj.add(trunkMesh, leavesMesh);
+            obj.position.set(tile.mesh.position.x, height, tile.mesh.position.z);
+            break;
+
+        case 'crystal':
+            geometry = new THREE.OctahedronGeometry(0.4, 0);
+            material = new THREE.MeshLambertMaterial({ 
+                color: 0x00FFFF, 
+                transparent: true, 
+                opacity: 0.8,
+                emissive: 0x004444
+            });
+            obj = new THREE.Mesh(geometry, material);
+            obj.position.set(tile.mesh.position.x, height + 0.4, tile.mesh.position.z);
+            break;
+
+        case 'shrine':
+            const base = new THREE.CylinderGeometry(0.6, 0.8, 0.3, 8);
+            const pillar = new THREE.CylinderGeometry(0.15, 0.15, 1.2, 8);
+            const top = new THREE.SphereGeometry(0.25, 8, 6);
+            
+            obj = new THREE.Group();
+            const baseMesh = new THREE.Mesh(base, new THREE.MeshLambertMaterial({ color: 0x708090 }));
+            const pillarMesh = new THREE.Mesh(pillar, new THREE.MeshLambertMaterial({ color: 0x708090 }));
+            const topMesh = new THREE.Mesh(top, new THREE.MeshLambertMaterial({ 
+                color: 0xFFD700, 
+                emissive: 0x332200 
+            }));
+            
+            baseMesh.position.y = 0.15;
+            pillarMesh.position.y = 0.9;
+            topMesh.position.y = 1.65;
+            
+            obj.add(baseMesh, pillarMesh, topMesh);
+            obj.position.set(tile.mesh.position.x, height, tile.mesh.position.z);
+            break;
+
+        default:
+            return null;
     }
 
-
-    initInput() {
-        this.game.canvas.addEventListener('click', e => {
-    if (this.game.editMode) return;
-    const rect = this.game.canvas.getBoundingClientRect();
-    this.game.mouse.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
-    this.game.raycaster.setFromCamera(this.game.mouse, this.game.camera);
-    const hits = this.game.raycaster.intersectObjects(this.game.terrain.terrainGroup.children);
-    if (hits.length) {
-        const { x, z } = hits[0].object.userData;
-        this.findPath(this.pos, { x, z }, (path) => {
-            this.path = path;
-            this.progress = 0;
-        });
-    }
-});
-
+    if (obj) {
+        obj.castShadow = obj.receiveShadow = true;
+        if (obj.children) {
+            obj.children.forEach(child => {
+                child.castShadow = child.receiveShadow = true;
+            });
+        }
     }
 
-   
-    update() {
-        if (!this.path.length) return;
+    return obj;
+}
 
-        const next = this.path[0];
-        const currentTile = this.game.terrain.getTile(this.pos.x, this.pos.z);
-        const nextTile = this.game.terrain.getTile(next.x, next.z);
-        if (!nextTile || !currentTile) { this.path = []; return; }
+checkProximityInteractions() {
+    if (!this.player || !this.player.sprite) return;
 
-        if (this.progress === 0) {
-            const a = currentTile.mesh.position;
-            const b = nextTile.mesh.position;
-            const yA = 0.5 + currentTile.height * 0.5;
-            const yB = 0.5 + nextTile.height * 0.5;
+    let closestInteractable = null;
+    let minDistance = Infinity;
 
-            this._vA.set(a.x, yA, a.z);
-            this._vB.set(b.x, yB, b.z);
+    this.interactables.forEach(interactable => {
+        const distance = Math.sqrt(
+            Math.pow(this.player.pos.x - interactable.x, 2) + 
+            Math.pow(this.player.pos.z - interactable.z, 2)
+        );
+
+        const wasInRange = interactable.inRange;
+        interactable.inRange = distance <= this.proximityRadius;
+
+        // Add subtle glow effect for nearby objects
+        if (interactable.inRange && !wasInRange) {
+            this.addGlowEffect(interactable.mesh);
+        } else if (!interactable.inRange && wasInRange) {
+            this.removeGlowEffect(interactable.mesh);
         }
 
-        this.progress += this.speed;
-
-        if (this.progress >= 1) {
-            this.setPosition(next.x, next.z);
-            this.path.shift();
-            this.progress = 0;
-        } else {
-            this.sprite.position.lerpVectors(this._vA, this._vB, this.progress);
-            this.sprite.position.y += Math.sin(this.progress * Math.PI) * 0.5;
+        if (interactable.inRange && distance < minDistance) {
+            minDistance = distance;
+            closestInteractable = interactable;
         }
+    });
+
+    this.updateTooltip(closestInteractable);
+}
+
+addGlowEffect(mesh) {
+    if (mesh.userData.glowAdded) return;
+    
+    const originalEmissive = mesh.material.emissive ? mesh.material.emissive.clone() : new THREE.Color(0x000000);
+    mesh.userData.originalEmissive = originalEmissive;
+    mesh.userData.glowAdded = true;
+    
+    // Animate glow
+    const animate = () => {
+        if (!mesh.userData.glowAdded) return;
+        
+        const intensity = (Math.sin(Date.now() * 0.003) + 1) * 0.1;
+        if (mesh.material.emissive) {
+            mesh.material.emissive.setRGB(
+                originalEmissive.r + intensity,
+                originalEmissive.g + intensity,
+                originalEmissive.b + intensity
+            );
+        }
+        requestAnimationFrame(animate);
+    };
+    animate();
+}
+
+removeGlowEffect(mesh) {
+    if (!mesh.userData.glowAdded) return;
+    
+    mesh.userData.glowAdded = false;
+    if (mesh.material.emissive && mesh.userData.originalEmissive) {
+        mesh.material.emissive.copy(mesh.userData.originalEmissive);
+    }
+}
+
+updateTooltip(interactable) {
+    const container = document.getElementById('tooltipContainer');
+    
+    if (!interactable) {
+        this.hideTooltip();
+        return;
     }
 
+    if (this.activeTooltip !== interactable) {
+        this.activeTooltip = interactable;
+        
+        const canInteract = this.getDistanceToInteractable(interactable) <= 1.5;
+        
+        container.innerHTML = `
+            <div class="tooltip ${canInteract ? 'interact' : ''} visible">
+                ${interactable.message}
+                ${canInteract ? `<div class="interact-prompt">${interactable.interact}</div>` : ''}
+            </div>
+        `;
 
-    findPath(start, end, callback) {
-    setTimeout(() => {
-        const grid = this.game.terrain.tiles.map(row => row.map(t => t.height < this.game.heightLevels));
-        const open = [start], cameFrom = {}, g = { [`${start.x},${start.z}`]: 0 };
-        const h = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.z - b.z);
-        while (open.length) {
-            open.sort((a, b) => (g[`${a.x},${a.z}`] + h(a, end)) - (g[`${b.x},${b.z}`] + h(b, end)));
-            const current = open.shift();
-            if (current.x === end.x && current.z === end.z) break;
-            for (let d of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]) {
-                const nx = current.x + d[0], nz = current.z + d[1];
-                const key = `${nx},${nz}`;
-                if (!grid[nx]?.[nz]) continue;
-                const tile = this.game.terrain.getTile(nx, nz);
-                if (!tile) continue;
-                const cost = g[`${current.x},${current.z}`] + 1;
-                if (!(key in g) || cost < g[key]) {
-                    g[key] = cost;
-                    cameFrom[key] = current;
-                    open.push({ x: nx, z: nz });
+        // Position tooltip above the object
+        this.positionTooltip(interactable);
+    }
+}
+
+positionTooltip(interactable) {
+    const container = document.getElementById('tooltipContainer');
+    const worldPos = new THREE.Vector3(
+        interactable.mesh.position.x,
+        interactable.mesh.position.y + 1.5,
+        interactable.mesh.position.z
+    );
+    
+    const screenPos = worldPos.project(this.camera);
+    const x = (screenPos.x + 1) / 2 * window.innerWidth;
+    const y = -(screenPos.y - 1) / 2 * window.innerHeight;
+    
+    container.style.left = `${x}px`;
+    container.style.top = `${y}px`;
+    container.style.transform = 'translate(-50%, -100%)';
+}
+
+hideTooltip() {
+    if (!this.activeTooltip) return;
+    
+    this.activeTooltip = null;
+    const container = document.getElementById('tooltipContainer');
+    container.innerHTML = '';
+}
+
+getDistanceToInteractable(interactable) {
+    if (!this.player) return Infinity;
+    return Math.sqrt(
+        Math.pow(this.player.pos.x - interactable.x, 2) + 
+        Math.pow(this.player.pos.z - interactable.z, 2)
+    );
+}
+
+handleInteraction() {
+    if (!this.activeTooltip) return;
+    
+    const distance = this.getDistanceToInteractable(this.activeTooltip);
+    if (distance > 1.5) return;
+    
+    const obj = this.activeTooltip;
+    let message = '';
+    
+    switch (obj.type) {
+        case 'chest':
+            message = 'You found 50 gold coins!';
+            break;
+        case 'tree':
+            message = 'The ancient tree whispers secrets of the forest...';
+            break;
+        case 'crystal':
+            message = 'The crystal glows brightly and fills you with energy!';
+            // Remove crystal after interaction
+            this.scene.remove(obj.mesh);
+            this.interactables = this.interactables.filter(i => i !== obj);
+            this.hideTooltip();
+            break;
+        case 'shrine':
+            message = 'You feel blessed by an ancient power...';
+            break;
+    }
+    
+    if (message) {
+        this.showInteractionMessage(message);
+    }
+}
+
+showInteractionMessage(message) {
+    // Create temporary message overlay
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+        position: absolute;
+        top: 20%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.9);
+        color: white;
+        padding: 16px 24px;
+        border-radius: 8px;
+        font-size: 14px;
+        z-index: 200;
+        animation: fadeInOut 3s ease forwards;
+    `;
+    overlay.textContent = message;
+    
+    // Add CSS animation
+    if (!document.getElementById('interactionStyles')) {
+        const style = document.createElement('style');
+        style.id = 'interactionStyles';
+        style.textContent = `
+            @keyframes fadeInOut {
+                0% { opacity: 0; transform: translate(-50%, -50%) translateY(20px); }
+                20%, 80% { opacity: 1; transform: translate(-50%, -50%) translateY(0); }
+                100% { opacity: 0; transform: translate(-50%, -50%) translateY(-20px); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    document.body.appendChild(overlay);
+    setTimeout(() => overlay.remove(), 3000);
+}
+        }
+
+        class Player {
+            constructor(game) {
+                this.game = game; this.speed = 0.05; this.path = []; this.progress = 0;
+                this._vA = new THREE.Vector3(); this._vB = new THREE.Vector3();
+                this.pos = { x: 8, z: 8 };
+                
+                if (USE_SPRITE_PLAYER) {
+                    const loader = new THREE.TextureLoader();
+                    loader.load('https://i.imgur.com/9QK0Xou.png', texture => {
+                        texture.magFilter = texture.minFilter = THREE.NearestFilter;
+                        this.sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true }));
+                        this.sprite.scale.setScalar(1);
+                        this.setFrameUV(0, 0, 64, 64, 64, 64);
+                        this.game.scene.add(this.sprite);
+                        this.setPosition(this.pos.x, this.pos.z);
+                    });
+                } else {
+                    const geometry = new THREE.CylinderGeometry(0.3, 0.3, 1, 8);
+                    const material = new THREE.MeshLambertMaterial({ color: 0xff6b6b });
+                    this.sprite = new THREE.Mesh(geometry, material);
+                    this.sprite.castShadow = true;
+                    this.game.scene.add(this.sprite);
+                    this.setPosition(this.pos.x, this.pos.z);
+                }
+                this.initInput();
+            }
+
+            setFrameUV(x, y, w, h, texW, texH) {
+                if (this.sprite.material.map) {
+                    this.sprite.material.map.offset.set(x / texW, 1 - (y + h) / texH);
+                    this.sprite.material.map.repeat.set(w / texW, h / texH);
                 }
             }
+
+            setPosition(x, z) {
+                const tile = this.game.terrain.getTile(x, z);
+                if (!tile || !this.sprite) return;
+                const height = 0.5 + tile.height * 0.5;
+                this.sprite.position.set(tile.mesh.position.x, height, tile.mesh.position.z);
+                this.pos = { x, z };
+            }
+
+            initInput() {
+                this.game.canvas.addEventListener('click', e => {
+                    if (this.game.editMode) return;
+                    const rect = this.game.canvas.getBoundingClientRect();
+                    this.game.mouse.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+                    this.game.raycaster.setFromCamera(this.game.mouse, this.game.camera);
+                    const hits = this.game.raycaster.intersectObjects(this.game.terrain.terrainGroup.children);
+                    if (hits.length) {
+                        const { x, z } = hits[0].object.userData;
+                        this.findPath(this.pos, { x, z }, path => { this.path = path; this.progress = 0; });
+                    }
+                });
+            }
+
+            update() {
+                if (!this.path.length || !this.sprite) return;
+                const next = this.path[0];
+                const currentTile = this.game.terrain.getTile(this.pos.x, this.pos.z);
+                const nextTile = this.game.terrain.getTile(next.x, next.z);
+                if (!nextTile || !currentTile) { this.path = []; return; }
+
+                if (this.progress === 0) {
+                    const a = currentTile.mesh.position, b = nextTile.mesh.position;
+                    this._vA.set(a.x, 0.5 + currentTile.height * 0.5, a.z);
+                    this._vB.set(b.x, 0.5 + nextTile.height * 0.5, b.z);
+                }
+
+                this.progress += this.speed;
+                if (this.progress >= 1) {
+                    this.setPosition(next.x, next.z); this.path.shift(); this.progress = 0;
+                } else {
+                    this.sprite.position.lerpVectors(this._vA, this._vB, this.progress);
+                    this.sprite.position.y += Math.sin(this.progress * Math.PI) * 0.5;
+                }
+            }
+
+            findPath(start, end, callback) {
+                setTimeout(() => {
+                    const grid = this.game.terrain.tiles.map(row => row.map(t => t.height < this.game.heightLevels));
+                    const open = [start], cameFrom = {}, g = { [`${start.x},${start.z}`]: 0 };
+                    const h = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.z - b.z);
+                    while (open.length) {
+                        open.sort((a, b) => (g[`${a.x},${a.z}`] + h(a, end)) - (g[`${b.x},${b.z}`] + h(b, end)));
+                        const current = open.shift();
+                        if (current.x === end.x && current.z === end.z) break;
+                        for (let d of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]) {
+                            const nx = current.x + d[0], nz = current.z + d[1], key = `${nx},${nz}`;
+                            if (!grid[nx]?.[nz]) continue;
+                            const cost = g[`${current.x},${current.z}`] + 1;
+                            if (!(key in g) || cost < g[key]) {
+                                g[key] = cost; cameFrom[key] = current; open.push({ x: nx, z: nz });
+                            }
+                        }
+                    }
+                    const path = []; let curr = end, key = `${curr.x},${curr.z}`;
+                    while (cameFrom[key]) { path.unshift(curr); curr = cameFrom[key]; key = `${curr.x},${curr.z}`; }
+                    callback(path);
+                }, 0);
+            }
         }
-        const path = [];
-        let curr = end, key = `${curr.x},${curr.z}`;
-        while (cameFrom[key]) {
-            path.unshift(curr);
-            curr = cameFrom[key];
-            key = `${curr.x},${curr.z}`;
-        }
-        callback(path);
-    }, 0);
-}
-
-}
-
-class SpriteManager {
-    constructor(scene) {
-        this.scene = scene;
-        this.sprites = [];
-    }
-
-    loadSpriteSheet(url, frameWidth, frameHeight, framesPerRow, totalFrames) {
-    const loader = new THREE.TextureLoader();
-    const texture = loader.load(url, (loadedTexture) => {
-        texture.userData = { loaded: true };
-    });
-    texture.magFilter = THREE.NearestFilter;
-    texture.minFilter = THREE.NearestFilter;
-    return { texture, frameWidth, frameHeight, framesPerRow, totalFrames };
-}
-
-
-    createAnimatedSprite(sheet, options = {}) {
-    const material = new THREE.SpriteMaterial({ map: sheet.texture, transparent: true });
-    const sprite = new THREE.Sprite(material);
-    sprite.scale.set(options.scale || 1, options.scale || 1, 1);
-    sprite.position.copy(options.position || new THREE.Vector3());
-    sprite.userData = {
-        sheet,
-        frame: 0,
-        direction: 0,
-        frameSpeed: options.frameSpeed || 0.15,
-        elapsed: 0,
-        loop: options.loop !== false,
-        ready: false
-    };
-
-    // Wait for texture to load
-    sheet.texture.onceImageReady = () => {
-        sprite.userData.ready = true;
-    };
-
-    this.scene.add(sprite);
-    this.sprites.push(sprite);
-    return sprite;
-}
-
-
-    update(delta) {
-    this.sprites.forEach(sprite => {
-        const data = sprite.userData;
-        if (!data.ready) return; // 👈 skip until image is loaded
-
-        data.elapsed += delta;
-        const frame = Math.floor(data.elapsed / data.frameSpeed) % data.sheet.totalFrames;
-        const row = data.direction;
-        const col = frame % data.sheet.framesPerRow;
-
-        const img = data.sheet.texture.image;
-        const fw = data.sheet.frameWidth / img.width;
-        const fh = data.sheet.frameHeight / img.height;
-
-        sprite.material.map.offset.set(col * fw, 1 - (row + 1) * fh);
-        sprite.material.map.repeat.set(fw, fh);
-    });
-}
-
-}
-
 
         class TerrainSystem {
             constructor(gridSize, tileSize, heightLevels) {
@@ -617,7 +826,7 @@ class SpriteManager {
                         const height = this.generateHeightForPosition(x, z);
                         const tile = this.createTile(x, z, height);
                         tile.castShadow = tile.receiveShadow = true;
-                        this.tiles[x][z] = { mesh: tile, height, x, z };
+                        this.tiles[x][z] = { height, mesh: tile };
                         this.terrainGroup.add(tile);
                     }
                 }
@@ -625,39 +834,49 @@ class SpriteManager {
 
             generateHeightForPosition(x, z) {
                 const centerX = this.gridSize / 2, centerZ = this.gridSize / 2;
-                const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(z - centerZ, 2));
-                const normalizedDistance = distance / (this.gridSize / 2);
-                let height = Math.floor((1 - normalizedDistance) * this.heightLevels) + Math.floor((Math.random() - 0.5) * 3);
+                const distanceFromCenter = Math.sqrt((x - centerX) ** 2 + (z - centerZ) ** 2);
+                const maxDistance = Math.sqrt(centerX ** 2 + centerZ ** 2);
+                const normalizedDistance = distanceFromCenter / maxDistance;
+                
+                let height = Math.floor((1 - normalizedDistance) * this.heightLevels);
+                height += Math.floor((Math.random() - 0.5) * 3);
                 return Math.max(0, Math.min(this.heightLevels - 1, height));
             }
 
             createTile(x, z, height) {
-                const geometry = new THREE.BoxGeometry(this.tileSize * 0.9, 0.5 + height * 0.5, this.tileSize * 0.9);
+                const geometry = new THREE.BoxGeometry(this.tileSize, height * 0.5 + 0.1, this.tileSize);
                 const material = new THREE.MeshLambertMaterial({ color: this.levelColors[height] });
-                const tile = new THREE.Mesh(geometry, material);
-                const worldX = (x - this.gridSize / 2) * this.tileSize, worldZ = (z - this.gridSize / 2) * this.tileSize, worldY = (0.5 + height * 0.5) / 2;
-                tile.position.set(worldX, worldY, worldZ); tile.castShadow = tile.receiveShadow = true; tile.userData = { x, z, height };
-                return tile;
+                const mesh = new THREE.Mesh(geometry, material);
+                
+                const worldX = (x - this.gridSize / 2) * this.tileSize;
+                const worldZ = (z - this.gridSize / 2) * this.tileSize;
+                mesh.position.set(worldX, (height * 0.5 + 0.1) / 2, worldZ);
+                mesh.userData = { x, z, height };
+                return mesh;
             }
 
-            getTile(x, z) { return (x >= 0 && x < this.gridSize && z >= 0 && z < this.gridSize) ? this.tiles[x][z] : null; }
+            getTile(x, z) {
+                return this.tiles[x]?.[z];
+            }
 
             updateTileHeight(x, z, newHeight) {
                 const tile = this.getTile(x, z);
-                if (tile) {
-                    tile.height = Math.max(0, Math.min(this.heightLevels - 1, newHeight));
-                    const mesh = tile.mesh;
-                    const newGeometry = new THREE.BoxGeometry(this.tileSize * 0.9, 0.5 + tile.height * 0.5, this.tileSize * 0.9);
-                    mesh.geometry.dispose(); mesh.geometry = newGeometry; mesh.material.color.setHex(this.levelColors[tile.height]);
-                    mesh.position.y = (0.5 + tile.height * 0.5) / 2;
-                }
+                if (!tile) return;
+
+                this.terrainGroup.remove(tile.mesh);
+                tile.mesh.geometry.dispose();
+                tile.mesh.material.dispose();
+
+                const newMesh = this.createTile(x, z, newHeight);
+                newMesh.castShadow = newMesh.receiveShadow = true;
+                tile.height = newHeight;
+                tile.mesh = newMesh;
+                this.terrainGroup.add(newMesh);
             }
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            const game = new GameEngine();
-            window.game = game;
-        });
+        // Initialize the game
+        new GameEngine();
     </script>
 </body>
 </html>

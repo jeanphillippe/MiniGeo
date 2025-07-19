@@ -547,38 +547,55 @@ checkProximityInteractions() {
 
     this.updateTooltip(closestInteractable);
 }
-
 addGlowEffect(mesh) {
     if (mesh.userData.glowAdded) return;
-    
-    const originalEmissive = mesh.material.emissive ? mesh.material.emissive.clone() : new THREE.Color(0x000000);
-    mesh.userData.originalEmissive = originalEmissive;
-    mesh.userData.glowAdded = true;
-    
-    // Animate glow
-    const animate = () => {
-        if (!mesh.userData.glowAdded) return;
-        
-        const intensity = (Math.sin(Date.now() * 0.003) + 1) * 0.1;
-        if (mesh.material.emissive) {
-            mesh.material.emissive.setRGB(
-                originalEmissive.r + intensity,
-                originalEmissive.g + intensity,
-                originalEmissive.b + intensity
-            );
+
+    // Helper function to add glow to a mesh or group
+    const addGlowTo = m => {
+        if (m.material && m.material.emissive) {
+            const originalEmissive = m.material.emissive.clone();
+            m.userData.originalEmissive = originalEmissive;
+            m.userData.glowAdded = true;
+
+            const animate = () => {
+                if (!m.userData.glowAdded) return;
+                const intensity = (Math.sin(Date.now() * 0.003) + 1) * 0.1;
+                m.material.emissive.setRGB(
+                    originalEmissive.r + intensity,
+                    originalEmissive.g + intensity,
+                    originalEmissive.b + intensity
+                );
+                requestAnimationFrame(animate);
+            };
+            animate();
         }
-        requestAnimationFrame(animate);
     };
-    animate();
+
+    if (mesh.isGroup) {
+        mesh.children.forEach(addGlowTo);
+    } else {
+        addGlowTo(mesh);
+    }
+    mesh.userData.glowAdded = true; // Mark group as processed
 }
 
 removeGlowEffect(mesh) {
-    if (!mesh.userData.glowAdded) return;
-    
-    mesh.userData.glowAdded = false;
-    if (mesh.material.emissive && mesh.userData.originalEmissive) {
-        mesh.material.emissive.copy(mesh.userData.originalEmissive);
+    // Helper function to remove glow from a mesh or group
+    const removeGlowFrom = m => {
+        if (m.userData.glowAdded) {
+            m.userData.glowAdded = false;
+            if (m.material && m.material.emissive && m.userData.originalEmissive) {
+                m.material.emissive.copy(m.userData.originalEmissive);
+            }
+        }
+    };
+
+    if (mesh.isGroup) {
+        mesh.children.forEach(removeGlowFrom);
+    } else {
+        removeGlowFrom(mesh);
     }
+    mesh.userData.glowAdded = false; // Mark group as processed
 }
 
 updateTooltip(interactable) {
@@ -844,7 +861,7 @@ showInteractionMessage(message) {
             }
 
             createTile(x, z, height) {
-                const geometry = new THREE.BoxGeometry(this.tileSize, height * 0.5 + 0.1, this.tileSize);
+                const geometry=new THREE.BoxGeometry(this.tileSize*0.9,0.5+height*0.5,this.tileSize*0.9);
                 const material = new THREE.MeshLambertMaterial({ color: this.levelColors[height] });
                 const mesh = new THREE.Mesh(geometry, material);
                 
@@ -876,7 +893,7 @@ showInteractionMessage(message) {
         }
 
         // Initialize the game
-        new GameEngine();
+        window.game = new GameEngine();
     </script>
 </body>
 </html>

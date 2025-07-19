@@ -5,64 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Optimized Isometric Game</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #2c3e50; overflow: hidden; }
-        #gameCanvas { display: block; width: 100vw; height: 100vh; touch-action: none; cursor: grab; }
-        #gameCanvas:active { cursor: grabbing; }
-        .ui-container { position: absolute; top: 10px; left: 10px; z-index: 100; }
-        .toggle-btn { background: rgba(0,0,0,0.8); color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-bottom: 5px; }
-        .toggle-btn:hover { background: rgba(0,0,0,0.9); }
-        .toggle-btn.active { background: #4CAF50; }
-        .panel { color: white; background: rgba(0,0,0,0.8); padding: 12px; border-radius: 6px; font-size: 12px; margin-bottom: 5px; min-width: 200px; display: none; }
-        .panel.visible { display: block; }
-        .panel button { background: #4CAF50; color: white; border: none; padding: 6px 12px; border-radius: 3px; cursor: pointer; font-size: 11px; margin: 2px; }
-        .panel button:hover { background: #45a049; }
-        .panel button:disabled { background: #666; cursor: not-allowed; }
-        .edit-indicator { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #ff6b6b; font-size: 16px; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); z-index: 99; pointer-events: none; display: none; }
-        .edit-indicator.visible { display: block; }
-        .controls-text { font-size: 10px; color: #ccc; margin-top: 8px; line-height: 1.3; }
-        
-        .tooltip-container {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-    z-index: 150;
-}
-
-.tooltip {
-    background: rgba(0, 0, 0, 0.9);
-    color: white;
-    padding: 8px 12px;
-    border-radius: 6px;
-    font-size: 12px;
-    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-    white-space: nowrap;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    opacity: 0;
-    transform: translateY(10px);
-    transition: all 0.3s ease;
-}
-
-.tooltip.visible {
-    opacity: 1;
-    transform: translateY(0);
-}
-
-.tooltip.interact {
-    border-color: #4CAF50;
-    background: rgba(76, 175, 80, 0.2);
-    backdrop-filter: blur(4px);
-}
-
-.interact-prompt {
-    color: #4CAF50;
-    font-size: 10px;
-    margin-top: 4px;
-}
+    <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#2c3e50;overflow:hidden}#gameCanvas{display:block;width:100vw;height:100vh;touch-action:none;cursor:grab}#gameCanvas:active{cursor:grabbing}.ui-container{position:absolute;top:10px;left:10px;z-index:100}.toggle-btn{background:rgb(0 0 0 / .8);color:#fff;border:none;padding:8px 12px;border-radius:4px;cursor:pointer;font-size:12px;margin-bottom:5px}.toggle-btn:hover{background:rgb(0 0 0 / .9)}.toggle-btn.active{background:#4CAF50}.panel{color:#fff;background:rgb(0 0 0 / .8);padding:12px;border-radius:6px;font-size:12px;margin-bottom:5px;min-width:200px;display:none}.panel.visible{display:block}.panel button{background:#4CAF50;color:#fff;border:none;padding:6px 12px;border-radius:3px;cursor:pointer;font-size:11px;margin:2px}.panel button:hover{background:#45a049}.panel button:disabled{background:#666;cursor:not-allowed}.edit-indicator{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#ff6b6b;font-size:16px;font-weight:700;text-shadow:2px 2px 4px rgb(0 0 0 / .8);z-index:99;pointer-events:none;display:none}.edit-indicator.visible{display:block}.controls-text{font-size:10px;color:#ccc;margin-top:8px;line-height:1.3}.tooltip-container{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:150}.tooltip{background:rgb(0 0 0 / .9);color:#fff;padding:8px 12px;border-radius:6px;font-size:12px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;white-space:nowrap;box-shadow:0 2px 8px rgb(0 0 0 / .4);border:1px solid rgb(255 255 255 / .2);opacity:0;transform:translateY(10px);transition:all 0.3s ease}.tooltip.visible{opacity:1;transform:translateY(0)}.tooltip.interact{border-color:#4CAF50;background:rgb(76 175 80 / .2);backdrop-filter:blur(4px)}.interact-prompt{color:#4CAF50;font-size:10px;margin-top:4px}
     </style>
 </head>
 <body>
@@ -165,7 +108,16 @@
                 ['mousedown', 'mousemove', 'mouseup'].forEach(evt => this.canvas.addEventListener(evt, e => this.handleMouse(evt, e)));
                 this.canvas.addEventListener('click', e => this.editMode && this.handleTileClick(e));
                 this.canvas.addEventListener('wheel', e => { e.preventDefault(); this.zoomCamera(e.deltaY > 0 ? 0.1 : -0.1); });
-                ['touchstart', 'touchmove', 'touchend'].forEach(evt => this.canvas.addEventListener(evt, e => { e.preventDefault(); this[`handleTouch${evt.slice(5)}`](e); }));
+                ['touchstart', 'touchmove', 'touchend'].forEach(evt => {
+    const methodName = 'handleTouch' + evt.slice(5).charAt(0).toUpperCase() + evt.slice(6);
+    this.canvas.addEventListener(evt, e => {
+        e.preventDefault();
+        if (typeof this[methodName] === 'function') {
+            this[methodName](e);
+        }
+    });
+});
+
                 addEventListener('resize', () => this.handleResize());
             }
 
@@ -297,28 +249,76 @@
                 }
             }
 
-            handleTouchMove(e) {
-                const touches = e.touches;
-                if (touches.length === 1 && this.input.touch.active) {
-                    const delta = { x: touches[0].clientX - this.input.touch.start.x, y: touches[0].clientY - this.input.touch.start.y };
-                    if (Math.hypot(delta.x, delta.y) > 5) {
-                        this.input.touch.moved = true;
-                        if (!this.editMode) this.panCamera(delta.x, delta.y);
-                    }
-                } else if (touches.length === 2) {
-                    const currentDist = Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
-                    this.zoomCamera((this.input.touch.pinchDistance - currentDist) * 0.01);
-                    this.input.touch.pinchDistance = currentDist; this.input.touch.moved = true;
+           handleTouchMove(e) {
+    const touches = e.touches;
+    if (touches.length === 1 && this.input.touch.active) {
+        const delta = {
+            x: touches[0].clientX - this.input.touch.start.x,
+            y: touches[0].clientY - this.input.touch.start.y
+        };
+        
+        const distance = Math.hypot(delta.x, delta.y);
+        
+        // Only mark as moved for significant camera panning movements
+        if (distance > 30 && !this.editMode) {
+            this.input.touch.moved = true;
+            this.panCamera(delta.x, delta.y);
+        }
+        // For edit mode, mark as moved for any significant movement
+        else if (distance > 20 && this.editMode) {
+            this.input.touch.moved = true;
+        }
+    } else if (touches.length === 2) {
+        const currentDist = Math.hypot(
+            touches[0].clientX - touches[1].clientX,
+            touches[0].clientY - touches[1].clientY
+        );
+        this.zoomCamera((this.input.touch.pinchDistance - currentDist) * 0.01);
+        this.input.touch.pinchDistance = currentDist;
+        this.input.touch.moved = true;
+    }
+}
+handleTouchEnd(e) {
+    if (this.input.touch.active && e.changedTouches.length === 1) {
+        const touch = e.changedTouches[0];
+        const wasShortTap = !this.input.touch.moved;
+        
+        if (this.editMode && wasShortTap) {
+            // Handle tile editing
+            this.handleTileClick({
+                clientX: touch.clientX,
+                clientY: touch.clientY,
+                shiftKey: false,
+                ctrlKey: false,
+                metaKey: false
+            });
+        } else if (!this.editMode && wasShortTap) {
+            // Handle player movement - only for short taps
+            const rect = this.canvas.getBoundingClientRect();
+            this.mouse.set(
+                ((touch.clientX - rect.left) / rect.width) * 2 - 1,
+                -((touch.clientY - rect.top) / rect.height) * 2 + 1
+            );
+            
+            this.raycaster.setFromCamera(this.mouse, this.camera);
+            const hits = this.raycaster.intersectObjects(this.terrain.terrainGroup.children);
+            
+            if (hits.length) {
+                const { x, z } = hits[0].object.userData;
+                // Make sure we have a valid player before trying to move
+                if (this.player && this.player.sprite) {
+                    this.player.findPath(this.player.pos, { x, z }, path => {
+                        this.player.path = path;
+                        this.player.progress = 0;
+                    });
                 }
             }
-
-            handleTouchEnd(e) {
-                if (this.input.touch.active && !this.input.touch.moved && e.changedTouches.length === 1 && this.editMode) {
-                    const touch = e.changedTouches[0];
-                    this.handleTileClick({ clientX: touch.clientX, clientY: touch.clientY, shiftKey: false, ctrlKey: false, metaKey: false });
-                }
-                Object.assign(this.input.touch, { active: false, start: null, moved: false });
-            }
+        }
+    }
+    
+    // Reset touch state
+    Object.assign(this.input.touch, { active: false, start: null, moved: false });
+}
 
             panCamera(deltaX, deltaY) {
                 const speed = 0.02 * this.zoomLevel;

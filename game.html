@@ -83,7 +83,7 @@
             }
 
             init() {
-                this.setupRenderer(); this.setupCamera(); this.setupScene(); this.setupLighting(); this.setupClouds(); this.setupTerrain(); this.setupInput(); this.setupUI(); this.start(); this.updateDebugInfo();
+                this.setupRenderer(); this.setupCamera(); this.setupScene(); this.setupLighting(); this.setupClouds(); this.setupTerrain(); this.setupInput(); this.setupUI();this.player = new Player(this); this.start(); this.updateDebugInfo();
             }
 
             setupRenderer() {
@@ -113,13 +113,29 @@
             setupClouds() {
                 const loader = new THREE.TextureLoader();
                 loader.load('https://i.imgur.com/mYRt74O.png', texture => {
-                    for (let i = 0; i < 6; i++) {
-                        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, color: 0xffffff, opacity: 0.7, transparent: true, depthWrite: false }));
-                        sprite.position.set((Math.random() - 0.5) * this.gridSize * this.tileSize, 8 + Math.random() * 2, (Math.random() - 0.5) * this.gridSize * this.tileSize);
-                        sprite.scale.set(8 + Math.random() * 6, 4 + Math.random() * 2, 1);
-                        this.scene.add(sprite); this.cloudSprites.push(sprite);
-                    }
-                });
+    for (let i = 0; i < 6; i++) {
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: texture,
+            color: 0xffffff,
+            opacity: 0.7,
+            transparent: true,
+            depthWrite: false
+        }));
+        sprite.position.set(
+            (Math.random() - 0.5) * this.gridSize * this.tileSize,
+            8 + Math.random() * 2,
+            (Math.random() - 0.5) * this.gridSize * this.tileSize
+        );
+        sprite.scale.set(8 + Math.random() * 6, 4 + Math.random() * 2, 1);
+        sprite.frustumCulled = false;
+        // Assign a constant speed to each cloud
+        sprite.userData.speed = 0.01 * (0.5 + Math.random() * 0.2);
+
+        this.scene.add(sprite);
+        this.cloudSprites.push(sprite);
+    }
+});
+
             }
 
             setupTerrain() { this.terrain = new TerrainSystem(this.gridSize, this.tileSize, this.heightLevels); this.terrain.generateTerrain(); this.scene.add(this.terrain.terrainGroup); }
@@ -346,11 +362,18 @@ if (direction.lengthSq() > 0) {
 
             update() {
                 this.handleKeyboardInput(); this.updateCameraPosition();
-                this.cloudSprites.forEach(c => { c.position.x += 0.01 * (0.5 + Math.random() * 0.2); if (c.position.x > this.gridSize * this.tileSize) c.position.x = -this.gridSize * this.tileSize; });
+                this.cloudSprites.forEach(c => {
+    c.position.x += c.userData.speed;
+    if (c.position.x > this.gridSize * this.tileSize)
+        c.position.x = -this.gridSize * this.tileSize;
+});
+
                 if (this.selectedTile && this.tileHighlight) {
                     const tile = this.terrain.getTile(this.selectedTile.x, this.selectedTile.z);
                     if (tile) { this.tileHighlight.position.copy(tile.mesh.position); this.tileHighlight.position.y += 0.01; }
                 }
+                if (this.player) this.player.update();
+
             }
 
             render() { this.renderer.render(this.scene, this.camera); }
@@ -375,6 +398,112 @@ if (direction.lengthSq() > 0) {
                 update();
             }
         }
+class Player {
+    constructor(game) {
+        this.game = game;
+        this.speed = 0.05;
+        this.path = [];
+    this._vA = new THREE.Vector3();
+    this._vB = new THREE.Vector3();
+        this.progress = 0;
+        this.model = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.3, 0.3, 1, 6),
+            new THREE.MeshStandardMaterial({ color: 0xffcc00 })
+        );
+
+        this.model.castShadow = true;
+        this.game.scene.add(this.model);
+        this.pos = { x: 8, z: 8 };
+        this.setPosition(this.pos.x, this.pos.z);
+        this.initInput();
+    }
+
+    setPosition(x, z) {
+    const tile = this.game.terrain.getTile(x, z);
+    if (!tile) return;
+    const meshPos = tile.mesh.position;
+    const height = 0.5 + tile.height * 0.5; // tile height from mesh calculation
+    this.model.position.set(meshPos.x, height, meshPos.z);
+    this.pos = { x, z };
+}
+
+
+    initInput() {
+        this.game.canvas.addEventListener('click', e => {
+    if (this.game.editMode) return;
+    const rect = this.game.canvas.getBoundingClientRect();
+    this.game.mouse.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+    this.game.raycaster.setFromCamera(this.game.mouse, this.game.camera);
+    const hits = this.game.raycaster.intersectObjects(this.game.terrain.terrainGroup.children);
+    if (hits.length) {
+        const { x, z } = hits[0].object.userData;
+        this.findPath(this.pos, { x, z }, (path) => {
+            this.path = path;
+            this.progress = 0;
+        });
+    }
+});
+
+    }
+
+    update() {
+        if (!this.path.length) return;
+        const next = this.path[0];
+        const currentTile = this.game.terrain.getTile(this.pos.x, this.pos.z);
+        const nextTile = this.game.terrain.getTile(next.x, next.z);
+        if (!nextTile) { this.path = []; return; }
+
+         const currentMeshPos = currentTile.mesh.position;
+    const nextMeshPos    = nextTile.mesh.position;
+
+
+        this.progress += this.speed;
+        if (this.progress >= 1) {
+            this.progress = 0;
+            this.setPosition(next.x, next.z);
+            this.path.shift();
+        } else {
+               this.model.position.lerpVectors(this._vA, this._vB, this.progress);
+            //this.model.position.lerpVectors(a.clone().addY(0.51), b.clone().addY(0.51), this.progress);
+            //this.model.position.y += Math.sin(this.progress * Math.PI) * 0.1; // bobbing animation
+        }
+    }
+
+    findPath(start, end, callback) {
+    setTimeout(() => {
+        const grid = this.game.terrain.tiles.map(row => row.map(t => t.height < this.game.heightLevels));
+        const open = [start], cameFrom = {}, g = { [`${start.x},${start.z}`]: 0 };
+        const h = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.z - b.z);
+        while (open.length) {
+            open.sort((a, b) => (g[`${a.x},${a.z}`] + h(a, end)) - (g[`${b.x},${b.z}`] + h(b, end)));
+            const current = open.shift();
+            if (current.x === end.x && current.z === end.z) break;
+            for (let d of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]) {
+                const nx = current.x + d[0], nz = current.z + d[1];
+                const key = `${nx},${nz}`;
+                if (!grid[nx]?.[nz]) continue;
+                const tile = this.game.terrain.getTile(nx, nz);
+                if (!tile) continue;
+                const cost = g[`${current.x},${current.z}`] + 1;
+                if (!(key in g) || cost < g[key]) {
+                    g[key] = cost;
+                    cameFrom[key] = current;
+                    open.push({ x: nx, z: nz });
+                }
+            }
+        }
+        const path = [];
+        let curr = end, key = `${curr.x},${curr.z}`;
+        while (cameFrom[key]) {
+            path.unshift(curr);
+            curr = cameFrom[key];
+            key = `${curr.x},${curr.z}`;
+        }
+        callback(path);
+    }, 0);
+}
+
+}
 
         class TerrainSystem {
             constructor(gridSize, tileSize, heightLevels) {

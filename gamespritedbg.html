@@ -1,0 +1,1320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optimized Isometric Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #2c3e50; overflow: hidden; }
+        #gameCanvas { display: block; width: 100vw; height: 100vh; touch-action: none; cursor: grab; }
+        #gameCanvas:active { cursor: grabbing; }
+        .ui-container { position: absolute; top: 10px; left: 10px; z-index: 100; }
+        .toggle-btn { background: rgba(0,0,0,0.8); color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-bottom: 5px; }
+        .toggle-btn:hover { background: rgba(0,0,0,0.9); }
+        .toggle-btn.active { background: #4CAF50; }
+        .panel { color: white; background: rgba(0,0,0,0.8); padding: 12px; border-radius: 6px; font-size: 12px; margin-bottom: 5px; min-width: 200px; display: none; }
+        .panel.visible { display: block; }
+        .panel button { background: #4CAF50; color: white; border: none; padding: 6px 12px; border-radius: 3px; cursor: pointer; font-size: 11px; margin: 2px; }
+        .panel button:hover { background: #45a049; }
+        .panel button:disabled { background: #666; cursor: not-allowed; }
+        .edit-indicator { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #ff6b6b; font-size: 16px; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); z-index: 99; pointer-events: none; display: none; }
+        .edit-indicator.visible { display: block; }
+        .controls-text { font-size: 10px; color: #ccc; margin-top: 8px; line-height: 1.3; }
+        .sprite-debug-panel {
+    background: rgba(0,0,0,0.9);
+    color: white;
+    padding: 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    margin-bottom: 5px;
+    min-width: 250px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.debug-section {
+    margin-bottom: 12px;
+    border-bottom: 1px solid #333;
+    padding-bottom: 8px;
+}
+
+.debug-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.slider-group {
+    display: flex;
+    align-items: center;
+    margin: 4px 0;
+    gap: 8px;
+}
+
+.slider-group label {
+    min-width: 20px;
+    font-weight: bold;
+}
+
+.slider-group input[type="range"] {
+    flex: 1;
+    height: 20px;
+}
+
+.slider-group .value {
+    min-width: 40px;
+    font-family: monospace;
+    font-size: 10px;
+    color: #4CAF50;
+}
+
+.frame-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2px;
+    margin: 4px 0;
+}
+
+.frame-btn {
+    background: #333;
+    color: white;
+    border: 1px solid #555;
+    padding: 4px;
+    cursor: pointer;
+    font-size: 9px;
+    border-radius: 2px;
+}
+
+.frame-btn:hover {
+    background: #555;
+}
+
+.frame-btn.active {
+    background: #4CAF50;
+    border-color: #45a049;
+}
+
+.param-output {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    padding: 6px;
+    font-family: monospace;
+    font-size: 9px;
+    border-radius: 3px;
+    white-space: pre-wrap;
+    max-height: 80px;
+    overflow-y: auto;
+    cursor: text;
+    user-select: all;
+}
+
+.collision-viz {
+    position: absolute;
+    border: 2px solid #ff0000;
+    pointer-events: none;
+    z-index: 10;
+    opacity: 0.7;
+}
+
+.debug-buttons {
+    display: flex;
+    gap: 4px;
+    margin-top: 6px;
+}
+
+.debug-buttons button {
+    flex: 1;
+    font-size: 9px;
+    padding: 4px 6px;
+}
+        .tooltip-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 150;
+}
+
+.tooltip {
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.3s ease;
+}
+
+.tooltip.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.tooltip.interact {
+    border-color: #4CAF50;
+    background: rgba(76, 175, 80, 0.2);
+    backdrop-filter: blur(4px);
+}
+
+.interact-prompt {
+    color: #4CAF50;
+    font-size: 10px;
+    margin-top: 4px;
+}
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div class="ui-container">
+        <button id="debugToggle" class="toggle-btn">Debug Info</button>
+        <button id="editToggle" class="toggle-btn">Edit Mode</button>
+        
+<button id="spriteDebugToggle" class="toggle-btn">Sprite Debug</button>
+
+        <div id="debugPanel" class="panel">
+            <div><strong>Debug Info</strong></div>
+            <div>FPS: <span id="fps">60</span></div>
+            <div>Camera: <span id="cameraPos">0, 0, 0</span></div>
+            <div>Zoom: <span id="zoomLevel">1.0</span></div>
+            <div class="controls-text">
+                <div><strong>Desktop:</strong> WASD/Arrows=Move | Wheel=Zoom | Drag=Pan</div>
+                <div><strong>Mobile:</strong> Drag=Pan | Pinch=Zoom | Tap=Select</div>
+            </div>
+        </div>
+        
+        <div id="editPanel" class="panel">
+            <div><strong>Tile Editor</strong></div>
+            <div style="margin: 8px 0;">Selected: <span id="selectedTile">None</span> | Height: <span id="selectedHeight">-</span></div>
+            <div>
+                <button id="raiseBtn" disabled>Raise (+)</button>
+                <button id="lowerBtn" disabled>Lower (-)</button>
+                <button id="clearBtn">Clear</button>
+            </div>
+            <div class="controls-text">Click tiles to select | Shift+Click=Lower | Ctrl+Click=Reset</div>
+        </div>
+        <div id="spriteDebugPanel" class="panel sprite-debug-panel">
+            <div><strong>Sprite Debug</strong></div>
+            <div>Target: <span id="debugTarget">No sprite selected</span></div>
+            
+            <div class="debug-section">
+                <div><strong>Position</strong></div>
+                <div class="slider-group">
+                    <label>X:</label>
+                    <input type="range" id="posX" min="-16" max="16" step="0.1" value="0">
+                    <span class="value" id="posXVal">0.0</span>
+                </div>
+                <div class="slider-group">
+                    <label>Y:</label>
+                    <input type="range" id="posY" min="0" max="10" step="0.1" value="1">
+                    <span class="value" id="posYVal">1.0</span>
+                </div>
+                <div class="slider-group">
+                    <label>Z:</label>
+                    <input type="range" id="posZ" min="-16" max="16" step="0.1" value="0">
+                    <span class="value" id="posZVal">0.0</span>
+                </div>
+            </div>
+            
+            <div class="debug-section">
+                <div><strong>Scale</strong></div>
+                <div class="slider-group">
+                    <label>W:</label>
+                    <input type="range" id="scaleW" min="0.1" max="3" step="0.1" value="1">
+                    <span class="value" id="scaleWVal">1.0</span>
+                </div>
+                <div class="slider-group">
+                    <label>H:</label>
+                    <input type="range" id="scaleH" min="0.1" max="3" step="0.1" value="1">
+                    <span class="value" id="scaleHVal">1.0</span>
+                </div>
+                <div class="slider-group">
+                    <label>D:</label>
+                    <input type="range" id="scaleD" min="0.1" max="3" step="0.1" value="1">
+                    <span class="value" id="scaleDVal">1.0</span>
+                </div>
+            </div>
+            
+            <div class="debug-section">
+                <div><strong>Animation Frames</strong></div>
+                <div class="frame-grid" id="frameGrid"></div>
+            </div>
+            
+            <div class="debug-section">
+                <div><strong>Parameters</strong></div>
+                <div class="param-output" id="paramOutput">Click "Update" to see parameters</div>
+                <div class="debug-buttons">
+                    <button id="updateParams">Update</button>
+                    <button id="copyParams">Copy</button>
+                    <button id="resetSprite">Reset</button>
+                </div>
+            </div>
+            
+            <div class="debug-section">
+                <div><strong>Collision</strong></div>
+                <button id="toggleCollision" class="toggle-btn">Show Collision</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="editIndicator" class="edit-indicator">EDIT MODE ACTIVE</div>
+    <div id="tooltipContainer" class="tooltip-container"></div>
+
+    <script>
+        const USE_SPRITE_PLAYER = true; // Set to false for cylinder player
+        
+        class GameEngine {
+            constructor() {
+                this.gridSize = 16; this.tileSize = 2; this.heightLevels = 8;
+                this.cameraTarget = new THREE.Vector3(); this.cameraOffset = new THREE.Vector3(10, 10, 10); this.zoomLevel = 1.0;
+                this.editMode = false; this.selectedTile = null; this.raycaster = new THREE.Raycaster(); this.mouse = new THREE.Vector2();
+                this.input = { keys: {}, mouse: { x: 0, y: 0, pressed: false }, touch: { active: false, pinchDistance: 0, moved: false } };
+                this.frameCount = 0; this.lastFpsUpdate = 0; this.cloudSprites = [];
+
+                this.interactables = [];
+                this.proximityRadius = 2.5;
+                this.activeTooltip = null;
+                this.init();
+            }
+
+            init() {
+                this.setupRenderer(); this.setupCamera(); this.setupScene(); this.setupLighting();
+                this.setupClouds(); this.setupTerrain(); this.setupInput(); this.setupUI();this.setupInteractables();
+                this.player = new Player(this); this.start(); this.updateDebugInfo();
+            }
+
+            setupRenderer() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
+                this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); this.renderer.setSize(innerWidth, innerHeight);
+                this.renderer.setClearColor(0x4FB3D9); this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            }
+
+            setupCamera() {
+                const aspect = innerWidth / innerHeight, frustumSize = 20;
+                this.camera = new THREE.OrthographicCamera(frustumSize * aspect / -2, frustumSize * aspect / 2, frustumSize / 2, frustumSize / -2, -100, 1000);
+                this.updateCameraPosition();
+            }
+
+            setupScene() { this.scene = new THREE.Scene(); this.scene.fog = new THREE.Fog(0x4FB3D9, 30, 100); }
+
+            setupLighting() {
+                this.scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+                const light = new THREE.DirectionalLight(0xfff6e0, 0.95);
+                light.position.set(50, 50, 25); light.castShadow = true;
+                light.shadow.mapSize.setScalar(2048);
+                Object.assign(light.shadow.camera, { near: 0.1, far: 200, left: -50, right: 50, top: 50, bottom: -50 });
+                this.scene.add(light);
+            }
+
+            setupClouds() {
+                const loader = new THREE.TextureLoader();
+                loader.load('https://i.imgur.com/mYRt74O.png', texture => {
+                    for (let i = 0; i < 6; i++) {
+                        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, opacity: 0.7, transparent: true }));
+                        sprite.position.set((Math.random() - 0.5) * this.gridSize * this.tileSize, 8 + Math.random() * 2, (Math.random() - 0.5) * this.gridSize * this.tileSize);
+                        sprite.scale.set(8 + Math.random() * 6, 4 + Math.random() * 2, 1);
+                        sprite.userData.speed = 0.01 * (0.5 + Math.random() * 0.2);
+                        this.scene.add(sprite); this.cloudSprites.push(sprite);
+                    }
+                });
+            }
+
+            setupTerrain() { this.terrain = new TerrainSystem(this.gridSize, this.tileSize, this.heightLevels); this.terrain.generateTerrain(); this.scene.add(this.terrain.terrainGroup); }
+
+            setupInput() {
+                ['keydown', 'keyup'].forEach(evt => addEventListener(evt, e => this.input.keys[e.code] = evt === 'keydown'));
+                ['mousedown', 'mousemove', 'mouseup'].forEach(evt => this.canvas.addEventListener(evt, e => this.handleMouse(evt, e)));
+                this.canvas.addEventListener('click', e => this.editMode && this.handleTileClick(e));
+                this.canvas.addEventListener('wheel', e => { e.preventDefault(); this.zoomCamera(e.deltaY > 0 ? 0.1 : -0.1); });
+                ['touchstart', 'touchmove', 'touchend'].forEach(evt => this.canvas.addEventListener(evt, e => { e.preventDefault(); this[`handleTouch${evt.slice(5)}`](e); }));
+                addEventListener('resize', () => this.handleResize());
+            }
+
+            setupUI() {
+                document.getElementById('debugToggle').onclick = () => this.togglePanel('debug');
+                document.getElementById('editToggle').onclick = () => this.togglePanel('edit');
+                document.getElementById('raiseBtn').onclick = () => this.modifySelected(1);
+                document.getElementById('lowerBtn').onclick = () => this.modifySelected(-1);
+                document.getElementById('clearBtn').onclick = () => confirm('Clear all terrain?') && this.clearTerrain();
+                document.getElementById('spriteDebugToggle').onclick = () => this.togglePanel('spriteDebug');
+
+            }
+
+            togglePanel(type) {
+                if (type === 'debug') {
+                    const panel = document.getElementById('debugPanel'), btn = document.getElementById('debugToggle');
+                    const isVisible = panel.classList.toggle('visible'); btn.classList.toggle('active', isVisible);
+                } else if (type === 'spriteDebug') {
+    const panel = document.getElementById('spriteDebugPanel');
+    const btn = document.getElementById('spriteDebugToggle');
+    const isVisible = panel.classList.toggle('visible');
+    btn.classList.toggle('active', isVisible);
+    
+    if (isVisible && !this.spriteDebugInitialized) {
+        this.setupSpriteDebug();
+        this.spriteDebugInitialized = true;
+    }
+} else {
+                    this.editMode = !this.editMode;
+                    const panel = document.getElementById('editPanel'), btn = document.getElementById('editToggle'), ind = document.getElementById('editIndicator');
+                    panel.classList.toggle('visible', this.editMode); btn.classList.toggle('active', this.editMode); ind.classList.toggle('visible', this.editMode);
+                    this.canvas.style.cursor = this.editMode ? 'crosshair' : 'grab';
+                    if (!this.editMode) this.clearSelection();
+                }
+            }
+
+            handleMouse(evt, e) {
+                const m = this.input.mouse;
+                if (evt === 'mousedown') { m.pressed = true; m.x = e.clientX; m.y = e.clientY; }
+                else if (evt === 'mousemove' && m.pressed && !this.editMode) this.panCamera(e.clientX - m.x, e.clientY - m.y);
+                else if (evt === 'mouseup') m.pressed = false;
+                if (evt !== 'mouseup') { m.x = e.clientX; m.y = e.clientY; }
+            }
+
+            handleTileClick(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                this.mouse.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+                this.raycaster.setFromCamera(this.mouse, this.camera);
+                const intersects = this.raycaster.intersectObjects(this.terrain.terrainGroup.children);
+                if (intersects.length) {
+                    const tile = intersects[0].object.userData;
+                    this.selectTile(tile.x, tile.z);
+                    if (e.shiftKey) this.modifyTileHeight(tile.x, tile.z, -1);
+                    else if (e.ctrlKey || e.metaKey) this.setTileHeight(tile.x, tile.z, 0);
+                    else this.modifyTileHeight(tile.x, tile.z, 1);
+                }
+            }
+
+            selectTile(x, z) {
+                const tile = this.terrain.getTile(x, z);
+                if (tile) { 
+                    this.selectedTile = { x, z, height: tile.height }; 
+                    this.updateEditUI(); this.highlightTile(tile.mesh); 
+                }
+            }
+
+            clearSelection() { this.selectedTile = null; this.updateEditUI(); this.removeHighlight(); }
+
+            highlightTile(mesh) {
+                this.removeHighlight();
+                const edges = new THREE.EdgesGeometry(mesh.geometry);
+                this.tileHighlight = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 3 }));
+                this.tileHighlight.position.copy(mesh.position); this.tileHighlight.position.y += 0.01; this.scene.add(this.tileHighlight);
+            }
+
+            removeHighlight() {
+                if (this.tileHighlight) { 
+                    this.scene.remove(this.tileHighlight); 
+                    this.tileHighlight.geometry.dispose(); 
+                    this.tileHighlight.material.dispose(); 
+                    this.tileHighlight = null; 
+                }
+            }
+
+            modifySelected(delta) { this.selectedTile && this.modifyTileHeight(this.selectedTile.x, this.selectedTile.z, delta); }
+
+            modifyTileHeight(x, z, delta) {
+                const tile = this.terrain.getTile(x, z);
+                if (tile) {
+                    const newHeight = Math.max(0, Math.min(this.heightLevels - 1, tile.height + delta));
+                    if (newHeight !== tile.height) {
+                        this.terrain.updateTileHeight(x, z, newHeight);
+                        if (this.selectedTile?.x === x && this.selectedTile?.z === z) { 
+                            this.selectedTile.height = newHeight; 
+                            this.updateEditUI(); 
+                            this.highlightTile(tile.mesh); 
+                        }
+                    }
+                }
+            }
+
+            setTileHeight(x, z, height) {
+                const tile = this.terrain.getTile(x, z);
+                if (tile && tile.height !== height) {
+                    this.terrain.updateTileHeight(x, z, height);
+                    if (this.selectedTile?.x === x && this.selectedTile?.z === z) { 
+                        this.selectedTile.height = height; 
+                        this.updateEditUI(); 
+                        this.highlightTile(tile.mesh); 
+                    }
+                }
+            }
+
+            clearTerrain() {
+                for (let x = 0; x < this.gridSize; x++) 
+                    for (let z = 0; z < this.gridSize; z++) 
+                        this.terrain.updateTileHeight(x, z, 2);
+                this.clearSelection();
+            }
+
+            updateEditUI() {
+                const elems = ['selectedTile', 'selectedHeight', 'raiseBtn', 'lowerBtn'].map(id => document.getElementById(id));
+                if (this.selectedTile) {
+                    elems[0].textContent = `${this.selectedTile.x},${this.selectedTile.z}`; 
+                    elems[1].textContent = this.selectedTile.height;
+                    elems[2].disabled = !this.editMode || this.selectedTile.height >= this.heightLevels - 1;
+                    elems[3].disabled = !this.editMode || this.selectedTile.height <= 0;
+                } else {
+                    elems[0].textContent = 'None'; elems[1].textContent = '-';
+                    elems.slice(2).forEach(btn => btn.disabled = true);
+                }
+            }
+
+            handleTouchStart(e) {
+                const touches = e.touches;
+                if (touches.length === 1) {
+                    Object.assign(this.input.touch, { active: true, moved: false, start: { x: touches[0].clientX, y: touches[0].clientY } });
+                } else if (touches.length === 2) {
+                    this.input.touch.pinchDistance = Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+                    this.input.touch.moved = false;
+                }
+            }
+
+            handleTouchMove(e) {
+                const touches = e.touches;
+                if (touches.length === 1 && this.input.touch.active) {
+                    const delta = { x: touches[0].clientX - this.input.touch.start.x, y: touches[0].clientY - this.input.touch.start.y };
+                    if (Math.hypot(delta.x, delta.y) > 5) {
+                        this.input.touch.moved = true;
+                        if (!this.editMode) this.panCamera(delta.x, delta.y);
+                    }
+                } else if (touches.length === 2) {
+                    const currentDist = Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+                    this.zoomCamera((this.input.touch.pinchDistance - currentDist) * 0.01);
+                    this.input.touch.pinchDistance = currentDist; this.input.touch.moved = true;
+                }
+            }
+
+            handleTouchEnd(e) {
+                if (this.input.touch.active && !this.input.touch.moved && e.changedTouches.length === 1 && this.editMode) {
+                    const touch = e.changedTouches[0];
+                    this.handleTileClick({ clientX: touch.clientX, clientY: touch.clientY, shiftKey: false, ctrlKey: false, metaKey: false });
+                }
+                Object.assign(this.input.touch, { active: false, start: null, moved: false });
+            }
+
+            panCamera(deltaX, deltaY) {
+                const speed = 0.02 * this.zoomLevel;
+                const moveX = new THREE.Vector3(1, 0, -1).normalize(), moveY = new THREE.Vector3(1, 0, 1).normalize();
+                this.cameraTarget.add(moveX.clone().multiplyScalar(-deltaX * speed));
+                this.cameraTarget.add(moveY.clone().multiplyScalar(deltaY * speed));
+                const maxBounds = this.gridSize * this.tileSize / 2;
+                this.cameraTarget.x = Math.max(-maxBounds, Math.min(maxBounds, this.cameraTarget.x));
+                this.cameraTarget.z = Math.max(-maxBounds, Math.min(maxBounds, this.cameraTarget.z));
+            }
+
+            zoomCamera(delta) {
+                this.zoomLevel = Math.max(0.3, Math.min(3, this.zoomLevel + delta));
+                const aspect = innerWidth / innerHeight, frustumSize = 20 * this.zoomLevel;
+                Object.assign(this.camera, { left: frustumSize * aspect / -2, right: frustumSize * aspect / 2, top: frustumSize / 2, bottom: frustumSize / -2 });
+                this.camera.updateProjectionMatrix();
+            }
+
+            updateCameraPosition() { this.camera.position.copy(this.cameraTarget.clone().add(this.cameraOffset)); this.camera.lookAt(this.cameraTarget); }
+
+            handleKeyboardInput() {
+                const speed = 0.3, keys = this.input.keys, direction = new THREE.Vector3();
+                if (keys['KeyW'] || keys['ArrowUp']) direction.add(new THREE.Vector3(-1, 0, -1));
+                if (keys['KeyS'] || keys['ArrowDown']) direction.add(new THREE.Vector3(1, 0, 1));
+                if (keys['KeyA'] || keys['ArrowLeft']) direction.add(new THREE.Vector3(-1, 0, 1));
+                if (keys['KeyD'] || keys['ArrowRight']) direction.add(new THREE.Vector3(1, 0, -1));
+                if (direction.lengthSq() > 0) {
+                    direction.normalize().multiplyScalar(speed);
+                    this.cameraTarget.add(direction);
+                }
+                if (keys['KeyQ']) this.zoomCamera(0.02); if (keys['KeyE']) this.zoomCamera(-0.02);
+                const maxBounds = this.gridSize * this.tileSize / 2;
+                this.cameraTarget.clamp(new THREE.Vector3(-maxBounds, 0, -maxBounds), new THREE.Vector3(maxBounds, 0, maxBounds));
+                if (this.input.keys['KeyE'] && !this.input.keys._ePressed) {
+                    this.input.keys._ePressed = true;
+                    this.handleInteraction();
+                } else if (!this.input.keys['KeyE']) {
+                    this.input.keys._ePressed = false;
+                }
+            }
+
+            handleResize() {
+                const aspect = innerWidth / innerHeight, frustumSize = 20 * this.zoomLevel;
+                Object.assign(this.camera, { left: frustumSize * aspect / -2, right: frustumSize * aspect / 2, top: frustumSize / 2, bottom: frustumSize / -2 });
+                this.camera.updateProjectionMatrix(); this.renderer.setSize(innerWidth, innerHeight); this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+            }
+
+            start() { this.animate(); }
+
+            animate() { 
+                requestAnimationFrame(() => this.animate()); 
+                this.update(); this.render(); this.updatePerformanceStats(); 
+            }
+
+            update() {
+                this.handleKeyboardInput(); this.updateCameraPosition();
+                this.checkProximityInteractions();
+                if (this.showCollision) {
+    this.updateCollisionVisualization();
+}
+                this.cloudSprites.forEach(c => {
+                    c.position.x += c.userData.speed;
+                    if (c.position.x > this.gridSize * this.tileSize) c.position.x = -this.gridSize * this.tileSize;
+                });
+                if (this.selectedTile && this.tileHighlight) {
+                    const tile = this.terrain.getTile(this.selectedTile.x, this.selectedTile.z);
+                    if (tile) { this.tileHighlight.position.copy(tile.mesh.position); this.tileHighlight.position.y += 0.01; }
+                }
+                if (this.player) this.player.update();
+            }
+
+            render() { this.renderer.render(this.scene, this.camera); }
+
+            updatePerformanceStats() {
+                this.frameCount++;
+                const now = performance.now();
+                if (now - this.lastFpsUpdate >= 1000) {
+                    const fps = Math.round((this.frameCount * 1000) / (now - this.lastFpsUpdate));
+                    this.frameCount = 0; this.lastFpsUpdate = now; document.getElementById('fps').textContent = fps;
+                }
+            }
+
+            updateDebugInfo() {
+                const update = () => {
+                    const pos = this.cameraTarget;
+                    document.getElementById('cameraPos').textContent = `${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)}`;
+                    document.getElementById('zoomLevel').textContent = this.zoomLevel.toFixed(1);
+                    requestAnimationFrame(update);
+                };
+                update();
+            }
+
+            // Add new methods to GameEngine class
+setupInteractables() {
+    // Create some interactive objects
+    const interactableData = [
+        { x: 3, z: 3, type: 'chest', message: 'Ancient Chest', interact: 'Press E to open' },
+        { x: 12, z: 5, type: 'tree', message: 'Old Oak Tree', interact: 'Press E to examine' },
+        { x: 7, z: 11, type: 'crystal', message: 'Magic Crystal', interact: 'Press E to collect' },
+        { x: 14, z: 14, type: 'shrine', message: 'Mysterious Shrine', interact: 'Press E to pray' }
+    ];
+
+    interactableData.forEach(data => {
+        const tile = this.terrain.getTile(data.x, data.z);
+        if (!tile) return;
+
+        const obj = this.createInteractableObject(data.type, data.x, data.z);
+        if (obj) {
+            this.scene.add(obj);
+            this.interactables.push({
+                mesh: obj,
+                x: data.x,
+                z: data.z,
+                type: data.type,
+                message: data.message,
+                interact: data.interact,
+                inRange: false
+            });
+        }
+    });
+}
+
+createInteractableObject(type, x, z) {
+    const tile = this.terrain.getTile(x, z);
+    if (!tile) return null;
+
+    let geometry, material, obj;
+    const height = 0.5 + tile.height * 0.5;
+
+    switch (type) {
+        case 'chest':
+            geometry = new THREE.BoxGeometry(0.8, 0.6, 0.6);
+            material = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+            obj = new THREE.Mesh(geometry, material);
+            obj.position.set(tile.mesh.position.x, height + 0.3, tile.mesh.position.z);
+            break;
+
+        case 'tree':
+            const trunk = new THREE.CylinderGeometry(0.15, 0.2, 1.5, 8);
+            const leaves = new THREE.SphereGeometry(0.8, 8, 6);
+            obj = new THREE.Group();
+            
+            const trunkMesh = new THREE.Mesh(trunk, new THREE.MeshLambertMaterial({ color: 0x8B4513 }));
+            const leavesMesh = new THREE.Mesh(leaves, new THREE.MeshLambertMaterial({ color: 0x228B22 }));
+            
+            trunkMesh.position.y = 0.75;
+            leavesMesh.position.y = 1.3;
+            
+            obj.add(trunkMesh, leavesMesh);
+            obj.position.set(tile.mesh.position.x, height, tile.mesh.position.z);
+            break;
+
+        case 'crystal':
+            geometry = new THREE.OctahedronGeometry(0.4, 0);
+            material = new THREE.MeshLambertMaterial({ 
+                color: 0x00FFFF, 
+                transparent: true, 
+                opacity: 0.8,
+                emissive: 0x004444
+            });
+            obj = new THREE.Mesh(geometry, material);
+            obj.position.set(tile.mesh.position.x, height + 0.4, tile.mesh.position.z);
+            break;
+
+        case 'shrine':
+            const base = new THREE.CylinderGeometry(0.6, 0.8, 0.3, 8);
+            const pillar = new THREE.CylinderGeometry(0.15, 0.15, 1.2, 8);
+            const top = new THREE.SphereGeometry(0.25, 8, 6);
+            
+            obj = new THREE.Group();
+            const baseMesh = new THREE.Mesh(base, new THREE.MeshLambertMaterial({ color: 0x708090 }));
+            const pillarMesh = new THREE.Mesh(pillar, new THREE.MeshLambertMaterial({ color: 0x708090 }));
+            const topMesh = new THREE.Mesh(top, new THREE.MeshLambertMaterial({ 
+                color: 0xFFD700, 
+                emissive: 0x332200 
+            }));
+            
+            baseMesh.position.y = 0.15;
+            pillarMesh.position.y = 0.9;
+            topMesh.position.y = 1.65;
+            
+            obj.add(baseMesh, pillarMesh, topMesh);
+            obj.position.set(tile.mesh.position.x, height, tile.mesh.position.z);
+            break;
+
+        default:
+            return null;
+    }
+
+    if (obj) {
+        obj.castShadow = obj.receiveShadow = true;
+        if (obj.children) {
+            obj.children.forEach(child => {
+                child.castShadow = child.receiveShadow = true;
+            });
+        }
+    }
+
+    return obj;
+}
+
+checkProximityInteractions() {
+    if (!this.player || !this.player.sprite) return;
+
+    let closestInteractable = null;
+    let minDistance = Infinity;
+
+    this.interactables.forEach(interactable => {
+        const distance = Math.sqrt(
+            Math.pow(this.player.pos.x - interactable.x, 2) + 
+            Math.pow(this.player.pos.z - interactable.z, 2)
+        );
+
+        const wasInRange = interactable.inRange;
+        interactable.inRange = distance <= this.proximityRadius;
+
+        // Add subtle glow effect for nearby objects
+        if (interactable.inRange && !wasInRange) {
+            this.addGlowEffect(interactable.mesh);
+        } else if (!interactable.inRange && wasInRange) {
+            this.removeGlowEffect(interactable.mesh);
+        }
+
+        if (interactable.inRange && distance < minDistance) {
+            minDistance = distance;
+            closestInteractable = interactable;
+        }
+    });
+
+    this.updateTooltip(closestInteractable);
+}
+
+addGlowEffect(mesh) {
+    if (mesh.userData.glowAdded) return;
+    
+    const originalEmissive = mesh.material.emissive ? mesh.material.emissive.clone() : new THREE.Color(0x000000);
+    mesh.userData.originalEmissive = originalEmissive;
+    mesh.userData.glowAdded = true;
+    
+    // Animate glow
+    const animate = () => {
+        if (!mesh.userData.glowAdded) return;
+        
+        const intensity = (Math.sin(Date.now() * 0.003) + 1) * 0.1;
+        if (mesh.material.emissive) {
+            mesh.material.emissive.setRGB(
+                originalEmissive.r + intensity,
+                originalEmissive.g + intensity,
+                originalEmissive.b + intensity
+            );
+        }
+        requestAnimationFrame(animate);
+    };
+    animate();
+}
+
+removeGlowEffect(mesh) {
+    if (!mesh.userData.glowAdded) return;
+    
+    mesh.userData.glowAdded = false;
+    if (mesh.material.emissive && mesh.userData.originalEmissive) {
+        mesh.material.emissive.copy(mesh.userData.originalEmissive);
+    }
+}
+
+updateTooltip(interactable) {
+    const container = document.getElementById('tooltipContainer');
+    
+    if (!interactable) {
+        this.hideTooltip();
+        return;
+    }
+
+    if (this.activeTooltip !== interactable) {
+        this.activeTooltip = interactable;
+        
+        const canInteract = this.getDistanceToInteractable(interactable) <= 1.5;
+        
+        container.innerHTML = `
+            <div class="tooltip ${canInteract ? 'interact' : ''} visible">
+                ${interactable.message}
+                ${canInteract ? `<div class="interact-prompt">${interactable.interact}</div>` : ''}
+            </div>
+        `;
+
+        // Position tooltip above the object
+        this.positionTooltip(interactable);
+    }
+}
+
+positionTooltip(interactable) {
+    const container = document.getElementById('tooltipContainer');
+    const worldPos = new THREE.Vector3(
+        interactable.mesh.position.x,
+        interactable.mesh.position.y + 1.5,
+        interactable.mesh.position.z
+    );
+    
+    const screenPos = worldPos.project(this.camera);
+    const x = (screenPos.x + 1) / 2 * window.innerWidth;
+    const y = -(screenPos.y - 1) / 2 * window.innerHeight;
+    
+    container.style.left = `${x}px`;
+    container.style.top = `${y}px`;
+    container.style.transform = 'translate(-50%, -100%)';
+}
+
+hideTooltip() {
+    if (!this.activeTooltip) return;
+    
+    this.activeTooltip = null;
+    const container = document.getElementById('tooltipContainer');
+    container.innerHTML = '';
+}
+
+getDistanceToInteractable(interactable) {
+    if (!this.player) return Infinity;
+    return Math.sqrt(
+        Math.pow(this.player.pos.x - interactable.x, 2) + 
+        Math.pow(this.player.pos.z - interactable.z, 2)
+    );
+}
+
+handleInteraction() {
+    if (!this.activeTooltip) return;
+    
+    const distance = this.getDistanceToInteractable(this.activeTooltip);
+    if (distance > 1.5) return;
+    
+    const obj = this.activeTooltip;
+    let message = '';
+    
+    switch (obj.type) {
+        case 'chest':
+            message = 'You found 50 gold coins!';
+            break;
+        case 'tree':
+            message = 'The ancient tree whispers secrets of the forest...';
+            break;
+        case 'crystal':
+            message = 'The crystal glows brightly and fills you with energy!';
+            // Remove crystal after interaction
+            this.scene.remove(obj.mesh);
+            this.interactables = this.interactables.filter(i => i !== obj);
+            this.hideTooltip();
+            break;
+        case 'shrine':
+            message = 'You feel blessed by an ancient power...';
+            break;
+    }
+    
+    if (message) {
+        this.showInteractionMessage(message);
+    }
+}
+
+showInteractionMessage(message) {
+    // Create temporary message overlay
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+        position: absolute;
+        top: 20%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.9);
+        color: white;
+        padding: 16px 24px;
+        border-radius: 8px;
+        font-size: 14px;
+        z-index: 200;
+        animation: fadeInOut 3s ease forwards;
+    `;
+    overlay.textContent = message;
+    
+    // Add CSS animation
+    if (!document.getElementById('interactionStyles')) {
+        const style = document.createElement('style');
+        style.id = 'interactionStyles';
+        style.textContent = `
+            @keyframes fadeInOut {
+                0% { opacity: 0; transform: translate(-50%, -50%) translateY(20px); }
+                20%, 80% { opacity: 1; transform: translate(-50%, -50%) translateY(0); }
+                100% { opacity: 0; transform: translate(-50%, -50%) translateY(-20px); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    document.body.appendChild(overlay);
+    setTimeout(() => overlay.remove(), 3000);
+}
+
+setupSpriteDebug() {
+    this.debugTarget = null;
+    this.showCollision = false;
+    this.originalSpriteParams = {};
+    
+    // Position sliders
+    ['X', 'Y', 'Z'].forEach(axis => {
+        const slider = document.getElementById(`pos${axis}`);
+        const valueSpan = document.getElementById(`pos${axis}Val`);
+        slider.oninput = () => {
+            valueSpan.textContent = parseFloat(slider.value).toFixed(1);
+            this.updateSpritePosition();
+        };
+    });
+    
+    // Scale sliders
+    ['W', 'H', 'D'].forEach(axis => {
+        const slider = document.getElementById(`scale${axis}`);
+        const valueSpan = document.getElementById(`scale${axis}Val`);
+        slider.oninput = () => {
+            valueSpan.textContent = parseFloat(slider.value).toFixed(1);
+            this.updateSpriteScale();
+        };
+    });
+    
+    // Debug buttons
+    document.getElementById('updateParams').onclick = () => this.updateParameterOutput();
+    document.getElementById('copyParams').onclick = () => this.copyParametersToClipboard();
+    document.getElementById('resetSprite').onclick = () => this.resetSpriteToOriginal();
+    document.getElementById('toggleCollision').onclick = () => this.toggleCollisionVisualization();
+    
+    // Generate frame buttons (assuming 4x4 grid of frames)
+    this.setupFrameGrid();
+    
+    // Auto-select player sprite if available
+    setTimeout(() => {
+        if (this.player && this.player.sprite) {
+            this.setDebugTarget(this.player.sprite, 'Player');
+        }
+    }, 1000);
+}
+
+setupFrameGrid() {
+    const grid = document.getElementById('frameGrid');
+    grid.innerHTML = '';
+    
+    for (let i = 0; i < 16; i++) {
+        const btn = document.createElement('button');
+        btn.className = 'frame-btn';
+        btn.textContent = i.toString();
+        btn.onclick = () => this.selectFrame(i);
+        grid.appendChild(btn);
+    }
+}
+
+setDebugTarget(sprite, name = 'Sprite') {
+    this.debugTarget = { sprite, name };
+    document.getElementById('debugTarget').textContent = name;
+    
+    // Store original parameters
+    this.originalSpriteParams = {
+        position: sprite.position.clone(),
+        scale: sprite.scale.clone()
+    };
+    
+    // Update sliders to current values
+    this.syncSlidersToSprite();
+    this.updateParameterOutput();
+}
+
+syncSlidersToSprite() {
+    if (!this.debugTarget) return;
+    
+    const sprite = this.debugTarget.sprite;
+    
+    // Position
+    document.getElementById('posX').value = sprite.position.x.toFixed(1);
+    document.getElementById('posXVal').textContent = sprite.position.x.toFixed(1);
+    document.getElementById('posY').value = sprite.position.y.toFixed(1);
+    document.getElementById('posYVal').textContent = sprite.position.y.toFixed(1);
+    document.getElementById('posZ').value = sprite.position.z.toFixed(1);
+    document.getElementById('posZVal').textContent = sprite.position.z.toFixed(1);
+    
+    // Scale
+    document.getElementById('scaleW').value = sprite.scale.x.toFixed(1);
+    document.getElementById('scaleWVal').textContent = sprite.scale.x.toFixed(1);
+    document.getElementById('scaleH').value = sprite.scale.y.toFixed(1);
+    document.getElementById('scaleHVal').textContent = sprite.scale.y.toFixed(1);
+    document.getElementById('scaleD').value = sprite.scale.z.toFixed(1);
+    document.getElementById('scaleDVal').textContent = sprite.scale.z.toFixed(1);
+}
+
+updateSpritePosition() {
+    if (!this.debugTarget) return;
+    
+    const sprite = this.debugTarget.sprite;
+    sprite.position.set(
+        parseFloat(document.getElementById('posX').value),
+        parseFloat(document.getElementById('posY').value),
+        parseFloat(document.getElementById('posZ').value)
+    );
+    
+    this.updateCollisionVisualization();
+}
+
+updateSpriteScale() {
+    if (!this.debugTarget) return;
+    
+    const sprite = this.debugTarget.sprite;
+    sprite.scale.set(
+        parseFloat(document.getElementById('scaleW').value),
+        parseFloat(document.getElementById('scaleH').value),
+        parseFloat(document.getElementById('scaleD').value)
+    );
+    
+    this.updateCollisionVisualization();
+}
+
+selectFrame(frameIndex) {
+    // Remove active class from all buttons
+    document.querySelectorAll('.frame-btn').forEach(btn => btn.classList.remove('active'));
+    
+    // Add active class to selected button
+    document.querySelectorAll('.frame-btn')[frameIndex].classList.add('active');
+    
+    if (this.debugTarget && this.debugTarget.sprite.material.map) {
+        // Assuming 64x64 frames in a 256x256 texture (4x4 grid)
+        const framesPerRow = 4;
+        const frameSize = 64;
+        const textureSize = 256;
+        
+        const row = Math.floor(frameIndex / framesPerRow);
+        const col = frameIndex % framesPerRow;
+        
+        const x = col * frameSize;
+        const y = row * frameSize;
+        
+        if (this.player && this.player.setFrameUV) {
+            this.player.setFrameUV(x, y, frameSize, frameSize, textureSize, textureSize);
+        }
+    }
+    
+    this.updateParameterOutput();
+}
+
+updateParameterOutput() {
+    if (!this.debugTarget) {
+        document.getElementById('paramOutput').textContent = 'No sprite selected';
+        return;
+    }
+    
+    const sprite = this.debugTarget.sprite;
+    const activeFrame = document.querySelector('.frame-btn.active')?.textContent || '0';
+    
+    const params = {
+        name: this.debugTarget.name,
+        position: {
+            x: sprite.position.x.toFixed(2),
+            y: sprite.position.y.toFixed(2),
+            z: sprite.position.z.toFixed(2)
+        },
+        scale: {
+            x: sprite.scale.x.toFixed(2),
+            y: sprite.scale.y.toFixed(2),
+            z: sprite.scale.z.toFixed(2)
+        },
+        frame: activeFrame,
+        timestamp: new Date().toLocaleTimeString()
+    };
+    
+    document.getElementById('paramOutput').textContent = JSON.stringify(params, null, 2);
+}
+
+copyParametersToClipboard() {
+    const output = document.getElementById('paramOutput').textContent;
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(output);
+        this.showInteractionMessage('Parameters copied to clipboard!');
+    } else {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = output;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        this.showInteractionMessage('Parameters copied to clipboard!');
+    }
+}
+
+resetSpriteToOriginal() {
+    if (!this.debugTarget || !this.originalSpriteParams) return;
+    
+    const sprite = this.debugTarget.sprite;
+    sprite.position.copy(this.originalSpriteParams.position);
+    sprite.scale.copy(this.originalSpriteParams.scale);
+    
+    this.syncSlidersToSprite();
+    this.updateParameterOutput();
+    this.updateCollisionVisualization();
+    this.showInteractionMessage('Sprite reset to original parameters');
+}
+
+toggleCollisionVisualization() {
+    this.showCollision = !this.showCollision;
+    const btn = document.getElementById('toggleCollision');
+    btn.classList.toggle('active', this.showCollision);
+    btn.textContent = this.showCollision ? 'Hide Collision' : 'Show Collision';
+    
+    if (this.showCollision) {
+        this.createCollisionVisualization();
+    } else {
+        this.removeCollisionVisualization();
+    }
+}
+
+createCollisionVisualization() {
+    this.removeCollisionVisualization();
+    
+    if (!this.debugTarget) return;
+    
+    this.collisionViz = document.createElement('div');
+    this.collisionViz.className = 'collision-viz';
+    document.body.appendChild(this.collisionViz);
+    
+    this.updateCollisionVisualization();
+}
+
+updateCollisionVisualization() {
+    if (!this.showCollision || !this.collisionViz || !this.debugTarget) return;
+    
+    const sprite = this.debugTarget.sprite;
+    const worldPos = sprite.position.clone();
+    const screenPos = worldPos.project(this.camera);
+    
+    const x = (screenPos.x + 1) / 2 * window.innerWidth;
+    const y = -(screenPos.y - 1) / 2 * window.innerHeight;
+    
+    // Approximate collision box size (adjust as needed)
+    const size = Math.max(30, 50 / this.zoomLevel) * sprite.scale.x;
+    
+    this.collisionViz.style.left = `${x - size/2}px`;
+    this.collisionViz.style.top = `${y - size}px`;
+    this.collisionViz.style.width = `${size}px`;
+    this.collisionViz.style.height = `${size}px`;
+}
+
+removeCollisionVisualization() {
+    if (this.collisionViz) {
+        this.collisionViz.remove();
+        this.collisionViz = null;
+    }
+}
+        }
+
+        class Player {
+            constructor(game) {
+                this.game = game; this.speed = 0.05; this.path = []; this.progress = 0;
+                this._vA = new THREE.Vector3(); this._vB = new THREE.Vector3();
+                this.pos = { x: 8, z: 8 };
+                
+                if (USE_SPRITE_PLAYER) {
+                    const loader = new THREE.TextureLoader();
+                    loader.load('https://i.imgur.com/9QK0Xou.png', texture => {
+                        texture.magFilter = texture.minFilter = THREE.NearestFilter;
+                        this.sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true }));
+                        this.sprite.scale.setScalar(1);
+                        this.setFrameUV(0, 0, 64, 64, 64, 64);
+                        this.game.scene.add(this.sprite);
+                        this.setPosition(this.pos.x, this.pos.z);
+                    });
+                } else {
+                    const geometry = new THREE.CylinderGeometry(0.3, 0.3, 1, 8);
+                    const material = new THREE.MeshLambertMaterial({ color: 0xff6b6b });
+                    this.sprite = new THREE.Mesh(geometry, material);
+                    this.sprite.castShadow = true;
+                    this.game.scene.add(this.sprite);
+                    this.setPosition(this.pos.x, this.pos.z);
+                }
+                this.initInput();
+            }
+
+            setFrameUV(x, y, w, h, texW, texH) {
+                if (this.sprite.material.map) {
+                    this.sprite.material.map.offset.set(x / texW, 1 - (y + h) / texH);
+                    this.sprite.material.map.repeat.set(w / texW, h / texH);
+                }
+            }
+
+            setPosition(x, z) {
+                const tile = this.game.terrain.getTile(x, z);
+                if (!tile || !this.sprite) return;
+                const height = 0.5 + tile.height * 0.5;
+                this.sprite.position.set(tile.mesh.position.x, height, tile.mesh.position.z);
+                this.pos = { x, z };
+            }
+
+            initInput() {
+                this.game.canvas.addEventListener('click', e => {
+                    if (this.game.editMode) return;
+                    const rect = this.game.canvas.getBoundingClientRect();
+                    this.game.mouse.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+                    this.game.raycaster.setFromCamera(this.game.mouse, this.game.camera);
+                    const hits = this.game.raycaster.intersectObjects(this.game.terrain.terrainGroup.children);
+                    if (hits.length) {
+                        const { x, z } = hits[0].object.userData;
+                        this.findPath(this.pos, { x, z }, path => { this.path = path; this.progress = 0; });
+                    }
+                });
+            }
+
+            update() {
+                if (!this.path.length || !this.sprite) return;
+                const next = this.path[0];
+                const currentTile = this.game.terrain.getTile(this.pos.x, this.pos.z);
+                const nextTile = this.game.terrain.getTile(next.x, next.z);
+                if (!nextTile || !currentTile) { this.path = []; return; }
+
+                if (this.progress === 0) {
+                    const a = currentTile.mesh.position, b = nextTile.mesh.position;
+                    this._vA.set(a.x, 0.5 + currentTile.height * 0.5, a.z);
+                    this._vB.set(b.x, 0.5 + nextTile.height * 0.5, b.z);
+                }
+
+                this.progress += this.speed;
+                if (this.progress >= 1) {
+                    this.setPosition(next.x, next.z); this.path.shift(); this.progress = 0;
+                } else {
+                    this.sprite.position.lerpVectors(this._vA, this._vB, this.progress);
+                    this.sprite.position.y += Math.sin(this.progress * Math.PI) * 0.5;
+                }
+            }
+
+            findPath(start, end, callback) {
+                setTimeout(() => {
+                    const grid = this.game.terrain.tiles.map(row => row.map(t => t.height < this.game.heightLevels));
+                    const open = [start], cameFrom = {}, g = { [`${start.x},${start.z}`]: 0 };
+                    const h = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.z - b.z);
+                    while (open.length) {
+                        open.sort((a, b) => (g[`${a.x},${a.z}`] + h(a, end)) - (g[`${b.x},${b.z}`] + h(b, end)));
+                        const current = open.shift();
+                        if (current.x === end.x && current.z === end.z) break;
+                        for (let d of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]) {
+                            const nx = current.x + d[0], nz = current.z + d[1], key = `${nx},${nz}`;
+                            if (!grid[nx]?.[nz]) continue;
+                            const cost = g[`${current.x},${current.z}`] + 1;
+                            if (!(key in g) || cost < g[key]) {
+                                g[key] = cost; cameFrom[key] = current; open.push({ x: nx, z: nz });
+                            }
+                        }
+                    }
+                    const path = []; let curr = end, key = `${curr.x},${curr.z}`;
+                    while (cameFrom[key]) { path.unshift(curr); curr = cameFrom[key]; key = `${curr.x},${curr.z}`; }
+                    callback(path);
+                }, 0);
+            }
+        }
+
+        class TerrainSystem {
+            constructor(gridSize, tileSize, heightLevels) {
+                this.gridSize = gridSize; this.tileSize = tileSize; this.heightLevels = heightLevels;
+                this.terrainGroup = new THREE.Group(); this.tiles = [];
+                this.levelColors = [0x277da1, 0x4fc3f7, 0x43aa8b, 0x90be6d, 0xf9c74f, 0xf9844a, 0xf3722c, 0x577590];
+            }
+
+            generateTerrain() {
+                for (let x = 0; x < this.gridSize; x++) {
+                    this.tiles[x] = [];
+                    for (let z = 0; z < this.gridSize; z++) {
+                        const height = this.generateHeightForPosition(x, z);
+                        const tile = this.createTile(x, z, height);
+                        tile.castShadow = tile.receiveShadow = true;
+                        this.tiles[x][z] = { height, mesh: tile };
+                        this.terrainGroup.add(tile);
+                    }
+                }
+            }
+
+            generateHeightForPosition(x, z) {
+                const centerX = this.gridSize / 2, centerZ = this.gridSize / 2;
+                const distanceFromCenter = Math.sqrt((x - centerX) ** 2 + (z - centerZ) ** 2);
+                const maxDistance = Math.sqrt(centerX ** 2 + centerZ ** 2);
+                const normalizedDistance = distanceFromCenter / maxDistance;
+                
+                let height = Math.floor((1 - normalizedDistance) * this.heightLevels);
+                height += Math.floor((Math.random() - 0.5) * 3);
+                return Math.max(0, Math.min(this.heightLevels - 1, height));
+            }
+
+            createTile(x, z, height) {
+                const geometry = new THREE.BoxGeometry(this.tileSize, height * 0.5 + 0.1, this.tileSize);
+                const material = new THREE.MeshLambertMaterial({ color: this.levelColors[height] });
+                const mesh = new THREE.Mesh(geometry, material);
+                
+                const worldX = (x - this.gridSize / 2) * this.tileSize;
+                const worldZ = (z - this.gridSize / 2) * this.tileSize;
+                mesh.position.set(worldX, (height * 0.5 + 0.1) / 2, worldZ);
+                mesh.userData = { x, z, height };
+                return mesh;
+            }
+
+            getTile(x, z) {
+                return this.tiles[x]?.[z];
+            }
+
+            updateTileHeight(x, z, newHeight) {
+                const tile = this.getTile(x, z);
+                if (!tile) return;
+
+                this.terrainGroup.remove(tile.mesh);
+                tile.mesh.geometry.dispose();
+                tile.mesh.material.dispose();
+
+                const newMesh = this.createTile(x, z, newHeight);
+                newMesh.castShadow = newMesh.receiveShadow = true;
+                tile.height = newHeight;
+                tile.mesh = newMesh;
+                this.terrainGroup.add(newMesh);
+            }
+        }
+
+        // Initialize the game
+        new GameEngine();
+    </script>
+</body>
+</html>

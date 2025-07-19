@@ -447,27 +447,35 @@ class Player {
     }
 
     update() {
-        if (!this.path.length) return;
-        const next = this.path[0];
-        const currentTile = this.game.terrain.getTile(this.pos.x, this.pos.z);
-        const nextTile = this.game.terrain.getTile(next.x, next.z);
-        if (!nextTile) { this.path = []; return; }
+    if (!this.path.length) return;
 
-         const currentMeshPos = currentTile.mesh.position;
-    const nextMeshPos    = nextTile.mesh.position;
+    const next = this.path[0];
+    const currentTile = this.game.terrain.getTile(this.pos.x, this.pos.z);
+    const nextTile = this.game.terrain.getTile(next.x, next.z);
+    if (!nextTile || !currentTile) { this.path = []; return; }
 
+    if (this.progress === 0) {
+        const a = currentTile.mesh.position;
+        const b = nextTile.mesh.position;
+        const yA = 0.5 + currentTile.height * 0.5;
+        const yB = 0.5 + nextTile.height * 0.5;
 
-        this.progress += this.speed;
-        if (this.progress >= 1) {
-            this.progress = 0;
-            this.setPosition(next.x, next.z);
-            this.path.shift();
-        } else {
-               this.model.position.lerpVectors(this._vA, this._vB, this.progress);
-            //this.model.position.lerpVectors(a.clone().addY(0.51), b.clone().addY(0.51), this.progress);
-            //this.model.position.y += Math.sin(this.progress * Math.PI) * 0.1; // bobbing animation
-        }
+        this._vA.set(a.x, yA, a.z);
+        this._vB.set(b.x, yB, b.z);
     }
+
+    this.progress += this.speed;
+
+    if (this.progress >= 1) {
+        this.setPosition(next.x, next.z);
+        this.path.shift();
+        this.progress = 0;
+    } else {
+        this.model.position.lerpVectors(this._vA, this._vB, this.progress);
+        this.model.position.y += Math.sin(this.progress * Math.PI) * 0.5;  // bobbing animation
+    }
+}
+
 
     findPath(start, end, callback) {
     setTimeout(() => {

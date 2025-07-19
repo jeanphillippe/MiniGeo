@@ -215,6 +215,7 @@
                 this.setupLighting();
                 this.setupClouds();
                 this.setupTerrain();
+                this.player = new Player(this.scene, this.terrain, Math.floor(this.gridSize/2), Math.floor(this.gridSize/2), this.tileSize);
                 this.setupInput();
                 this.setupEditMode();
                 this.start();
@@ -354,7 +355,19 @@ directionalLight.castShadow = true;
                 this.canvas.addEventListener('click', (e) => {
                     if (this.editMode) {
                         this.handleTileClick(e);
-                    }
+                    }else {
+    // Pick tile as in edit mode
+    const rect = this.canvas.getBoundingClientRect();
+    this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    const intersects = this.raycaster.intersectObjects(this.terrain.terrainGroup.children);
+    if (intersects.length > 0) {
+        const tile = intersects[0].object.userData;
+        const path = findPath(this.terrain, this.player.x, this.player.z, tile.x, tile.z);
+        this.player.moveTo(path);
+    }
+}
                 });
                 
                 document.addEventListener('mouseup', () => {
@@ -898,7 +911,7 @@ directionalLight.castShadow = true;
                         }
                     }
                 }
-                
+
                 // Update tile highlight position if selected
                 if (this.selectedTile && this.tileHighlight) {
                     const tile = this.terrain.getTile(this.selectedTile.x, this.selectedTile.z);
@@ -1089,6 +1102,94 @@ tile.receiveShadow = true;
             }
         }
         
+
+        class Player {
+    constructor(scene, terrain, x, z, tileSize) {
+        this.terrain = terrain;
+        this.tileSize = tileSize;
+        this.x = x;
+        this.z = z;
+        // Simple geometry (yellow sphere)
+        this.mesh = new THREE.Mesh(
+            new THREE.SphereGeometry(tileSize * 0.4, 16, 16),
+            new THREE.MeshStandardMaterial({ color: 0xffe066 })
+        );
+        this.mesh.castShadow = true;
+        scene.add(this.mesh);
+        this.setPos(x, z);
+        this.path = [];
+        this.moveSpeed = 4; // tiles per second
+        this.targetVec = this.mesh.position.clone();
+    }
+    setPos(x, z) {
+        this.x = x; this.z = z;
+        const t = this.terrain.getTile(x, z);
+        this.mesh.position.set(
+            (x - 0.5 * (this.terrain.gridSize - 1)) * this.tileSize,
+            (t.height + 0.5) * 0.5, // Adjust Y if needed
+            (z - 0.5 * (this.terrain.gridSize - 1)) * this.tileSize
+        );
+        this.targetVec.copy(this.mesh.position);
+    }
+    moveTo(path) {
+        this.path = path;
+    }
+    update(delta) {
+        if (this.path.length > 0) {
+            const next = this.path[0];
+            const t = this.terrain.getTile(next.x, next.z);
+            this.targetVec.set(
+                (next.x - 0.5 * (this.terrain.gridSize - 1)) * this.tileSize,
+                (t.height + 0.5) * 0.5,
+                (next.z - 0.5 * (this.terrain.gridSize - 1)) * this.tileSize
+            );
+            // Move towards targetVec
+            const dist = this.mesh.position.distanceTo(this.targetVec);
+            const step = this.moveSpeed * delta;
+            if (dist < step) {
+                this.mesh.position.copy(this.targetVec);
+                this.setPos(next.x, next.z);
+                this.path.shift();
+            } else {
+                this.mesh.position.lerp(this.targetVec, step / dist);
+            }
+            // Simple "bounce" animation while moving
+            this.mesh.position.y += Math.sin(Date.now() * 0.01) * 0.03;
+        }
+    }
+}
+
+function findPath(terrain, sx, sz, ex, ez) {
+    const gridSize = terrain.gridSize;
+    const levels = terrain.heightLevels;
+    const open = [], closed = Array.from({length:gridSize},()=>Array(gridSize).fill(false));
+    open.push({x:sx, z:sz, g:0, h:Math.abs(ex-sx)+Math.abs(ez-sz), prev:null});
+    while(open.length) {
+        open.sort((a,b)=>a.g+a.h-b.g-b.h);
+        const curr = open.shift();
+        if (curr.x === ex && curr.z === ez) {
+            // Reconstruct path
+            const path = [];
+            let p = curr;
+            while (p.prev) { path.unshift({x:p.x,z:p.z}); p = p.prev; }
+            return path;
+        }
+        closed[curr.x][curr.z]=true;
+        for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+            const nx=curr.x+dx, nz=curr.z+dz;
+            if(nx<0||nz<0||nx>=gridSize||nz>=gridSize||closed[nx][nz])continue;
+            // Optionally block impassable heights here
+            open.push({
+                x:nx, z:nz,
+                g:curr.g+1,
+                h:Math.abs(ex-nx)+Math.abs(ez-nz),
+                prev:curr
+            });
+        }
+    }
+    return [];
+}
+
         /**
          * Initialize the game
          */

@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Isometric Game - Steps 2-3: Terrain & Controls</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #2c3e50;
+            overflow: hidden;
+        }
+        
+        #gameCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            touch-action: none;
+            cursor: grab;
+        }
+        
+        #gameCanvas:active {
+            cursor: grabbing;
+        }
+        
+        #debugInfo {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 100;
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 11px;
+            z-index: 100;
+        }
+        
+        #editPanel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            z-index: 100;
+            min-width: 180px;
+        }
+        
+        #editPanel button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin: 2px;
+        }
+        
+        #editPanel button:hover {
+            background: #45a049;
+        }
+        
+        #editPanel button.active {
+            background: #ff6b6b;
+        }
+        
+        #editPanel button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        
+        .edit-mode-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff6b6b;
+            font-size: 16px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            z-index: 99;
+            pointer-events: none;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        @media (max-width: 768px) {
+            #debugInfo, #controls {
+                font-size: 10px;
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="debugInfo">
+        <div>FPS: <span id="fps">60</span></div>
+        <div>Camera: <span id="cameraPos">0, 0, 0</span></div>
+        <div>Zoom: <span id="zoomLevel">1.0</span></div>
+        <div>Status: <span id="status">Initializing...</span></div>
+    </div>
+    
+    <div id="controls">
+        <div><strong>Desktop:</strong> WASD/Arrow Keys = Move | Mouse Wheel = Zoom | Click+Drag = Pan</div>
+        <div><strong>Mobile:</strong> Touch+Drag = Pan | Pinch = Zoom | Tap = Select</div>
+        <div><strong>Edit Mode:</strong> Click/Tap tiles to modify height | Shift+Click = Lower | Ctrl+Click = Set to 0</div>
+    </div>
+    
+    <div id="editPanel">
+        <div><strong>Tile Editor</strong></div>
+        <button id="toggleEdit">Enable Edit Mode</button>
+        <div style="margin: 10px 0;">
+            <div>Selected Tile: <span id="selectedTile">None</span></div>
+            <div>Height: <span id="selectedHeight">-</span></div>
+        </div>
+        <div>
+            <button id="raiseBtn" disabled>Raise (+1)</button>
+            <button id="lowerBtn" disabled>Lower (-1)</button>
+        </div>
+        <div>
+            <button id="setWaterBtn" disabled>Water (0)</button>
+            <button id="setLandBtn" disabled>Land (3)</button>
+            <button id="setMountainBtn" disabled>Mountain (6)</button>
+        </div>
+        <div style="margin-top: 10px;">
+            <button id="undoBtn" disabled>Undo</button>
+            <button id="clearBtn">Clear All</button>
+        </div>
+    </div>
+    
+    <div id="editModeIndicator" class="edit-mode-indicator hidden">
+        EDIT MODE ACTIVE
+    </div>
+
+    <script>
+        /**
+         * ISOMETRIC GAME ENGINE - STEPS 2-3
+         * Grid-based terrain system with 8 height levels + Camera controls
+         */
+        
+        class GameEngine {
+            constructor() {
+                // Core Three.js components
+                this.scene = null;
+                this.camera = null;
+                this.renderer = null;
+                this.canvas = null;
+                
+                // Terrain system
+                this.terrain = null;
+                this.gridSize = 16;
+                this.tileSize = 2;
+                this.heightLevels = 8;
+                
+                // Camera controls
+                this.cameraTarget = new THREE.Vector3(0, 0, 0);
+                this.cameraOffset = new THREE.Vector3(10, 10, 10);
+                this.zoomLevel = 1.0;
+                this.minZoom = 0.3;
+                this.maxZoom = 3.0;
+                
+                // Edit mode system
+                this.editMode = false;
+                this.selectedTile = null;
+                this.raycaster = new THREE.Raycaster();
+                this.mouse = new THREE.Vector2();
+                this.editHistory = [];
+                this.maxHistorySize = 20;
+                
+                // Input handling
+                this.input = {
+                    keys: {},
+                    mouse: { x: 0, y: 0, pressed: false },
+                    touch: { active: false, start: null, current: null, pinchDistance: 0 }
+                };
+                
+                // Performance tracking
+                this.frameCount = 0;
+                this.lastFpsUpdate = 0;
+                this.currentFps = 60;
+                this.isRunning = false;
+                
+                this.init();
+            }
+            
+            init() {
+                this.setupRenderer();
+                this.setupCamera();
+                this.setupScene();
+                this.setupLighting();
+                this.setupTerrain();
+                this.setupInput();
+                this.setupEditMode();
+                this.start();
+                this.updateDebugInfo();
+            }
+            
+            setupRenderer() {
+                this.canvas = document.getElementById('gameCanvas');
+                
+                this.renderer = new THREE.WebGLRenderer({
+                    canvas: this.canvas,
+                    antialias: true,
+                    alpha: false,
+                    powerPreference: "high-performance"
+                });
+                
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setClearColor(0x4FB3D9, 1); // Teal sky
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                
+                console.log('✓ Renderer setup complete');
+            }
+            
+            setupCamera() {
+                const aspect = window.innerWidth / window.innerHeight;
+                const frustumSize = 20;
+                
+                this.camera = new THREE.OrthographicCamera(
+                    frustumSize * aspect / -2,
+                    frustumSize * aspect / 2,
+                    frustumSize / 2,
+                    frustumSize / -2,
+                    0.1,
+                    1000
+                );
+                
+                this.updateCameraPosition();
+                console.log('✓ Isometric camera setup complete');
+            }
+            
+            setupScene() {
+                this.scene = new THREE.Scene();
+                this.scene.fog = new THREE.Fog(0x4FB3D9, 30, 100);
+                console.log('✓ Scene setup complete');
+            }
+            
+            setupLighting() {
+                // Ambient light
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+                this.scene.add(ambientLight);
+                
+                // Directional light
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(50, 50, 25);
+                directionalLight.castShadow = true;
+                
+                directionalLight.shadow.mapSize.width = 2048;
+                directionalLight.shadow.mapSize.height = 2048;
+                directionalLight.shadow.camera.near = 0.1;
+                directionalLight.shadow.camera.far = 200;
+                directionalLight.shadow.camera.left = -50;
+                directionalLight.shadow.camera.right = 50;
+                directionalLight.shadow.camera.top = 50;
+                directionalLight.shadow.camera.bottom = -50;
+                
+                this.scene.add(directionalLight);
+                console.log('✓ Lighting setup complete');
+            }
+            
+            /**
+             * STEP 2: Setup grid-based terrain with 8 height levels
+             */
+            setupTerrain() {
+                this.terrain = new TerrainSystem(this.gridSize, this.tileSize, this.heightLevels);
+                this.terrain.generateTerrain();
+                
+                // Add terrain to scene
+                this.scene.add(this.terrain.terrainGroup);
+                
+                console.log('✓ Terrain system setup complete');
+            }
+            
+            /**
+             * STEP 3: Setup input handling for camera controls
+             */
+            setupInput() {
+                // Keyboard events
+                document.addEventListener('keydown', (e) => {
+                    this.input.keys[e.code] = true;
+                });
+                
+                document.addEventListener('keyup', (e) => {
+                    this.input.keys[e.code] = false;
+                });
+                
+                // Mouse events
+                this.canvas.addEventListener('mousedown', (e) => {
+                    this.input.mouse.pressed = true;
+                    this.input.mouse.x = e.clientX;
+                    this.input.mouse.y = e.clientY;
+                });
+                
+                this.canvas.addEventListener('mousemove', (e) => {
+                    if (this.input.mouse.pressed && !this.editMode) {
+                        const deltaX = e.clientX - this.input.mouse.x;
+                        const deltaY = e.clientY - this.input.mouse.y;
+                        this.panCamera(deltaX, deltaY);
+                    }
+                    this.input.mouse.x = e.clientX;
+                    this.input.mouse.y = e.clientY;
+                });
+                
+                this.canvas.addEventListener('click', (e) => {
+                    if (this.editMode) {
+                        this.handleTileClick(e);
+                    }
+                });
+                
+                document.addEventListener('mouseup', () => {
+                    this.input.mouse.pressed = false;
+                });
+                
+                // Mouse wheel zoom
+                this.canvas.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    const zoomDelta = e.deltaY > 0 ? 0.1 : -0.1;
+                    this.zoomCamera(zoomDelta);
+                });
+                
+                // Touch events
+                this.canvas.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    this.handleTouchStart(e);
+                });
+                
+                this.canvas.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                    this.handleTouchMove(e);
+                });
+                
+                this.canvas.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    this.handleTouchEnd(e);
+                });
+                
+                // Window resize
+                window.addEventListener('resize', () => {
+                    this.handleResize();
+                });
+                
+                console.log('✓ Input handling setup complete');
+            }
+            
+            /**
+             * STEP 4: Setup edit mode functionality
+             */
+            setupEditMode() {
+                // Toggle edit mode button
+                const toggleBtn = document.getElementById('toggleEdit');
+                toggleBtn.addEventListener('click', () => {
+                    this.toggleEditMode();
+                });
+                
+                // Tile modification buttons
+                document.getElementById('raiseBtn').addEventListener('click', () => {
+                    if (this.selectedTile) {
+                        this.modifyTileHeight(this.selectedTile.x, this.selectedTile.z, 1);
+                    }
+                });
+                
+                document.getElementById('lowerBtn').addEventListener('click', () => {
+                    if (this.selectedTile) {
+                        this.modifyTileHeight(this.selectedTile.x, this.selectedTile.z, -1);
+                    }
+                });
+                
+                // Preset height buttons
+                document.getElementById('setWaterBtn').addEventListener('click', () => {
+                    if (this.selectedTile) {
+                        this.setTileHeight(this.selectedTile.x, this.selectedTile.z, 0);
+                    }
+                });
+                
+                document.getElementById('setLandBtn').addEventListener('click', () => {
+                    if (this.selectedTile) {
+                        this.setTileHeight(this.selectedTile.x, this.selectedTile.z, 3);
+                    }
+                });
+                
+                document.getElementById('setMountainBtn').addEventListener('click', () => {
+                    if (this.selectedTile) {
+                        this.setTileHeight(this.selectedTile.x, this.selectedTile.z, 6);
+                    }
+                });
+                
+                // Utility buttons
+                document.getElementById('undoBtn').addEventListener('click', () => {
+                    this.undoLastEdit();
+                });
+                
+                document.getElementById('clearBtn').addEventListener('click', () => {
+                    if (confirm('Clear all terrain? This cannot be undone.')) {
+                        this.clearTerrain();
+                    }
+                });
+                
+                console.log('✓ Edit mode setup complete');
+            }
+            
+            /**
+             * Toggle edit mode on/off
+             */
+            toggleEditMode() {
+                this.editMode = !this.editMode;
+                
+                const toggleBtn = document.getElementById('toggleEdit');
+                const indicator = document.getElementById('editModeIndicator');
+                
+                if (this.editMode) {
+                    toggleBtn.textContent = 'Disable Edit Mode';
+                    toggleBtn.classList.add('active');
+                    indicator.classList.remove('hidden');
+                    this.canvas.style.cursor = 'crosshair';
+                } else {
+                    toggleBtn.textContent = 'Enable Edit Mode';
+                    toggleBtn.classList.remove('active');
+                    indicator.classList.add('hidden');
+                    this.canvas.style.cursor = 'grab';
+                    this.clearSelection();
+                }
+                
+                console.log(`Edit mode: ${this.editMode ? 'ON' : 'OFF'}`);
+            }
+            
+            /**
+             * Handle tile click for selection and editing
+             */
+            handleTileClick(event) {
+                if (!this.editMode) return;
+                
+                // Calculate mouse position in normalized device coordinates
+                const rect = this.canvas.getBoundingClientRect();
+                this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+                
+                // Raycast to find intersected tiles
+                this.raycaster.setFromCamera(this.mouse, this.camera);
+                const intersects = this.raycaster.intersectObjects(this.terrain.terrainGroup.children);
+                
+                if (intersects.length > 0) {
+                    const clickedTile = intersects[0].object;
+                    const tileData = clickedTile.userData;
+                    
+                    // Select the tile
+                    this.selectTile(tileData.x, tileData.z);
+                    
+                    // Handle different click types
+                    if (event.shiftKey) {
+                        // Shift+Click: Lower tile
+                        this.modifyTileHeight(tileData.x, tileData.z, -1);
+                    } else if (event.ctrlKey || event.metaKey) {
+                        // Ctrl+Click: Set to water level
+                        this.setTileHeight(tileData.x, tileData.z, 0);
+                    } else {
+                        // Normal click: Raise tile
+                        this.modifyTileHeight(tileData.x, tileData.z, 1);
+                    }
+                }
+            }
+            
+            /**
+             * Select a tile for editing
+             */
+            selectTile(x, z) {
+                const tile = this.terrain.getTile(x, z);
+                if (tile) {
+                    this.selectedTile = { x, z, height: tile.height };
+                    this.updateEditUI();
+                    
+                    // Visual feedback - add a subtle highlight
+                    this.highlightTile(tile.mesh);
+                }
+            }
+            
+            /**
+             * Clear tile selection
+             */
+            clearSelection() {
+                this.selectedTile = null;
+                this.updateEditUI();
+                this.removeHighlight();
+            }
+            
+            /**
+             * Add visual highlight to selected tile
+             */
+            highlightTile(mesh) {
+                this.removeHighlight();
+                
+                // Create highlight outline
+                const edges = new THREE.EdgesGeometry(mesh.geometry);
+                const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 3 });
+                this.tileHighlight = new THREE.LineSegments(edges, lineMaterial);
+                
+                this.tileHighlight.position.copy(mesh.position);
+                this.tileHighlight.position.y += 0.01; // Slightly above tile
+                this.scene.add(this.tileHighlight);
+            }
+            
+            /**
+             * Remove tile highlight
+             */
+            removeHighlight() {
+                if (this.tileHighlight) {
+                    this.scene.remove(this.tileHighlight);
+                    this.tileHighlight.geometry.dispose();
+                    this.tileHighlight.material.dispose();
+                    this.tileHighlight = null;
+                }
+            }
+            
+            /**
+             * Modify tile height by delta amount
+             */
+            modifyTileHeight(x, z, delta) {
+                const tile = this.terrain.getTile(x, z);
+                if (tile) {
+                    const oldHeight = tile.height;
+                    const newHeight = Math.max(0, Math.min(this.heightLevels - 1, oldHeight + delta));
+                    
+                    if (newHeight !== oldHeight) {
+                        this.addToHistory(x, z, oldHeight, newHeight);
+                        this.terrain.updateTileHeight(x, z, newHeight);
+                        
+                        if (this.selectedTile && this.selectedTile.x === x && this.selectedTile.z === z) {
+                            this.selectedTile.height = newHeight;
+                            this.updateEditUI();
+                            this.highlightTile(tile.mesh);
+                        }
+                    }
+                }
+            }
+            
+            /**
+             * Set tile to specific height
+             */
+            setTileHeight(x, z, height) {
+                const tile = this.terrain.getTile(x, z);
+                if (tile && tile.height !== height) {
+                    this.addToHistory(x, z, tile.height, height);
+                    this.terrain.updateTileHeight(x, z, height);
+                    
+                    if (this.selectedTile && this.selectedTile.x === x && this.selectedTile.z === z) {
+                        this.selectedTile.height = height;
+                        this.updateEditUI();
+                        this.highlightTile(tile.mesh);
+                    }
+                }
+            }
+            
+            /**
+             * Add action to edit history
+             */
+            addToHistory(x, z, oldHeight, newHeight) {
+                this.editHistory.push({ x, z, oldHeight, newHeight });
+                
+                if (this.editHistory.length > this.maxHistorySize) {
+                    this.editHistory.shift();
+                }
+                
+                document.getElementById('undoBtn').disabled = false;
+            }
+            
+            /**
+             * Undo last edit action
+             */
+            undoLastEdit() {
+                if (this.editHistory.length > 0) {
+                    const lastAction = this.editHistory.pop();
+                    this.terrain.updateTileHeight(lastAction.x, lastAction.z, lastAction.oldHeight);
+                    
+                    if (this.selectedTile && 
+                        this.selectedTile.x === lastAction.x && 
+                        this.selectedTile.z === lastAction.z) {
+                        this.selectedTile.height = lastAction.oldHeight;
+                        this.updateEditUI();
+                        const tile = this.terrain.getTile(lastAction.x, lastAction.z);
+                        this.highlightTile(tile.mesh);
+                    }
+                    
+                    if (this.editHistory.length === 0) {
+                        document.getElementById('undoBtn').disabled = true;
+                    }
+                }
+            }
+            
+            /**
+             * Clear all terrain to flat land
+             */
+            clearTerrain() {
+                this.editHistory = [];
+                
+                for (let x = 0; x < this.gridSize; x++) {
+                    for (let z = 0; z < this.gridSize; z++) {
+                        this.terrain.updateTileHeight(x, z, 2); // Set to land level
+                    }
+                }
+                
+                this.clearSelection();
+                document.getElementById('undoBtn').disabled = true;
+            }
+            
+            /**
+             * Update edit mode UI elements
+             */
+            updateEditUI() {
+                const selectedTileSpan = document.getElementById('selectedTile');
+                const selectedHeightSpan = document.getElementById('selectedHeight');
+                const raiseBtn = document.getElementById('raiseBtn');
+                const lowerBtn = document.getElementById('lowerBtn');
+                const setWaterBtn = document.getElementById('setWaterBtn');
+                const setLandBtn = document.getElementById('setLandBtn');
+                const setMountainBtn = document.getElementById('setMountainBtn');
+                
+                if (this.selectedTile) {
+                    selectedTileSpan.textContent = `${this.selectedTile.x}, ${this.selectedTile.z}`;
+                    selectedHeightSpan.textContent = this.selectedTile.height;
+                    
+                    const atMaxHeight = this.selectedTile.height >= this.heightLevels - 1;
+                    const atMinHeight = this.selectedTile.height <= 0;
+                    
+                    raiseBtn.disabled = !this.editMode || atMaxHeight;
+                    lowerBtn.disabled = !this.editMode || atMinHeight;
+                    setWaterBtn.disabled = !this.editMode;
+                    setLandBtn.disabled = !this.editMode;
+                    setMountainBtn.disabled = !this.editMode;
+                } else {
+                    selectedTileSpan.textContent = 'None';
+                    selectedHeightSpan.textContent = '-';
+                    
+                    raiseBtn.disabled = true;
+                    lowerBtn.disabled = true;
+                    setWaterBtn.disabled = true;
+                    setLandBtn.disabled = true;
+                    setMountainBtn.disabled = true;
+                }
+            }
+            handleTouchStart(e) {
+                const touches = e.touches;
+                
+                if (touches.length === 1) {
+                    this.input.touch.active = true;
+                    this.input.touch.moved = false;
+                    this.input.touch.start = {
+                        x: touches[0].clientX,
+                        y: touches[0].clientY
+                    };
+                    this.input.touch.current = { ...this.input.touch.start };
+                } else if (touches.length === 2) {
+                    // Pinch zoom start
+                    this.input.touch.pinchDistance = this.getTouchDistance(touches[0], touches[1]);
+                    this.input.touch.moved = false;
+                }
+            }
+            
+            /**
+             * Handle touch move for panning and pinch zoom
+             */
+            handleTouchMove(e) {
+                const touches = e.touches;
+                
+                if (touches.length === 1 && this.input.touch.active) {
+                    const deltaX = touches[0].clientX - this.input.touch.current.x;
+                    const deltaY = touches[0].clientY - this.input.touch.current.y;
+                    
+                    // Only pan if not in edit mode or if significant movement
+                    const moveDistance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                    if (moveDistance > 5) {
+                        this.input.touch.moved = true;
+                        if (!this.editMode) {
+                            this.panCamera(deltaX, deltaY);
+                        }
+                    }
+                    
+                    this.input.touch.current = {
+                        x: touches[0].clientX,
+                        y: touches[0].clientY
+                    };
+                } else if (touches.length === 2) {
+                    // Pinch zoom
+                    const currentDistance = this.getTouchDistance(touches[0], touches[1]);
+                    const zoomDelta = (this.input.touch.pinchDistance - currentDistance) * 0.01;
+                    
+                    this.zoomCamera(zoomDelta);
+                    this.input.touch.pinchDistance = currentDistance;
+                    this.input.touch.moved = true;
+                }
+            }
+            
+            /**
+             * Handle touch end
+             */
+            handleTouchEnd(e) {
+                const wasSingleTap = this.input.touch.active && 
+                                   !this.input.touch.moved && 
+                                   e.changedTouches.length === 1;
+                
+                if (wasSingleTap && this.editMode) {
+                    // Handle tap as tile selection/editing
+                    const touch = e.changedTouches[0];
+                    const fakeEvent = {
+                        clientX: touch.clientX,
+                        clientY: touch.clientY,
+                        shiftKey: false,
+                        ctrlKey: false,
+                        metaKey: false
+                    };
+                    this.handleTileClick(fakeEvent);
+                }
+                
+                this.input.touch.active = false;
+                this.input.touch.start = null;
+                this.input.touch.current = null;
+                this.input.touch.moved = false;
+            }
+            
+            /**
+             * Calculate distance between two touch points
+             */
+            getTouchDistance(touch1, touch2) {
+                const dx = touch1.clientX - touch2.clientX;
+                const dy = touch1.clientY - touch2.clientY;
+                return Math.sqrt(dx * dx + dy * dy);
+            }
+            
+            /**
+             * Pan camera based on input delta
+             */
+            panCamera(deltaX, deltaY) {
+                const panSpeed = 0.02 * this.zoomLevel;
+                
+                // Convert screen movement to world movement
+                const right = new THREE.Vector3(1, 0, 1).normalize();
+                const up = new THREE.Vector3(-1, 0, 1).normalize();
+                
+                this.cameraTarget.add(right.multiplyScalar(deltaX * panSpeed));
+                this.cameraTarget.add(up.multiplyScalar(deltaY * panSpeed));
+                
+                // Constrain camera within bounds
+                const maxBounds = this.gridSize * this.tileSize / 2;
+                this.cameraTarget.x = Math.max(-maxBounds, Math.min(maxBounds, this.cameraTarget.x));
+                this.cameraTarget.z = Math.max(-maxBounds, Math.min(maxBounds, this.cameraTarget.z));
+            }
+            
+            /**
+             * Zoom camera in/out
+             */
+            zoomCamera(delta) {
+                this.zoomLevel += delta;
+                this.zoomLevel = Math.max(this.minZoom, Math.min(this.maxZoom, this.zoomLevel));
+                
+                // Update camera frustum
+                const aspect = window.innerWidth / window.innerHeight;
+                const frustumSize = 20 * this.zoomLevel;
+                
+                this.camera.left = frustumSize * aspect / -2;
+                this.camera.right = frustumSize * aspect / 2;
+                this.camera.top = frustumSize / 2;
+                this.camera.bottom = frustumSize / -2;
+                this.camera.updateProjectionMatrix();
+            }
+            
+            /**
+             * Update camera position based on target and offset
+             */
+            updateCameraPosition() {
+                const position = this.cameraTarget.clone().add(this.cameraOffset);
+                this.camera.position.copy(position);
+                this.camera.lookAt(this.cameraTarget);
+            }
+            
+            /**
+             * Handle keyboard input for camera movement
+             */
+            handleKeyboardInput() {
+                const moveSpeed = 0.3;
+                
+                // WASD movement
+                if (this.input.keys['KeyW'] || this.input.keys['ArrowUp']) {
+                    this.cameraTarget.z -= moveSpeed;
+                }
+                if (this.input.keys['KeyS'] || this.input.keys['ArrowDown']) {
+                    this.cameraTarget.z += moveSpeed;
+                }
+                if (this.input.keys['KeyA'] || this.input.keys['ArrowLeft']) {
+                    this.cameraTarget.x -= moveSpeed;
+                }
+                if (this.input.keys['KeyD'] || this.input.keys['ArrowRight']) {
+                    this.cameraTarget.x += moveSpeed;
+                }
+                
+                // Zoom with Q/E
+                if (this.input.keys['KeyQ']) {
+                    this.zoomCamera(0.02);
+                }
+                if (this.input.keys['KeyE']) {
+                    this.zoomCamera(-0.02);
+                }
+                
+                // Constrain movement
+                const maxBounds = this.gridSize * this.tileSize / 2;
+                this.cameraTarget.x = Math.max(-maxBounds, Math.min(maxBounds, this.cameraTarget.x));
+                this.cameraTarget.z = Math.max(-maxBounds, Math.min(maxBounds, this.cameraTarget.z));
+            }
+            
+            handleResize() {
+                const aspect = window.innerWidth / window.innerHeight;
+                const frustumSize = 20 * this.zoomLevel;
+                
+                this.camera.left = frustumSize * aspect / -2;
+                this.camera.right = frustumSize * aspect / 2;
+                this.camera.top = frustumSize / 2;
+                this.camera.bottom = frustumSize / -2;
+                this.camera.updateProjectionMatrix();
+                
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            }
+            
+            start() {
+                this.isRunning = true;
+                this.animate();
+                document.getElementById('status').textContent = 'Running';
+                console.log('✓ Game loop started');
+            }
+            
+            animate() {
+                if (!this.isRunning) return;
+                
+                requestAnimationFrame(() => this.animate());
+                
+                this.update();
+                this.render();
+                this.updatePerformanceStats();
+            }
+            
+            update() {
+                this.handleKeyboardInput();
+                this.updateCameraPosition();
+                
+                // Update tile highlight position if selected
+                if (this.selectedTile && this.tileHighlight) {
+                    const tile = this.terrain.getTile(this.selectedTile.x, this.selectedTile.z);
+                    if (tile) {
+                        this.tileHighlight.position.copy(tile.mesh.position);
+                        this.tileHighlight.position.y += 0.01;
+                    }
+                }
+            }
+            
+            render() {
+                this.renderer.render(this.scene, this.camera);
+            }
+            
+            updatePerformanceStats() {
+                this.frameCount++;
+                const now = performance.now();
+                
+                if (now - this.lastFpsUpdate >= 1000) {
+                    this.currentFps = Math.round((this.frameCount * 1000) / (now - this.lastFpsUpdate));
+                    this.frameCount = 0;
+                    this.lastFpsUpdate = now;
+                    
+                    document.getElementById('fps').textContent = this.currentFps;
+                }
+            }
+            
+            updateDebugInfo() {
+                const updateInfo = () => {
+                    if (!this.isRunning) return;
+                    
+                    const pos = this.cameraTarget;
+                    document.getElementById('cameraPos').textContent = 
+                        `${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)}`;
+                    
+                    document.getElementById('zoomLevel').textContent = this.zoomLevel.toFixed(1);
+                    
+                    requestAnimationFrame(updateInfo);
+                };
+                
+                updateInfo();
+            }
+        }
+        
+        /**
+         * TERRAIN SYSTEM CLASS
+         * Handles grid-based terrain with 8 height levels
+         */
+        class TerrainSystem {
+            constructor(gridSize, tileSize, heightLevels) {
+                this.gridSize = gridSize;
+                this.tileSize = tileSize;
+                this.heightLevels = heightLevels;
+                this.terrainGroup = new THREE.Group();
+                this.tiles = [];
+                
+                // Height level colors
+                this.levelColors = [
+                    0x1e3a8a, // Level 0: Deep water (dark blue)
+                    0x3b82f6, // Level 1: Shallow water (blue)
+                    0x22c55e, // Level 2: Grass (green)
+                    0x16a34a, // Level 3: Grass (darker green)
+                    0x15803d, // Level 4: Forest (dark green)
+                    0x166534, // Level 5: Dense forest (very dark green)
+                    0x78716c, // Level 6: Mountain (gray)
+                    0x57534e  // Level 7: Mountain peak (dark gray)
+                ];
+            }
+            
+            /**
+             * Generate the terrain grid with varied heights
+             */
+            generateTerrain() {
+                const halfGrid = this.gridSize / 2;
+                
+                for (let x = 0; x < this.gridSize; x++) {
+                    this.tiles[x] = [];
+                    
+                    for (let z = 0; z < this.gridSize; z++) {
+                        const height = this.generateHeightForPosition(x, z);
+                        const tile = this.createTile(x, z, height);
+                        
+                        this.tiles[x][z] = {
+                            mesh: tile,
+                            height: height,
+                            x: x,
+                            z: z
+                        };
+                        
+                        this.terrainGroup.add(tile);
+                    }
+                }
+                
+                console.log(`✓ Generated ${this.gridSize}x${this.gridSize} terrain grid`);
+            }
+            
+            /**
+             * Generate height for a given position using noise-like function
+             */
+            generateHeightForPosition(x, z) {
+                const centerX = this.gridSize / 2;
+                const centerZ = this.gridSize / 2;
+                
+                // Distance from center
+                const distance = Math.sqrt(
+                    Math.pow(x - centerX, 2) + Math.pow(z - centerZ, 2)
+                );
+                
+                // Normalize distance
+                const normalizedDistance = distance / (this.gridSize / 2);
+                
+                // Create height based on distance with some randomness
+                let height = Math.floor((1 - normalizedDistance) * this.heightLevels);
+                
+                // Add some randomness
+                height += Math.floor((Math.random() - 0.5) * 3);
+                
+                // Clamp to valid range
+                height = Math.max(0, Math.min(this.heightLevels - 1, height));
+                
+                return height;
+            }
+            
+            /**
+             * Create a single terrain tile
+             */
+            createTile(x, z, height) {
+                const geometry = new THREE.BoxGeometry(
+                    this.tileSize * 0.9, // Slightly smaller for grid lines
+                    0.5 + height * 0.5, // Variable height
+                    this.tileSize * 0.9
+                );
+                
+                const material = new THREE.MeshLambertMaterial({
+                    color: this.levelColors[height]
+                });
+                
+                const tile = new THREE.Mesh(geometry, material);
+                
+                // Position tile
+                const worldX = (x - this.gridSize / 2) * this.tileSize;
+                const worldZ = (z - this.gridSize / 2) * this.tileSize;
+                const worldY = (0.5 + height * 0.5) / 2;
+                
+                tile.position.set(worldX, worldY, worldZ);
+                tile.castShadow = true;
+                tile.receiveShadow = true;
+                
+                // Store tile data
+                tile.userData = { x, z, height };
+                
+                return tile;
+            }
+            
+            /**
+             * Get tile at grid position
+             */
+            getTile(x, z) {
+                if (x >= 0 && x < this.gridSize && z >= 0 && z < this.gridSize) {
+                    return this.tiles[x][z];
+                }
+                return null;
+            }
+            
+            /**
+             * Update tile height (for future editing functionality)
+             */
+            updateTileHeight(x, z, newHeight) {
+                const tile = this.getTile(x, z);
+                if (tile) {
+                    tile.height = Math.max(0, Math.min(this.heightLevels - 1, newHeight));
+                    
+                    // Update mesh
+                    const mesh = tile.mesh;
+                    const newGeometry = new THREE.BoxGeometry(
+                        this.tileSize * 0.9,
+                        0.5 + tile.height * 0.5,
+                        this.tileSize * 0.9
+                    );
+                    
+                    mesh.geometry.dispose();
+                    mesh.geometry = newGeometry;
+                    mesh.material.color.setHex(this.levelColors[tile.height]);
+                    
+                    // Update position
+                    mesh.position.y = (0.5 + tile.height * 0.5) / 2;
+                }
+            }
+        }
+        
+        /**
+         * Initialize the game
+         */
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 Initializing Isometric Game Engine - Steps 2-3');
+            
+            const game = new GameEngine();
+            window.game = game;
+            
+            console.log('✅ Steps 2-3 Complete: Grid terrain system + Camera controls');
+            console.log('📋 Next: Step 4 - Tile height editor');
+        });
+    </script>
+</body>
+</html>

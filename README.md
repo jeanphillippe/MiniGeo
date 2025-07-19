@@ -1,6 +1,111 @@
 # MiniGeo
-MiniGEO / Story Island / Isla Historias its a game 
-# Isometric Tile-Based Game Development Steps
+MiniGEO / Story Island / Isla Historias its a game
+
+STO
+RY ISLAND / ISLA HISTO
+RIAS
+LA IDEA PRINCIPAL
+Imagina una isla que crece contigo. Cada vez que vives una historia, ayudas a alguien o aprendes algo
+nuevo, tu isla se transforma. Un árbol brota donde antes no había nada. Una piedra especial aparece
+junto al lago. Tu isla se convierte en un diario visual de todas las historias que has vivido.
+CÓM
+O FUNCIONA
+Cuando Vives una Historia
+Ayudas a alguien que necesita aprender a pescar en lugar de simplemente darle un pescado. De
+repente, aparece una caña de pescar en tu isla. Un pastorcito te pide ayuda porque el lobo amenaza
+sus ovejas. Después de resolverlo, un pequeño rebaño aparece paciendo en tu isla.
+Cada historia deja su huella. Cada experiencia se convierte en algo que puedes tocar y
+ver.
+Tu Isla, Tu Decisión
+No todos los objetos tienen que quedarse siempre en tu isla. Puedes guardar algunos en un almacén
+que crece con el tiempo. Empiezas con un cofre pequeño, pero eventualmente tienes un granero
+completo. Puedes reorganizar tu isla como quieras, guardando algunas memorias y mostrando otras.
+Moldea Tu Paisaje
+Con tu dedo, puedes transformar el terreno de tu isla. Desliza hacia arriba y la tierra se eleva. Sigue
+subiendo y se convierte en una montaña. Desliza hacia abajo y se forma un valle. Baja más y se llena
+de agua, creando un lago o río.
+Es simple: arriba = montaña, abajo = agua. Tu isla refleja no solo las historias que vives, sino también
+cómo decides que se vea.
+ALGUNAS DE LAS HISTO
+RIAS QUE VIVIRÁS
+Historias de Sabiduría
+El Pescador Hambriento: "No le des pescado, enséñale a pescar" - Aparece una caña de pescar
+El Pastorcito y el Lobo: Sobre la honestidad y las consecuencias - Aparece un rebaño de ovejas
+El Escorpión y la Rana: Sobre la naturaleza inmutable - Aparece un tronco flotante
+El Pajarito en Invierno: Sobre la compasión y el silencio - Aparece un nido con comedero
+RECO
+MPENSAS QUE EVOLUCIONAN
+El Pescador que Prospera
+Después de ayudar al pescador hambriento, aparece en tu isla pescando tranquilamente. Con el
+tiempo, conseguirá un bote. Si le preguntas cómo lo obtu
+vo, te dirá orgulloso que vendió el pescado
+que le sobraba. Cuando el pescador obtiene su bote, desbloqueas el acceso al océano - tu isla se
+conecta con el mundo marítimo.
+Progresión Natural
+Las historias no siguen un orden fijo. Cada experiencia que vives puede abrir nuevas posibilidades.
+Ayudar a ciertos personajes los hace prosperar, y su prosperidad desbloquea nuevas áreas para
+explorar. No son niveles secuenciales - es un mundo que responde a tus acciones.
+Historias de Perseverancia
+La Liebre y la Tortuga: "Lento pero seguro" - Aparece una meta o trofeo
+La Hormiga y la Cigarra: Sobre el trabajo y la previsión - Aparece un hormiguero
+El Cuervo y el Cántaro: Sobre la creatividad para resolver problemas - Aparece un cántaro con
+piedras
+Historias de Codicia y Humildad
+La Gallina de los Huevos de Oro: Sobre la paciencia vs la codicia - Aparece una gallina dorada
+El León y el Ratón: Sobre la ayuda mutua - Aparece una trampa rota
+La Lechera: Sobre soñar con los pies en la tierra - Aparece un cántaro
+PO
+R QUÉ CONECTA CON LAS PERSONAS
+Es Personal
+Tu isla es única. Nadie más tendrá exactamente la misma combinación de objetos, el mismo paisaje
+moldeado, las mismas historias vividas en el mismo orden.
+Es Significativo
+Cada objeto cuenta una historia. No es decoración vacía - es un recordatorio de algo que aprendiste,
+alguien a quien ayudaste, una sabiduría que ganaste.
+Es Relajante
+No hay prisa. No hay competencia. Solo tú, tu isla, y las historias que vas descubriendo a tu propio
+ritmo.
+Es Intuitivo
+Arriba = montaña, abajo = agua. Toca una historia = aparece un objeto. Drag and drop = reorganiza tu
+isla. No hay menús complicados ni controles conf
+usos.
+LA MAGIA ESTÁ EN LOS DETALLES
+Los O
+bjetos Recuerdan
+Cada objeto que aparece en tu isla puede contarte cómo llegó ahí. Toca la caña de pescar y te
+recuerda la historia del pescador hambriento.
+El Paisaje Habla
+La forma de tu isla refleja tu personalidad. ¿Prefieres montañas altas y
+tranquilos y
+valles serenos?
+vistas panorámicas? ¿O lagos
+Las Historias Conectan
+Algunas historias en niveles posteriores hacen referencia a personajes que conociste antes. El mundo
+se siente vivo y conectado.
+La Sabiduría Crece
+No se trata solo de coleccionar objetos. Se trata de entender las lecciones detrás de cada historia, de
+ver cómo se aplican a tu propia vida.
+DIMENSIONES TÉCNICAS
+Optimizado para Móviles
+Resolución base: 640x360 píxeles (se adapta a cualquier pantalla)
+Sprites isométricos: 64x32 píxeles (vista 3D clásica)
+Controles táctiles: Gestos simples y naturales
+Carga rápida: Funciona en cualquier navegador móvil
+Sistema de Escalado
+Pantallas pequeñas: Escala 1x
+Pantallas medianas: Escala 1.5x
+Pantallas grandes: Escala 2x
+Tablets: Escala 2.5x
+Todo se ajusta automáticamente para que siempre se vea perfecto, sin importar el dispositivo.
+ISLA HISTO
+RIAS / STO
+RY ISLAND
+Cada historia tradicional que vives se convierte en parte de tu paisaje personal. Tu isla crece, cambia y
+evoluciona, al igual que tú.
+Es la combinación perfecta de entretenimiento y sabiduría, de tecnología y tradición, de juego y
+contemplación. Simple de entender, no tan fácil de olvidar.
+ 
+ Isometric Tile-Based Game Development Steps
 
 ## Step 1: Basic Three.js Setup & Isometric Camera
 **Goal**: Create the foundation with Three.js scene, isometric camera, and basic rendering loop

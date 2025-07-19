@@ -213,6 +213,7 @@
                 this.setupCamera();
                 this.setupScene();
                 this.setupLighting();
+                this.setupClouds();
                 this.setupTerrain();
                 this.setupInput();
                 this.setupEditMode();
@@ -267,11 +268,10 @@
                 const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
                 this.scene.add(ambientLight);
                 
-                // Directional light
-                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-                directionalLight.position.set(50, 50, 25);
-                directionalLight.castShadow = true;
-                
+                // Directional light with orange tint
+const directionalLight = new THREE.DirectionalLight(0xfff6e0, 0.95); // Warm sun
+directionalLight.position.set(50, 50, 25);
+directionalLight.castShadow = true;
                 directionalLight.shadow.mapSize.width = 2048;
                 directionalLight.shadow.mapSize.height = 2048;
                 directionalLight.shadow.camera.near = 0.1;
@@ -284,7 +284,30 @@
                 this.scene.add(directionalLight);
                 console.log('✓ Lighting setup complete');
             }
-            
+            setupClouds() {
+    this.cloudSprites = [];
+    const loader = new THREE.TextureLoader();
+    loader.load('https://i.imgur.com/mYRt74O.png', texture => {
+        for (let i = 0; i < 6; i++) {
+            const material = new THREE.SpriteMaterial({
+                map: texture,
+                color: 0xffffff,
+                opacity: 0.7,
+                transparent: true,
+                depthWrite: false
+            });
+            const sprite = new THREE.Sprite(material);
+            sprite.position.set(
+                (Math.random() - 0.5) * this.gridSize * this.tileSize,
+                8 + Math.random() * 2,
+                (Math.random() - 0.5) * this.gridSize * this.tileSize
+            );
+            sprite.scale.set(8 + Math.random() * 6, 4 + Math.random() * 2, 1);
+            this.scene.add(sprite);
+            this.cloudSprites.push(sprite);
+        }
+    });
+}
             /**
              * STEP 2: Setup grid-based terrain with 8 height levels
              */
@@ -866,6 +889,16 @@
                 this.handleKeyboardInput();
                 this.updateCameraPosition();
                 
+                // Animate clouds (call in update loop)
+                if (this.cloudSprites) {
+                    for (const c of this.cloudSprites) {
+                        c.position.x += 0.01 * (0.5 + Math.random() * 0.2);
+                        if (c.position.x > this.gridSize * this.tileSize) {
+                            c.position.x = -this.gridSize * this.tileSize;
+                        }
+                    }
+                }
+                
                 // Update tile highlight position if selected
                 if (this.selectedTile && this.tileHighlight) {
                     const tile = this.terrain.getTile(this.selectedTile.x, this.selectedTile.z);
@@ -922,17 +955,16 @@
                 this.terrainGroup = new THREE.Group();
                 this.tiles = [];
                 
-                // Height level colors
                 this.levelColors = [
-                    0x1e3a8a, // Level 0: Deep water (dark blue)
-                    0x3b82f6, // Level 1: Shallow water (blue)
-                    0x22c55e, // Level 2: Grass (green)
-                    0x16a34a, // Level 3: Grass (darker green)
-                    0x15803d, // Level 4: Forest (dark green)
-                    0x166534, // Level 5: Dense forest (very dark green)
-                    0x78716c, // Level 6: Mountain (gray)
-                    0x57534e  // Level 7: Mountain peak (dark gray)
-                ];
+    0x277da1, // Level 0: Deep water (teal blue)
+    0x4fc3f7, // Level 1: Shallow water (light blue)
+    0x43aa8b, // Level 2: Land (mint green)
+    0x90be6d, // Level 3: Land (soft green)
+    0xf9c74f, // Level 4: Sand/shore (yellow)
+    0xf9844a, // Level 5: Dry grass (orange)
+    0xf3722c, // Level 6: Mountain base (orange-brown)
+    0x577590  // Level 7: Mountain peak (blue-gray)
+];
             }
             
             /**
@@ -947,7 +979,8 @@
                     for (let z = 0; z < this.gridSize; z++) {
                         const height = this.generateHeightForPosition(x, z);
                         const tile = this.createTile(x, z, height);
-                        
+                        tile.castShadow = true;
+tile.receiveShadow = true;
                         this.tiles[x][z] = {
                             mesh: tile,
                             height: height,

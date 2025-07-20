@@ -65,12 +65,32 @@ this.useObjectSprites = false;
                 this.init();
             }
 
-            init() {
-                this.setupRenderer(); this.setupCamera(); this.setupScene(); this.setupLighting();
-                this.setupClouds(); this.setupTerrain(); this.setupInput(); this.setupUI();this.setupInteractables();
-                  this.loadSprites();
-                this.player = new Player(this); this.start(); this.updateDebugInfo();
-            }
+          init() {
+    // Clear any existing state
+    if (this.terrain) {
+        this.terrain.dispose(); // We'll add this method to TerrainSystem
+    }
+    
+    this.setupRenderer();
+    this.setupCamera();
+    this.setupScene();
+    this.setupLighting();
+    this.setupClouds();
+    
+    // Initialize terrain with current mode
+    this.useTerrainSprites = false; // Set initial state
+    this.terrain = new TerrainSystem(this.gridSize, this.tileSize, this.heightLevels);
+    this.terrain.init(this.useTerrainSprites); // New method for controlled initialization
+    this.scene.add(this.terrain.terrainGroup);
+    
+    this.setupInput();
+    this.setupUI();
+    this.setupInteractables();
+    this.loadSprites();
+    this.player = new Player(this);
+    this.start();
+    this.updateDebugInfo();
+}
 // Load all sprites at initialization
                 loadSprites() {
                     const loader = new THREE.TextureLoader();
@@ -1001,35 +1021,73 @@ showInteractionMessage(message) {
         }
 
         class TerrainSystem {
-            constructor(gridSize, tileSize, heightLevels) {
-    this.gridSize = gridSize;
-    this.tileSize = tileSize;
-    this.heightLevels = heightLevels;
-    this.terrainGroup = new THREE.Group();
-    this.tiles = [];
-    this.levelColors = [0x277da1, 0x4fc3f7, 0x43aa8b, 0x90be6d, 0xf9c74f, 0xf9844a, 0xf3722c, 0x577590];
-    
-    // Load sprite texture
-    const textureLoader = new THREE.TextureLoader();
-    textureLoader.load('path/to/your/tile/sprite/texture.png', (texture) => {
-        texture.magFilter = THREE.NearestFilter;
-        texture.minFilter = THREE.NearestFilter;
-        this.spriteTexture = texture;
-    });
-}
-
-            generateTerrain() {
-                for (let x = 0; x < this.gridSize; x++) {
-                    this.tiles[x] = [];
-                    for (let z = 0; z < this.gridSize; z++) {
-                        const height = this.generateHeightForPosition(x, z);
-                        const tile = this.createTile(x, z, height);
-                        tile.castShadow = tile.receiveShadow = true;
-                        this.tiles[x][z] = { height, mesh: tile };
-                        this.terrainGroup.add(tile);
+             constructor(gridSize, tileSize, heightLevels) {
+        this.gridSize = gridSize;
+        this.tileSize = tileSize;
+        this.heightLevels = heightLevels;
+        this.terrainGroup = new THREE.Group();
+        this.tiles = [];
+        this.levelColors = [0x277da1, 0x4fc3f7, 0x43aa8b, 0x90be6d, 0xf9c74f, 0xf9844a, 0xf3722c, 0x577590];
+        
+        // Track initialization state
+        this.initialized = false;
+    }
+  init(useSprites = false) {
+        // Ensure clean state
+        if (this.initialized) {
+            this.dispose();
+        }
+        
+        this.generateTerrain(useSprites);
+        this.initialized = true;
+    }
+    dispose() {
+        // Properly dispose of all resources
+        this.tiles.forEach(row => {
+            row.forEach(tile => {
+                if (tile.mesh) {
+                    if (tile.mesh.geometry) {
+                        tile.mesh.geometry.dispose();
+                    }
+                    if (tile.mesh.material) {
+                        if (Array.isArray(tile.mesh.material)) {
+                            tile.mesh.material.forEach(mat => mat.dispose());
+                        } else {
+                            tile.mesh.material.dispose();
+                        }
                     }
                 }
+            });
+        });
+        
+        // Clear arrays
+        this.tiles = [];
+        
+        // Remove all children from terrain group
+        while (this.terrainGroup.children.length > 0) {
+            this.terrainGroup.remove(this.terrainGroup.children[0]);
+        }
+        
+        this.initialized = false;
+    }
+
+
+        
+    generateTerrain(useSprites = false) {
+        // Clear existing terrain if any
+        this.dispose();
+        
+        for (let x = 0; x < this.gridSize; x++) {
+            this.tiles[x] = [];
+            for (let z = 0; z < this.gridSize; z++) {
+                const height = this.generateHeightForPosition(x, z);
+                const tile = this.createTile(x, z, height, useSprites);
+                tile.castShadow = tile.receiveShadow = true;
+                this.tiles[x][z] = { height, mesh: tile };
+                this.terrainGroup.add(tile);
             }
+        }
+    }
 
             generateHeightForPosition(x, z) {
                 const centerX = this.gridSize / 2, centerZ = this.gridSize / 2;

@@ -505,7 +505,7 @@ handleTouchEnd(e) {
     const tile = this.terrain.getTile(this.selectedTile.x, this.selectedTile.z);
     if (tile) { 
         this.tileHighlight.position.copy(tile.mesh.position); 
-        if(window.USE_SPRITE_TERRAIN){
+        if (USE_SPRITE_TERRAIN) {
             this.tileHighlight.position.y = 0.5 + tile.height * 0.5 + 0.02;
         } else {
             this.tileHighlight.position.y += 0.01;
@@ -1001,7 +1001,7 @@ showInteractionMessage(message) {
                 this.gridSize = gridSize; this.tileSize = tileSize; this.heightLevels = heightLevels;
                 this.terrainGroup = new THREE.Group(); this.tiles = [];
                 this.levelColors = [0x277da1, 0x4fc3f7, 0x43aa8b, 0x90be6d, 0xf9c74f, 0xf9844a, 0xf3722c, 0x577590];
-                if(window.USE_SPRITE_TERRAIN){
+                if (USE_SPRITE_TERRAIN) {
     const loader = new THREE.TextureLoader();
     this.terrainTexture = loader.load('https://i.imgur.com/C4l87Xp.png');
     this.terrainTexture.magFilter = THREE.NearestFilter;
@@ -1034,7 +1034,7 @@ showInteractionMessage(message) {
             }
 
             createTile(x, z, height) {
-    if(window.USE_SPRITE_TERRAIN){
+    if (USE_SPRITE_TERRAIN) {
         return this.createSpriteTile(x, z, height);
     } else {
         return this.create3DTile(x, z, height);

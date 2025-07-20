@@ -5,54 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Optimized Isometric Game</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#2c3e50;overflow:hidden}#gameCanvas{display:block;width:100vw;height:100vh;touch-action:none;cursor:grab}#gameCanvas:active{cursor:grabbing}.ui-container{position:absolute;top:10px;left:10px;z-index:100}.toggle-btn{background:rgb(0 0 0 / .8);color:#fff;border:none;padding:8px 12px;border-radius:4px;cursor:pointer;font-size:12px;margin-bottom:5px}.toggle-btn:hover{background:rgb(0 0 0 / .9)}.toggle-btn.active{background:#4CAF50}.panel{color:#fff;background:rgb(0 0 0 / .8);padding:12px;border-radius:6px;font-size:12px;margin-bottom:5px;min-width:200px;display:none}.panel.visible{display:block}.panel button{background:#4CAF50;color:#fff;border:none;padding:6px 12px;border-radius:3px;cursor:pointer;font-size:11px;margin:2px}.panel button:hover{background:#45a049}.panel button:disabled{background:#666;cursor:not-allowed}.edit-indicator{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#ff6b6b;font-size:16px;font-weight:700;text-shadow:2px 2px 4px rgb(0 0 0 / .8);z-index:99;pointer-events:none;display:none}.edit-indicator.visible{display:block}.controls-text{font-size:10px;color:#ccc;margin-top:8px;line-height:1.3}.tooltip-container{
-    position:absolute;
-    top:50%;
-    left:50%;
-    transform:translate(-50%,-50%);
-    pointer-events:auto; /* Changed from none to auto */
-    z-index:150;
-}
-
-.tooltip{
-    background:rgb(0 0 0 / .9);
-    color:#fff;
-    padding:8px 12px;
-    border-radius:6px;
-    font-size:12px;
-    font-family:-apple-system,BlinkMacSystemFont,sans-serif;
-    white-space:nowrap;
-    box-shadow:0 2px 8px rgb(0 0 0 / .4);
-    border:1px solid rgb(255 255 255 / .2);
-    opacity:0;
-    transform:translateY(10px);
-    transition:all 0.3s ease;
-    cursor:pointer; /* Add cursor pointer */
-}
-
-.tooltip:hover{
-    background:rgb(76 175 80 / .3);
-    border-color:#4CAF50;
-    transform:translateY(-2px);
-    box-shadow:0 4px 12px rgb(0 0 0 / .6);
-}
-
-.tooltip.visible{
-    opacity:1;
-    transform:translateY(0);
-}
-
-.tooltip.interact{
-    border-color:#4CAF50;
-    background:rgb(76 175 80 / .2);
-    backdrop-filter:blur(4px);
-}
-
-.interact-prompt{
-    color:#4CAF50;
-    font-size:10px;
-    margin-top:4px;
-}
+    <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#2c3e50;overflow:hidden}#gameCanvas{display:block;width:100vw;height:100vh;touch-action:none;cursor:grab}#gameCanvas:active{cursor:grabbing}.ui-container{position:absolute;top:10px;left:10px;z-index:100}.toggle-btn{background:rgb(0 0 0 / .8);color:#fff;border:none;padding:8px 12px;border-radius:4px;cursor:pointer;font-size:12px;margin-bottom:5px}.toggle-btn:hover{background:rgb(0 0 0 / .9)}.toggle-btn.active{background:#4CAF50}.panel{color:#fff;background:rgb(0 0 0 / .8);padding:12px;border-radius:6px;font-size:12px;margin-bottom:5px;min-width:200px;display:none}.panel.visible{display:block}.panel button{background:#4CAF50;color:#fff;border:none;padding:6px 12px;border-radius:3px;cursor:pointer;font-size:11px;margin:2px}.panel button:hover{background:#45a049}.panel button:disabled{background:#666;cursor:not-allowed}.edit-indicator{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#ff6b6b;font-size:16px;font-weight:700;text-shadow:2px 2px 4px rgb(0 0 0 / .8);z-index:99;pointer-events:none;display:none}.edit-indicator.visible{display:block}.controls-text{font-size:10px;color:#ccc;margin-top:8px;line-height:1.3}.tooltip-container{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:auto;z-index:150}.tooltip{background:rgb(0 0 0 / .9);color:#fff;padding:8px 12px;border-radius:6px;font-size:14px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;white-space:nowrap;box-shadow:0 2px 8px rgb(0 0 0 / .4);border:1px solid rgb(255 255 255 / .2);opacity:0;transform:translateY(10px);transition:all 0.3s ease;cursor:pointer}.tooltip:hover{background:rgb(76 175 80 / .3);border-color:#4CAF50;transform:translateY(-2px);box-shadow:0 4px 12px rgb(0 0 0 / .6)}.tooltip.visible{opacity:1;transform:translateY(0)}.tooltip.interact{border-color:#4CAF50;background:rgb(76 175 80 / .2);backdrop-filter:blur(4px)}.interact-prompt{color:#fff;font-weight:700;font-size:12px;margin-top:4px}
     </style>
 </head>
 <body>
@@ -642,40 +595,64 @@ removeGlowEffect(mesh) {
     }
     mesh.userData.glowAdded = false; // Mark group as processed
 }
-updateTooltip(interactable) {
-    const container = document.getElementById('tooltipContainer');
-    
-    if (!interactable) {
+updateTooltip(interactable){
+    const container=document.getElementById('tooltipContainer');
+    if(!interactable){
         this.hideTooltip();
         return;
     }
-
-    this.activeTooltip = interactable;
-    const canInteract = this.getDistanceToInteractable(interactable) <= 1.5;
     
-    // Create clickable tooltip
-    const tooltipDiv = document.createElement('div');
-    tooltipDiv.className = `tooltip interact visible ${canInteract ? 'clickable' : ''}`;
-    tooltipDiv.innerHTML = `
+    this.activeTooltip=interactable;
+    const canInteract=this.getDistanceToInteractable(interactable)<=1.5;
+    const tooltipDiv=document.createElement('div');
+    tooltipDiv.className=`tooltip interact visible ${canInteract ? 'clickable' : ''}`;
+    tooltipDiv.innerHTML=`
         <strong>${interactable.message}</strong>
         <div class="interact-prompt">${canInteract ? 'Click to interact' : interactable.interact}</div>
     `;
     
-    // Add click event if player is close enough
-    if (canInteract) {
-        tooltipDiv.style.cursor = 'pointer';
-        tooltipDiv.addEventListener('click', (e) => {
+    // Clear any existing handlers from container
+    const oldHandler = container._clickHandler;
+    if(oldHandler) {
+        container.removeEventListener('click', oldHandler);
+        container.removeEventListener('mousedown', oldHandler);
+    }
+    
+    if(canInteract){
+        tooltipDiv.style.cursor='pointer';
+        container.style.pointerEvents = 'auto';
+        container.style.zIndex = '999';
+        
+        // Attach handler to container instead of tooltip
+        const handleInteraction = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            console.log('Desktop interaction triggered!'); // Debug log
+            this.handleInteraction();
+        };
+        
+        // Try both click and mousedown events
+        container.addEventListener('click', handleInteraction);
+        container.addEventListener('mousedown', handleInteraction);
+        container.addEventListener('touchstart',(e)=>{
+            e.preventDefault();
             e.stopPropagation();
             this.handleInteraction();
         });
+        
+        // Store for cleanup
+        container._clickHandler = handleInteraction;
     } else {
-        tooltipDiv.style.cursor = 'default';
+        container.style.pointerEvents = 'none';
+        tooltipDiv.style.cursor='default';
     }
     
-    container.innerHTML = '';
+    container.innerHTML='';
     container.appendChild(tooltipDiv);
     this.positionTooltip(interactable);
 }
+
 positionTooltip(interactable) {
     const container = document.getElementById('tooltipContainer');
     const worldPos = new THREE.Vector3(
@@ -693,19 +670,17 @@ positionTooltip(interactable) {
     container.style.transform = 'translate(-50%, -100%)';
 }
 
-hideTooltip() {
-    if (!this.activeTooltip) return;
-    
-    this.activeTooltip = null;
-    const container = document.getElementById('tooltipContainer');
-    
-    // Clear all content and event listeners
-    const tooltips = container.querySelectorAll('.tooltip');
-    tooltips.forEach(tooltip => {
-        tooltip.removeEventListener('click', this.handleInteraction);
+hideTooltip(){
+    if(!this.activeTooltip)return;
+    this.activeTooltip=null;
+    const container=document.getElementById('tooltipContainer');
+    const tooltips=container.querySelectorAll('.tooltip');
+    tooltips.forEach(tooltip=>{
+        if(tooltip._clickHandler){
+            tooltip.removeEventListener('click', tooltip._clickHandler);
+        }
     });
-    
-    container.innerHTML = '';
+    container.innerHTML='';
 }
 
 getDistanceToInteractable(interactable) {
@@ -828,19 +803,21 @@ showInteractionMessage(message) {
                 this.pos = { x, z };
             }
 
-            initInput() {
-                this.game.canvas.addEventListener('click', e => {
-                    if (this.game.editMode) return;
-                    const rect = this.game.canvas.getBoundingClientRect();
-                    this.game.mouse.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
-                    this.game.raycaster.setFromCamera(this.game.mouse, this.game.camera);
-                    const hits = this.game.raycaster.intersectObjects(this.game.terrain.terrainGroup.children);
-                    if (hits.length) {
-                        const { x, z } = hits[0].object.userData;
-                        this.findPath(this.pos, { x, z }, path => { this.path = path; this.progress = 0; });
-                    }
-                });
-            }
+            initInput(){
+    this.game.canvas.addEventListener('click',e=>{
+        // Don't handle canvas clicks if there's an active interactable tooltip
+        if(this.game.editMode || this.game.activeTooltip) return;
+        
+        const rect=this.game.canvas.getBoundingClientRect();
+        this.game.mouse.set(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);
+        this.game.raycaster.setFromCamera(this.game.mouse,this.game.camera);
+        const hits=this.game.raycaster.intersectObjects(this.game.terrain.terrainGroup.children);
+        if(hits.length){
+            const{x,z}=hits[0].object.userData;
+            this.findPath(this.pos,{x,z},path=>{this.path=path;this.progress=0});
+        }
+    });
+}
 
             update() {
                 if (!this.path.length || !this.sprite) return;

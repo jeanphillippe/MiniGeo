@@ -16,7 +16,25 @@
     border-radius: 5px;
     display: none;
 }
+#spriteDebugPanel input[type="number"] {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 2px 4px;
+    border-radius: 2px;
+    margin: 0 5px;
+}
 
+#spriteDebugPanel input[type="range"] {
+    width: 100px;
+    margin: 0 5px;
+}
+
+#spriteDebugPanel label {
+    display: inline-block;
+    width: 60px;
+    font-size: 11px;
+}
 .sprite-debug-panel.visible {
     display: block;
 }
@@ -44,13 +62,27 @@
         <div id="spriteDebugPanel" class="panel sprite-debug-panel">
     <div><strong>Sprite Debug</strong></div>
     <div>
-        <button id="terrainSpriteToggle">Terrain: 3D</button>
-        <button id="spriteScaleUp">Scale +</button>
-        <button id="spriteScaleDown">Scale -</button>
+        <button id="terrainSpriteToggle">Terrain: Sprites</button>
     </div>
-    <div>
-        <label>Sprite Height:</label>
-        <input type="range" id="spriteHeight" min="0" max="10" step="0.1" value="1">
+    <div style="margin: 8px 0;">
+        <label>U Offset:</label>
+        <input type="number" id="uOffsetInput" step="0.01" value="0" style="width: 60px;">
+        <input type="range" id="uOffset" min="-20" max="20" step="0.01" value="0">
+    </div>
+    <div style="margin: 8px 0;">
+        <label>V Offset:</label>
+        <input type="number" id="vOffsetInput" step="0.01" value="0" style="width: 60px;">
+        <input type="range" id="vOffset" min="-20" max="20" step="0.01" value="0">
+    </div>
+    <div style="margin: 8px 0;">
+        <label>U Scale:</label>
+        <input type="number" id="uScaleInput" step="0.1" value="1" style="width: 60px;">
+        <input type="range" id="uScale" min="-30" max="30" step="0.01" value="1">
+    </div>
+    <div style="margin: 8px 0;">
+        <label>V Scale:</label>
+        <input type="number" id="vScaleInput" step="0.1" value="1" style="width: 60px;">
+        <input type="range" id="vScale" min="-30" max="30" step="0.01" value="1">
     </div>
 </div>
         
@@ -157,17 +189,77 @@ this.useTerrainSprites = USE_SPRITE_TERRAIN;
                 document.getElementById('lowerBtn').onclick = () => this.modifySelected(-1);
                 document.getElementById('clearBtn').onclick = () => confirm('Clear all terrain?') && this.clearTerrain();
             }
-setupSpriteDebug(){
-    const terrainToggle=document.getElementById('terrainSpriteToggle');
-    const scaleUp=document.getElementById('spriteScaleUp');
-    const scaleDown=document.getElementById('spriteScaleDown');
-    const heightSlider=document.getElementById('spriteHeight');
-    terrainToggle.onclick=()=>this.toggleTerrainMode();
-    scaleUp.onclick=()=>this.adjustSpriteScale(1.1);
-    scaleDown.onclick=()=>this.adjustSpriteScale(0.9);
-    heightSlider.oninput=(e)=>this.adjustSpriteHeight(parseFloat(e.target.value));
+setupSpriteDebug() {
+    const terrainToggle = document.getElementById('terrainSpriteToggle');
+    
+    // Get all input elements
+    const uOffset = document.getElementById('uOffset');
+    const vOffset = document.getElementById('vOffset');
+    const uScale = document.getElementById('uScale');
+    const vScale = document.getElementById('vScale');
+    
+    const uOffsetInput = document.getElementById('uOffsetInput');
+    const vOffsetInput = document.getElementById('vOffsetInput');
+    const uScaleInput = document.getElementById('uScaleInput');
+    const vScaleInput = document.getElementById('vScaleInput');
+
+    terrainToggle.textContent = `Terrain: ${this.useTerrainSprites ? 'Sprites' : '3D'}`;
+    terrainToggle.onclick = () => this.toggleTerrainMode();
+
+    // Sync sliders with number inputs
+    const syncInputs = (slider, input, callback) => {
+        slider.oninput = (e) => {
+            const value = parseFloat(e.target.value);
+            input.value = value;
+            callback(value);
+        };
+        input.oninput = (e) => {
+            const value = parseFloat(e.target.value);
+            slider.value = value;
+            callback(value);
+        };
+    };
+
+    syncInputs(uOffset, uOffsetInput, (value) => this.adjustTextureOffset('u', value));
+    syncInputs(vOffset, vOffsetInput, (value) => this.adjustTextureOffset('v', value));
+    syncInputs(uScale, uScaleInput, (value) => this.adjustTextureScale('u', value));
+    syncInputs(vScale, vScaleInput, (value) => this.adjustTextureScale('v', value));
+}
+adjustTextureOffset(axis, value) {
+    if (!this.useTerrainSprites) return;
+    
+    this.terrain.terrainGroup.children.forEach(tileGroup => {
+        if (tileGroup.isGroup) {
+            tileGroup.children.forEach(child => {
+                if (child.material && child.material.map) {
+                    if (axis === 'u') {
+                        child.material.map.offset.x = value;
+                    } else {
+                        child.material.map.offset.y = value;
+                    }
+                }
+            });
+        }
+    });
 }
 
+adjustTextureScale(axis, value) {
+    if (!this.useTerrainSprites) return;
+    
+    this.terrain.terrainGroup.children.forEach(tileGroup => {
+        if (tileGroup.isGroup) {
+            tileGroup.children.forEach(child => {
+                if (child.material && child.material.map) {
+                    if (axis === 'u') {
+                        child.material.map.repeat.x = value;
+                    } else {
+                        child.material.map.repeat.y = value;
+                    }
+                }
+            });
+        }
+    });
+}
 toggleTerrainMode(){
     this.useTerrainSprites = !this.useTerrainSprites;
     document.getElementById('terrainSpriteToggle').textContent = `Terrain: ${this.useTerrainSprites ? 'Sprites' : '3D'}`;
@@ -182,15 +274,20 @@ toggleTerrainMode(){
     window.USE_SPRITE_TERRAIN = this.useTerrainSprites;
 }
 
-adjustSpriteScale(factor){
-    if(!this.useTerrainSprites) return;
+adjustSpriteScale(factor) {
+    if (!this.useTerrainSprites) return;
     
     this.terrain.terrainGroup.children.forEach(tileGroup => {
-        if(tileGroup.isGroup) {
+        if (tileGroup.isGroup) {
             tileGroup.children.forEach(child => {
-                if(child.isSprite || (child.material && child.material.map)) {
-                    child.scale.x *= factor;
-                    child.scale.y *= factor;
+                if (child.material && child.material.map) {
+                    // Scale the UV mapping instead of the mesh scale
+                    const uv = child.geometry.attributes.uv;
+                    for (let i = 0; i < uv.count; i++) {
+                        uv.setX(i, uv.getX(i) * factor);
+                        uv.setY(i, uv.getY(i) * factor);
+                    }
+                    uv.needsUpdate = true;
                 }
             });
         }
@@ -1057,59 +1154,60 @@ createSpriteTile(x, z, height) {
     const group = new THREE.Group();
     const tileSize = this.tileSize * 0.9;
     const tileHeight = 0.5 + height * 0.5;
-
-    const spriteWidth = 1 / 8;
+    
+    const spriteWidth = 1/8;
     const spriteU = height * spriteWidth;
 
-    const createFace = (width, height, rotX, rotY, posY, posZ) => {
+    const createFace = (width, height, rotX, rotY, rotZ, posX, posY, posZ) => {
         const geometry = new THREE.PlaneGeometry(width, height);
         const material = new THREE.MeshLambertMaterial({
             map: this.terrainTexture,
             transparent: true,
             side: THREE.DoubleSide
         });
-
+        
         const uvs = geometry.attributes.uv;
-        for (let i = 0; i < uvs.count; i++) {
-            uvs.setX(i, uvs.getX(i) * spriteWidth + spriteU);
-        }
-
+for (let i = 0; i < uvs.count; i++) {
+    uvs.setX(i, uvs.getX(i) * spriteWidth + spriteU - 0.13); // Apply U offset
+    uvs.setY(i, uvs.getY(i) + 0.69); // Apply V offset
+}
+        
         const plane = new THREE.Mesh(geometry, material);
         plane.rotation.x = rotX;
         plane.rotation.y = rotY;
-        plane.position.y = posY;
-        plane.position.z = posZ;
+        plane.rotation.z = rotZ;
+        plane.position.set(posX, posY, posZ);
         return plane;
     };
 
-    const top = createFace(tileSize, tileSize, -Math.PI / 2, 0, tileHeight, 0);
-    group.add(top);
+    // Create all 6 faces of the box
+    const top = createFace(tileSize, tileSize, -Math.PI/2, 0, 0, 0, tileHeight, 0);
+    const bottom = createFace(tileSize, tileSize, Math.PI/2, 0, 0, 0, 0, 0);
+    
+    const front = createFace(tileSize, tileHeight, 0, 0, 0, 0, tileHeight/2, tileSize/2);
+    const back = createFace(tileSize, tileHeight, 0, Math.PI, 0, 0, tileHeight/2, -tileSize/2);
+    const left = createFace(tileSize, tileHeight, 0, -Math.PI/2, 0, -tileSize/2, tileHeight/2, 0);
+    const right = createFace(tileSize, tileHeight, 0, Math.PI/2, 0, tileSize/2, tileHeight/2, 0);
 
-    if (tileHeight > 0.5) {
-        const front = createFace(tileSize, tileHeight, 0, 0, tileHeight / 2, tileSize / 2);
-        const back = createFace(tileSize, tileHeight, 0, Math.PI, tileHeight / 2, -tileSize / 2);
-        const left = createFace(tileSize, tileHeight, 0, -Math.PI / 2, tileHeight / 2, 0);
-        const right = createFace(tileSize, tileHeight, 0, Math.PI / 2, tileHeight / 2, 0);
-        group.add(front, back, left, right);
-    }
+    group.add(top, bottom, front, back, left, right);
 
-    const worldX = (x - this.gridSize / 2) * this.tileSize;
-    const worldZ = (z - this.gridSize / 2) * this.tileSize;
+    const worldX = (x - this.gridSize/2) * this.tileSize;
+    const worldZ = (z - this.gridSize/2) * this.tileSize;
     group.position.set(worldX, 0, worldZ);
-    group.userData = { x, z, height };
+    group.userData = {x, z, height};
 
-// Add an invisible geometry for raycasting
-const raycastGeometry = new THREE.PlaneGeometry(tileSize, tileSize);
-const raycastMaterial = new THREE.MeshBasicMaterial({ 
-    transparent: true, 
-    opacity: 0, 
-    side: THREE.DoubleSide 
-});
-const raycastPlane = new THREE.Mesh(raycastGeometry, raycastMaterial);
-raycastPlane.rotation.x = -Math.PI / 2;
-raycastPlane.position.y = tileHeight + 0.01;
-raycastPlane.userData = { x, z, height };
-group.add(raycastPlane);
+    // Add invisible raycast plane for interaction
+    const raycastGeometry = new THREE.PlaneGeometry(tileSize, tileSize);
+    const raycastMaterial = new THREE.MeshBasicMaterial({
+        transparent: true, 
+        opacity: 0, 
+        side: THREE.DoubleSide
+    });
+    const raycastPlane = new THREE.Mesh(raycastGeometry, raycastMaterial);
+    raycastPlane.rotation.x = -Math.PI/2;
+    raycastPlane.position.y = tileHeight + 0.01;
+    raycastPlane.userData = {x, z, height};
+    group.add(raycastPlane);
 
     return group;
 }

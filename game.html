@@ -28,6 +28,19 @@
     <div class="ui-container">
         <button id="debugToggle" class="toggle-btn">Debug Info</button>
         <button id="editToggle" class="toggle-btn">Edit Mode</button>
+<button id="spriteDebugToggle" class="toggle-btn">Sprite Debug</button>
+        
+        <div id="debugPanel" class="panel">
+            <div><strong>Debug Info</strong></div>
+            <div>FPS: <span id="fps">60</span></div>
+            <div>Camera: <span id="cameraPos">0, 0, 0</span></div>
+            <div>Zoom: <span id="zoomLevel">1.0</span></div>
+            <div class="controls-text">
+                <div><strong>Desktop:</strong> WASD/Arrows=Move | Wheel=Zoom | Drag=Pan</div>
+                <div><strong>Mobile:</strong> Drag=Pan | Pinch=Zoom | Tap=Select</div>
+            </div>
+
+        </div>
         <div id="spriteDebugPanel" class="panel sprite-debug-panel">
     <div><strong>Sprite Debug</strong></div>
     <div>
@@ -40,16 +53,6 @@
         <input type="range" id="spriteHeight" min="0" max="10" step="0.1" value="1">
     </div>
 </div>
-        <div id="debugPanel" class="panel">
-            <div><strong>Debug Info</strong></div>
-            <div>FPS: <span id="fps">60</span></div>
-            <div>Camera: <span id="cameraPos">0, 0, 0</span></div>
-            <div>Zoom: <span id="zoomLevel">1.0</span></div>
-            <div class="controls-text">
-                <div><strong>Desktop:</strong> WASD/Arrows=Move | Wheel=Zoom | Drag=Pan</div>
-                <div><strong>Mobile:</strong> Drag=Pan | Pinch=Zoom | Tap=Select</div>
-            </div>
-        </div>
         
         <div id="editPanel" class="panel">
             <div><strong>Tile Editor</strong></div>
@@ -76,7 +79,7 @@
                 this.editMode = false; this.selectedTile = null; this.raycaster = new THREE.Raycaster(); this.mouse = new THREE.Vector2();
                 this.input = { keys: {}, mouse: { x: 0, y: 0, pressed: false }, touch: { active: false, pinchDistance: 0, moved: false } };
                 this.frameCount = 0; this.lastFpsUpdate = 0; this.cloudSprites = [];
-
+this.useTerrainSprites = USE_SPRITE_TERRAIN;
                 this.interactables = [];
                 this.proximityRadius = 2.5;
                 this.activeTooltip = null;
@@ -149,38 +152,47 @@
             setupUI() {
                 document.getElementById('debugToggle').onclick = () => this.togglePanel('debug');
                 document.getElementById('editToggle').onclick = () => this.togglePanel('edit');
+                 document.getElementById('spriteDebugToggle').onclick=()=>this.togglePanel('spriteDebug');
                 document.getElementById('raiseBtn').onclick = () => this.modifySelected(1);
                 document.getElementById('lowerBtn').onclick = () => this.modifySelected(-1);
-                document.getElementById('spriteDebugToggle').onclick = () => this.togglePanel('spriteDebug');
                 document.getElementById('clearBtn').onclick = () => confirm('Clear all terrain?') && this.clearTerrain();
             }
-setupSpriteDebug() {
-    const terrainToggle = document.getElementById('terrainSpriteToggle');
-    const scaleUp = document.getElementById('spriteScaleUp');
-    const scaleDown = document.getElementById('spriteScaleDown');
-    const heightSlider = document.getElementById('spriteHeight');
-
-    terrainToggle.onclick = () => this.toggleTerrainMode();
-    scaleUp.onclick = () => this.adjustSpriteScale(1.1);
-    scaleDown.onclick = () => this.adjustSpriteScale(0.9);
-    heightSlider.oninput = (e) => this.adjustSpriteHeight(parseFloat(e.target.value));
+setupSpriteDebug(){
+    const terrainToggle=document.getElementById('terrainSpriteToggle');
+    const scaleUp=document.getElementById('spriteScaleUp');
+    const scaleDown=document.getElementById('spriteScaleDown');
+    const heightSlider=document.getElementById('spriteHeight');
+    terrainToggle.onclick=()=>this.toggleTerrainMode();
+    scaleUp.onclick=()=>this.adjustSpriteScale(1.1);
+    scaleDown.onclick=()=>this.adjustSpriteScale(0.9);
+    heightSlider.oninput=(e)=>this.adjustSpriteHeight(parseFloat(e.target.value));
 }
 
-toggleTerrainMode() {
+toggleTerrainMode(){
     this.useTerrainSprites = !this.useTerrainSprites;
-    document.getElementById('terrainSpriteToggle').textContent = 
-        `Terrain: ${this.useTerrainSprites ? 'Sprites' : '3D'}`;
+    document.getElementById('terrainSpriteToggle').textContent = `Terrain: ${this.useTerrainSprites ? 'Sprites' : '3D'}`;
     
-    // Reinitialize the terrain with new mode
-    this.terrain.init(this.useTerrainSprites);
+    // Regenerate terrain with new mode
+    this.scene.remove(this.terrain.terrainGroup);
+    this.terrain = new TerrainSystem(this.gridSize, this.tileSize, this.heightLevels);
+    this.terrain.generateTerrain();
+    this.scene.add(this.terrain.terrainGroup);
+    
+    // Update the global constant
+    window.USE_SPRITE_TERRAIN = this.useTerrainSprites;
 }
 
-adjustSpriteScale(factor) {
-    if (!this.useTerrainSprites) return;
-    this.terrain.terrainGroup.children.forEach(sprite => {
-        if (sprite.isSprite) {
-            sprite.scale.x *= factor;
-            sprite.scale.y *= factor;
+adjustSpriteScale(factor){
+    if(!this.useTerrainSprites) return;
+    
+    this.terrain.terrainGroup.children.forEach(tileGroup => {
+        if(tileGroup.isGroup) {
+            tileGroup.children.forEach(child => {
+                if(child.isSprite || (child.material && child.material.map)) {
+                    child.scale.x *= factor;
+                    child.scale.y *= factor;
+                }
+            });
         }
     });
 }
@@ -252,11 +264,45 @@ adjustSpriteHeight(height) {
             clearSelection() { this.selectedTile = null; this.updateEditUI(); this.removeHighlight(); }
 
             highlightTile(mesh) {
-                this.removeHighlight();
-                const edges = new THREE.EdgesGeometry(mesh.geometry);
-                this.tileHighlight = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 3 }));
-                this.tileHighlight.position.copy(mesh.position); this.tileHighlight.position.y += 0.01; this.scene.add(this.tileHighlight);
-            }
+    this.removeHighlight();
+    
+    if (USE_SPRITE_TERRAIN && mesh.isGroup) {
+        // For sprite terrain, create a simple outline around the tile base
+        const tileSize = this.tileSize * 0.9;
+        const geometry = new THREE.RingGeometry(tileSize * 0.6, tileSize * 0.65, 16);
+        const material = new THREE.MeshBasicMaterial({ 
+            color: 0xffffff, 
+            transparent: true, 
+            opacity: 0.8,
+            side: THREE.DoubleSide 
+        });
+        
+        this.tileHighlight = new THREE.Mesh(geometry, material);
+        this.tileHighlight.rotation.x = -Math.PI / 2;
+        this.tileHighlight.position.copy(mesh.position);
+        
+        // Position slightly above the tile
+        const tile = this.getTileFromMesh(mesh);
+        if (tile) {
+            this.tileHighlight.position.y = 0.5 + tile.height * 0.5 + 0.02;
+        }
+        
+        this.scene.add(this.tileHighlight);
+    } else {
+        // Original 3D tile highlighting
+        const edges = new THREE.EdgesGeometry(mesh.geometry);
+        this.tileHighlight = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 3 }));
+        this.tileHighlight.position.copy(mesh.position); 
+        this.tileHighlight.position.y += 0.01; 
+        this.scene.add(this.tileHighlight);
+    }
+}
+getTileFromMesh(mesh) {
+    if (mesh.userData && mesh.userData.x !== undefined) {
+        return this.terrain.getTile(mesh.userData.x, mesh.userData.z);
+    }
+    return null;
+}
 
             removeHighlight() {
                 if (this.tileHighlight) { 
@@ -456,9 +502,16 @@ handleTouchEnd(e) {
                     if (c.position.x > this.gridSize * this.tileSize) c.position.x = -this.gridSize * this.tileSize;
                 });
                 if (this.selectedTile && this.tileHighlight) {
-                    const tile = this.terrain.getTile(this.selectedTile.x, this.selectedTile.z);
-                    if (tile) { this.tileHighlight.position.copy(tile.mesh.position); this.tileHighlight.position.y += 0.01; }
-                }
+    const tile = this.terrain.getTile(this.selectedTile.x, this.selectedTile.z);
+    if (tile) { 
+        this.tileHighlight.position.copy(tile.mesh.position); 
+        if(window.USE_SPRITE_TERRAIN){
+            this.tileHighlight.position.y = 0.5 + tile.height * 0.5 + 0.02;
+        } else {
+            this.tileHighlight.position.y += 0.01;
+        }
+    }
+}
                 if (this.player) this.player.update();
             }
 
@@ -948,7 +1001,7 @@ showInteractionMessage(message) {
                 this.gridSize = gridSize; this.tileSize = tileSize; this.heightLevels = heightLevels;
                 this.terrainGroup = new THREE.Group(); this.tiles = [];
                 this.levelColors = [0x277da1, 0x4fc3f7, 0x43aa8b, 0x90be6d, 0xf9c74f, 0xf9844a, 0xf3722c, 0x577590];
-                if (USE_SPRITE_TERRAIN) {
+                if(window.USE_SPRITE_TERRAIN){
     const loader = new THREE.TextureLoader();
     this.terrainTexture = loader.load('https://i.imgur.com/C4l87Xp.png');
     this.terrainTexture.magFilter = THREE.NearestFilter;
@@ -981,7 +1034,7 @@ showInteractionMessage(message) {
             }
 
             createTile(x, z, height) {
-    if (USE_SPRITE_TERRAIN) {
+    if(window.USE_SPRITE_TERRAIN){
         return this.createSpriteTile(x, z, height);
     } else {
         return this.create3DTile(x, z, height);

@@ -112,34 +112,33 @@ clearScene() {
     
     this.setupInput();
     this.setupUI();
-    this.setupInteractables();
-    this.loadSprites();
-    this.player = new Player(this);
-    this.start();
-    this.updateDebugInfo();
+    // Load sprites first
+    this.loadSprites().then(() => {
+        // Then setup terrain and other dependent systems
+        this.setupTerrain();
+        this.setupInteractables();
+        this.player = new Player(this);
+        this.start();
+        this.updateDebugInfo();
+    });
 }
 // Load all sprites at initialization
-                loadSprites() {
-                    const loader = new THREE.TextureLoader();
-                    
-                    loader.load('https://i.imgur.com/UaNOFAA.png', texture => {
-                        texture.magFilter = texture.minFilter = THREE.NearestFilter;
-                        this.sprites.terrain = texture;
-                        this.setupTerrain(); // Rebuild terrain with sprites
-                    });
-                    
-                    loader.load('https://i.imgur.com/UaNOFAA.png', texture => {
-                        texture.magFilter = texture.minFilter = THREE.NearestFilter;
-                        this.sprites.objects = texture;
-                        this.setupInteractables(); // Rebuild objects with sprites
-                    });
-                    
-                    loader.load('https://i.imgur.com/UaNOFAA.png', texture => {
-                        texture.magFilter = texture.minFilter = THREE.NearestFilter;
-                        this.sprites.characters = texture;
-                        this.player = new Player(this); // Create player with sprites
-                    });
-                }
+                async loadSprites() {
+    const loader = new THREE.TextureLoader();
+    const loadTexture = (url) => new Promise(resolve => loader.load(url, resolve));
+    
+    // Load all sprites before proceeding
+    this.sprites = {
+        terrain: await loadTexture('https://i.imgur.com/UaNOFAA.png'),
+        objects: await loadTexture('https://i.imgur.com/UaNOFAA.png'),
+        characters: await loadTexture('https://i.imgur.com/UaNOFAA.png')
+    };
+    
+    // Set texture filters
+    Object.values(this.sprites).forEach(texture => {
+        texture.magFilter = texture.minFilter = THREE.NearestFilter;
+    });
+}
             setupRenderer() {
                 this.canvas = document.getElementById('gameCanvas');
                 this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });

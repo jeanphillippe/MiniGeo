@@ -868,19 +868,10 @@ showInteractionMessage(message) {
 
         class TerrainSystem {
             constructor(gridSize, tileSize, heightLevels) {
-    this.gridSize = gridSize;
-    this.tileSize = tileSize;
-    this.heightLevels = heightLevels;
-    this.terrainGroup = new THREE.Group();
-    this.tiles = [];
-    this.levelColors = [0x277da1, 0x4fc3f7, 0x43aa8b, 0x90be6d, 0xf9c74f, 0xf9844a, 0xf3722c, 0x577590];
-    
-    // Add this new code for sprite texture
-    const loader = new THREE.TextureLoader();
-    this.terrainTexture = loader.load('https://i.imgur.com/C4l87Xp.png');
-    this.terrainTexture.magFilter = THREE.NearestFilter;
-    this.terrainTexture.minFilter = THREE.NearestFilter;
-}
+                this.gridSize = gridSize; this.tileSize = tileSize; this.heightLevels = heightLevels;
+                this.terrainGroup = new THREE.Group(); this.tiles = [];
+                this.levelColors = [0x277da1, 0x4fc3f7, 0x43aa8b, 0x90be6d, 0xf9c74f, 0xf9844a, 0xf3722c, 0x577590];
+            }
 
             generateTerrain() {
                 for (let x = 0; x < this.gridSize; x++) {
@@ -906,64 +897,17 @@ showInteractionMessage(message) {
                 return Math.max(0, Math.min(this.heightLevels - 1, height));
             }
 
-            // Replace the createTile method with this version:
-createTile(x, z, height) {
-    const group = new THREE.Group();
-    const tileSize = this.tileSize * 0.9;
-    const tileHeight = 0.5 + height * 0.5;
-    
-    // Calculate UV coordinates for the sprite
-    const spriteWidth = 1/8; // 8 sprites horizontally
-    const spriteU = height * spriteWidth;
-    
-    // Create textured planes for each visible face
-    const createFace = (width, height, rotX, rotY, posY, posZ) => {
-        const geometry = new THREE.PlaneGeometry(width, height);
-        const material = new THREE.MeshLambertMaterial({
-            map: this.terrainTexture,
-            transparent: true,
-            side: THREE.DoubleSide
-        });
-        
-        // Set UV coordinates for the sprite
-        const uvs = geometry.attributes.uv;
-        for(let i = 0; i < uvs.count; i++) {
-            uvs.setX(i, uvs.getX(i) * spriteWidth + spriteU);
-        }
-        
-        const plane = new THREE.Mesh(geometry, material);
-        plane.rotation.x = rotX;
-        plane.rotation.y = rotY;
-        plane.position.y = posY;
-        plane.position.z = posZ;
-        return plane;
-    };
-    
-    // Top face
-    const top = createFace(tileSize, tileSize, -Math.PI/2, 0, tileHeight, 0);
-    group.add(top);
-    
-    // Side faces - only create if visible (height > 0)
-    if(tileHeight > 0.5) {
-        // Front
-        const front = createFace(tileSize, tileHeight, 0, 0, tileHeight/2, tileSize/2);
-        // Back
-        const back = createFace(tileSize, tileHeight, 0, Math.PI, tileHeight/2, -tileSize/2);
-        // Left
-        const left = createFace(tileSize, tileHeight, 0, -Math.PI/2, tileHeight/2, 0);
-        // Right
-        const right = createFace(tileSize, tileHeight, 0, Math.PI/2, tileHeight/2, 0);
-        
-        group.add(front, back, left, right);
-    }
-    
-    const worldX = (x - this.gridSize / 2) * this.tileSize;
-    const worldZ = (z - this.gridSize / 2) * this.tileSize;
-    group.position.set(worldX, 0, worldZ);
-    group.userData = { x, z, height };
-    
-    return group;
-}
+            createTile(x, z, height) {
+                const geometry=new THREE.BoxGeometry(this.tileSize*0.9,0.5+height*0.5,this.tileSize*0.9);
+                const material = new THREE.MeshLambertMaterial({ color: this.levelColors[height] });
+                const mesh = new THREE.Mesh(geometry, material);
+                
+                const worldX = (x - this.gridSize / 2) * this.tileSize;
+                const worldZ = (z - this.gridSize / 2) * this.tileSize;
+                mesh.position.set(worldX, (height * 0.5 + 0.1) / 2, worldZ);
+                mesh.userData = { x, z, height };
+                return mesh;
+            }
 
             getTile(x, z) {
                 return this.tiles[x]?.[z];

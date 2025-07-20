@@ -610,7 +610,11 @@ toggleTerrainMode() {
     this.useTerrainSprites = !this.useTerrainSprites;
     document.getElementById('terrainSpriteToggle').textContent = 
         `Terrain: ${this.useTerrainSprites ? 'Sprites' : '3D'}`;
-    this.rebuildTerrain();
+    
+    // Only rebuild if sprite texture is loaded (for sprite mode)
+    if (!this.useTerrainSprites || (this.useTerrainSprites && this.terrain.spriteTexture)) {
+        this.rebuildTerrain();
+    }
 }
 
 toggleObjectMode() {
@@ -621,21 +625,40 @@ toggleObjectMode() {
 }
 
 rebuildTerrain() {
-    // Clear existing terrain
+    // First, properly dispose of all existing terrain meshes and their resources
     this.terrain.terrainGroup.children.forEach(child => {
-        child.geometry?.dispose();
-        child.material?.dispose();
+        if (child.geometry) {
+            child.geometry.dispose();
+        }
+        if (child.material) {
+            if (Array.isArray(child.material)) {
+                child.material.forEach(mat => mat.dispose());
+            } else {
+                child.material.dispose();
+            }
+        }
+        this.terrain.terrainGroup.remove(child);
     });
-    this.terrain.terrainGroup.clear();
+    
+    // Clear the terrain group
+    while(this.terrain.terrainGroup.children.length > 0) {
+        this.terrain.terrainGroup.remove(this.terrain.terrainGroup.children[0]);
+    }
     
     // Rebuild with current mode
     for (let x = 0; x < this.gridSize; x++) {
         for (let z = 0; z < this.gridSize; z++) {
             const tileData = this.terrain.tiles[x][z];
+            // Create new tile with current mode (sprite or 3D)
             const newMesh = this.terrain.createTile(x, z, tileData.height, this.useTerrainSprites);
             tileData.mesh = newMesh;
             this.terrain.terrainGroup.add(newMesh);
         }
+    }
+    
+    // Force a garbage collection hint
+    if (window.gc) {
+        window.gc();
     }
 }
 
@@ -979,10 +1002,21 @@ showInteractionMessage(message) {
 
         class TerrainSystem {
             constructor(gridSize, tileSize, heightLevels) {
-                this.gridSize = gridSize; this.tileSize = tileSize; this.heightLevels = heightLevels;
-                this.terrainGroup = new THREE.Group(); this.tiles = [];
-                this.levelColors = [0x277da1, 0x4fc3f7, 0x43aa8b, 0x90be6d, 0xf9c74f, 0xf9844a, 0xf3722c, 0x577590];
-            }
+    this.gridSize = gridSize;
+    this.tileSize = tileSize;
+    this.heightLevels = heightLevels;
+    this.terrainGroup = new THREE.Group();
+    this.tiles = [];
+    this.levelColors = [0x277da1, 0x4fc3f7, 0x43aa8b, 0x90be6d, 0xf9c74f, 0xf9844a, 0xf3722c, 0x577590];
+    
+    // Load sprite texture
+    const textureLoader = new THREE.TextureLoader();
+    textureLoader.load('path/to/your/tile/sprite/texture.png', (texture) => {
+        texture.magFilter = THREE.NearestFilter;
+        texture.minFilter = THREE.NearestFilter;
+        this.spriteTexture = texture;
+    });
+}
 
             generateTerrain() {
                 for (let x = 0; x < this.gridSize; x++) {
@@ -1008,33 +1042,45 @@ showInteractionMessage(message) {
                 return Math.max(0, Math.min(this.heightLevels - 1, height));
             }
 
-            createTile(x, z, height, useSprites = false) {
-    let mesh;
-    
-    if (useSprites && this.game?.sprites?.terrain) {
-        // Sprite version
-        const material = new THREE.SpriteMaterial({ 
-            map: this.game.sprites.terrain,
-            transparent: true 
+            createTile(x, z, height, useSprite = false) {
+    if (useSprite) {
+        // Create sprite version of tile
+        const material = new THREE.SpriteMaterial({
+            map: this.spriteTexture, // You'll need to load this texture
+            transparent: true
         });
-        mesh = new THREE.Sprite(material);
-        mesh.scale.set(this.tileSize, this.tileSize * (0.5 + height * 0.3), 1);
+        const sprite = new THREE.Sprite(material);
         
-        // Set UV for different tile types based on height
-        const frameIndex = Math.min(height, 7);
-        this.setTileFrameUV(mesh, frameIndex);
+        // Position the sprite
+        const posX = (x - this.gridSize / 2) * this.tileSize;
+        const posZ = (z - this.gridSize / 2) * this.tileSize;
+        const posY = height * 0.5;
+        sprite.position.set(posX, posY, posZ);
+        
+        // Scale sprite appropriately
+        sprite.scale.set(this.tileSize, this.tileSize * 0.5, 1);
+        
+        // Store tile data
+        sprite.userData = { x, z, height };
+        
+        return sprite;
     } else {
-        // 3D version (existing code)
-        const geometry = new THREE.BoxGeometry(this.tileSize*0.9, 0.5+height*0.5, this.tileSize*0.9);
-        const material = new THREE.MeshLambertMaterial({ color: this.levelColors[height] });
-        mesh = new THREE.Mesh(geometry, material);
+        // Original 3D tile creation code
+        const geometry = new THREE.BoxGeometry(this.tileSize, 1 + height, this.tileSize);
+        const material = new THREE.MeshLambertMaterial({ 
+            color: this.levelColors[height] || 0x808080 
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+        
+        const posX = (x - this.gridSize / 2) * this.tileSize;
+        const posZ = (z - this.gridSize / 2) * this.tileSize;
+        const posY = (height * 0.5);
+        mesh.position.set(posX, posY, posZ);
+        
+        mesh.userData = { x, z, height };
+        
+        return mesh;
     }
-    
-    const worldX = (x - this.gridSize / 2) * this.tileSize;
-    const worldZ = (z - this.gridSize / 2) * this.tileSize;
-    mesh.position.set(worldX, (height * 0.5 + 0.1) / 2, worldZ);
-    mesh.userData = { x, z, height };
-    return mesh;
 }
 
 setTileFrameUV(sprite, frameIndex) {

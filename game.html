@@ -43,7 +43,7 @@
 
     <script>
         const USE_SPRITE_PLAYER = false; // Set to false for cylinder player
-        
+        const USE_SPRITE_TERRAIN = true; // Set to true for sprite terrain, false for 3D tiles
         class GameEngine {
             constructor() {
                 this.gridSize = 16; this.tileSize = 2; this.heightLevels = 8;
@@ -154,7 +154,7 @@
                 const rect = this.canvas.getBoundingClientRect();
                 this.mouse.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
                 this.raycaster.setFromCamera(this.mouse, this.camera);
-                const intersects = this.raycaster.intersectObjects(this.terrain.terrainGroup.children);
+                const intersects = this.raycaster.intersectObjects(this.terrain.terrainGroup.children, true);
                 if (intersects.length) {
                     const tile = intersects[0].object.userData;
                     this.selectTile(tile.x, tile.z);
@@ -297,7 +297,7 @@ handleTouchEnd(e) {
             );
             
             this.raycaster.setFromCamera(this.mouse, this.camera);
-            const hits = this.raycaster.intersectObjects(this.terrain.terrainGroup.children);
+            const hits = this.raycaster.intersectObjects(this.terrain.terrainGroup.children, true);
             
             if (hits.length) {
                 const { x, z } = hits[0].object.userData;
@@ -811,7 +811,7 @@ showInteractionMessage(message) {
         const rect=this.game.canvas.getBoundingClientRect();
         this.game.mouse.set(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);
         this.game.raycaster.setFromCamera(this.game.mouse,this.game.camera);
-        const hits=this.game.raycaster.intersectObjects(this.game.terrain.terrainGroup.children);
+        const hits=this.game.raycaster.intersectObjects(this.game.terrain.terrainGroup.children, true);
         if(hits.length){
             const{x,z}=hits[0].object.userData;
             this.findPath(this.pos,{x,z},path=>{this.path=path;this.progress=0});
@@ -871,6 +871,12 @@ showInteractionMessage(message) {
                 this.gridSize = gridSize; this.tileSize = tileSize; this.heightLevels = heightLevels;
                 this.terrainGroup = new THREE.Group(); this.tiles = [];
                 this.levelColors = [0x277da1, 0x4fc3f7, 0x43aa8b, 0x90be6d, 0xf9c74f, 0xf9844a, 0xf3722c, 0x577590];
+                if (USE_SPRITE_TERRAIN) {
+    const loader = new THREE.TextureLoader();
+    this.terrainTexture = loader.load('https://i.imgur.com/C4l87Xp.png');
+    this.terrainTexture.magFilter = THREE.NearestFilter;
+    this.terrainTexture.minFilter = THREE.NearestFilter;
+}
             }
 
             generateTerrain() {
@@ -898,35 +904,119 @@ showInteractionMessage(message) {
             }
 
             createTile(x, z, height) {
-                const geometry=new THREE.BoxGeometry(this.tileSize*0.9,0.5+height*0.5,this.tileSize*0.9);
-                const material = new THREE.MeshLambertMaterial({ color: this.levelColors[height] });
-                const mesh = new THREE.Mesh(geometry, material);
-                
-                const worldX = (x - this.gridSize / 2) * this.tileSize;
-                const worldZ = (z - this.gridSize / 2) * this.tileSize;
-                mesh.position.set(worldX, (height * 0.5 + 0.1) / 2, worldZ);
-                mesh.userData = { x, z, height };
-                return mesh;
-            }
+    if (USE_SPRITE_TERRAIN) {
+        return this.createSpriteTile(x, z, height);
+    } else {
+        return this.create3DTile(x, z, height);
+    }
+}
+
+create3DTile(x, z, height) {
+    const geometry = new THREE.BoxGeometry(this.tileSize * 0.9, 0.5 + height * 0.5, this.tileSize * 0.9);
+    const material = new THREE.MeshLambertMaterial({ color: this.levelColors[height] });
+    const mesh = new THREE.Mesh(geometry, material);
+    
+    const worldX = (x - this.gridSize / 2) * this.tileSize;
+    const worldZ = (z - this.gridSize / 2) * this.tileSize;
+    mesh.position.set(worldX, (height * 0.5 + 0.1) / 2, worldZ);
+    mesh.userData = { x, z, height };
+    return mesh;
+}
+
+createSpriteTile(x, z, height) {
+    const group = new THREE.Group();
+    const tileSize = this.tileSize * 0.9;
+    const tileHeight = 0.5 + height * 0.5;
+
+    const spriteWidth = 1 / 8;
+    const spriteU = height * spriteWidth;
+
+    const createFace = (width, height, rotX, rotY, posY, posZ) => {
+        const geometry = new THREE.PlaneGeometry(width, height);
+        const material = new THREE.MeshLambertMaterial({
+            map: this.terrainTexture,
+            transparent: true,
+            side: THREE.DoubleSide
+        });
+
+        const uvs = geometry.attributes.uv;
+        for (let i = 0; i < uvs.count; i++) {
+            uvs.setX(i, uvs.getX(i) * spriteWidth + spriteU);
+        }
+
+        const plane = new THREE.Mesh(geometry, material);
+        plane.rotation.x = rotX;
+        plane.rotation.y = rotY;
+        plane.position.y = posY;
+        plane.position.z = posZ;
+        return plane;
+    };
+
+    const top = createFace(tileSize, tileSize, -Math.PI / 2, 0, tileHeight, 0);
+    group.add(top);
+
+    if (tileHeight > 0.5) {
+        const front = createFace(tileSize, tileHeight, 0, 0, tileHeight / 2, tileSize / 2);
+        const back = createFace(tileSize, tileHeight, 0, Math.PI, tileHeight / 2, -tileSize / 2);
+        const left = createFace(tileSize, tileHeight, 0, -Math.PI / 2, tileHeight / 2, 0);
+        const right = createFace(tileSize, tileHeight, 0, Math.PI / 2, tileHeight / 2, 0);
+        group.add(front, back, left, right);
+    }
+
+    const worldX = (x - this.gridSize / 2) * this.tileSize;
+    const worldZ = (z - this.gridSize / 2) * this.tileSize;
+    group.position.set(worldX, 0, worldZ);
+    group.userData = { x, z, height };
+
+// Add an invisible geometry for raycasting
+const raycastGeometry = new THREE.PlaneGeometry(tileSize, tileSize);
+const raycastMaterial = new THREE.MeshBasicMaterial({ 
+    transparent: true, 
+    opacity: 0, 
+    side: THREE.DoubleSide 
+});
+const raycastPlane = new THREE.Mesh(raycastGeometry, raycastMaterial);
+raycastPlane.rotation.x = -Math.PI / 2;
+raycastPlane.position.y = tileHeight + 0.01;
+raycastPlane.userData = { x, z, height };
+group.add(raycastPlane);
+
+    return group;
+}
 
             getTile(x, z) {
                 return this.tiles[x]?.[z];
             }
 
             updateTileHeight(x, z, newHeight) {
-                const tile = this.getTile(x, z);
-                if (!tile) return;
+    const tile = this.getTile(x, z);
+    if (!tile) return;
 
-                this.terrainGroup.remove(tile.mesh);
-                tile.mesh.geometry.dispose();
-                tile.mesh.material.dispose();
+    this.terrainGroup.remove(tile.mesh);
+    
+    // Dispose of geometry and materials properly for both types
+    if (tile.mesh.isGroup) {
+        tile.mesh.children.forEach(child => {
+            child.geometry?.dispose();
+            child.material?.dispose();
+        });
+    } else {
+        tile.mesh.geometry?.dispose();
+        tile.mesh.material?.dispose();
+    }
 
-                const newMesh = this.createTile(x, z, newHeight);
-                newMesh.castShadow = newMesh.receiveShadow = true;
-                tile.height = newHeight;
-                tile.mesh = newMesh;
-                this.terrainGroup.add(newMesh);
-            }
+    const newMesh = this.createTile(x, z, newHeight);
+    newMesh.castShadow = newMesh.receiveShadow = true;
+    if (newMesh.children) {
+        newMesh.children.forEach(child => {
+            child.castShadow = child.receiveShadow = true;
+        });
+    }
+    
+    tile.height = newHeight;
+    tile.mesh = newMesh;
+    this.terrainGroup.add(newMesh);
+}
         }
 
         // Initialize the game

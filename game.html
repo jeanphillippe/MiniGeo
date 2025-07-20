@@ -6,6 +6,20 @@
     <title>Optimized Isometric Game</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#2c3e50;overflow:hidden}#gameCanvas{display:block;width:100vw;height:100vh;touch-action:none;cursor:grab}#gameCanvas:active{cursor:grabbing}.ui-container{position:absolute;top:10px;left:10px;z-index:100}.toggle-btn{background:rgb(0 0 0 / .8);color:#fff;border:none;padding:8px 12px;border-radius:4px;cursor:pointer;font-size:12px;margin-bottom:5px}.toggle-btn:hover{background:rgb(0 0 0 / .9)}.toggle-btn.active{background:#4CAF50}.panel{color:#fff;background:rgb(0 0 0 / .8);padding:12px;border-radius:6px;font-size:12px;margin-bottom:5px;min-width:200px;display:none}.panel.visible{display:block}.panel button{background:#4CAF50;color:#fff;border:none;padding:6px 12px;border-radius:3px;cursor:pointer;font-size:11px;margin:2px}.panel button:hover{background:#45a049}.panel button:disabled{background:#666;cursor:not-allowed}.edit-indicator{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#ff6b6b;font-size:16px;font-weight:700;text-shadow:2px 2px 4px rgb(0 0 0 / .8);z-index:99;pointer-events:none;display:none}.edit-indicator.visible{display:block}.controls-text{font-size:10px;color:#ccc;margin-top:8px;line-height:1.3}.tooltip-container{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:auto;z-index:150}.tooltip{background:rgb(0 0 0 / .9);color:#fff;padding:8px 12px;border-radius:6px;font-size:14px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;white-space:nowrap;box-shadow:0 2px 8px rgb(0 0 0 / .4);border:1px solid rgb(255 255 255 / .2);opacity:0;transform:translateY(10px);transition:all 0.3s ease;cursor:pointer}.tooltip:hover{background:rgb(76 175 80 / .3);border-color:#4CAF50;transform:translateY(-2px);box-shadow:0 4px 12px rgb(0 0 0 / .6)}.tooltip.visible{opacity:1;transform:translateY(0)}.tooltip.interact{border-color:#4CAF50;background:rgb(76 175 80 / .2);backdrop-filter:blur(4px)}.interact-prompt{color:#fff;font-weight:700;font-size:12px;margin-top:4px}
+.sprite-debug-panel {
+    position: absolute;
+    top: 120px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 10px;
+    border-radius: 5px;
+    display: none;
+}
+
+.sprite-debug-panel.visible {
+    display: block;
+}
     </style>
 </head>
 <body>
@@ -14,7 +28,18 @@
     <div class="ui-container">
         <button id="debugToggle" class="toggle-btn">Debug Info</button>
         <button id="editToggle" class="toggle-btn">Edit Mode</button>
-        
+        <div id="spriteDebugPanel" class="panel sprite-debug-panel">
+    <div><strong>Sprite Debug</strong></div>
+    <div>
+        <button id="terrainSpriteToggle">Terrain: 3D</button>
+        <button id="spriteScaleUp">Scale +</button>
+        <button id="spriteScaleDown">Scale -</button>
+    </div>
+    <div>
+        <label>Sprite Height:</label>
+        <input type="range" id="spriteHeight" min="0" max="10" step="0.1" value="1">
+    </div>
+</div>
         <div id="debugPanel" class="panel">
             <div><strong>Debug Info</strong></div>
             <div>FPS: <span id="fps">60</span></div>
@@ -126,14 +151,66 @@
                 document.getElementById('editToggle').onclick = () => this.togglePanel('edit');
                 document.getElementById('raiseBtn').onclick = () => this.modifySelected(1);
                 document.getElementById('lowerBtn').onclick = () => this.modifySelected(-1);
+                document.getElementById('spriteDebugToggle').onclick = () => this.togglePanel('spriteDebug');
                 document.getElementById('clearBtn').onclick = () => confirm('Clear all terrain?') && this.clearTerrain();
             }
+setupSpriteDebug() {
+    const terrainToggle = document.getElementById('terrainSpriteToggle');
+    const scaleUp = document.getElementById('spriteScaleUp');
+    const scaleDown = document.getElementById('spriteScaleDown');
+    const heightSlider = document.getElementById('spriteHeight');
 
+    terrainToggle.onclick = () => this.toggleTerrainMode();
+    scaleUp.onclick = () => this.adjustSpriteScale(1.1);
+    scaleDown.onclick = () => this.adjustSpriteScale(0.9);
+    heightSlider.oninput = (e) => this.adjustSpriteHeight(parseFloat(e.target.value));
+}
+
+toggleTerrainMode() {
+    this.useTerrainSprites = !this.useTerrainSprites;
+    document.getElementById('terrainSpriteToggle').textContent = 
+        `Terrain: ${this.useTerrainSprites ? 'Sprites' : '3D'}`;
+    
+    // Reinitialize the terrain with new mode
+    this.terrain.init(this.useTerrainSprites);
+}
+
+adjustSpriteScale(factor) {
+    if (!this.useTerrainSprites) return;
+    this.terrain.terrainGroup.children.forEach(sprite => {
+        if (sprite.isSprite) {
+            sprite.scale.x *= factor;
+            sprite.scale.y *= factor;
+        }
+    });
+}
+
+adjustSpriteHeight(height) {
+    if (!this.useTerrainSprites) return;
+    this.terrain.terrainGroup.children.forEach(sprite => {
+        if (sprite.isSprite) {
+            sprite.position.y = height * sprite.userData.height;
+        }
+    });
+}
             togglePanel(type) {
-                if (type === 'debug') {
-                    const panel = document.getElementById('debugPanel'), btn = document.getElementById('debugToggle');
-                    const isVisible = panel.classList.toggle('visible'); btn.classList.toggle('active', isVisible);
-                } else {
+    if (type === 'debug') {
+        const panel = document.getElementById('debugPanel');
+        const btn = document.getElementById('debugToggle');
+        const isVisible = panel.classList.toggle('visible');
+        btn.classList.toggle('active', isVisible);
+    } else if (type === 'spriteDebug') {
+        const panel = document.getElementById('spriteDebugPanel');
+        const btn = document.getElementById('spriteDebugToggle');
+        const isVisible = panel.classList.toggle('visible');
+        btn.classList.toggle('active', isVisible);
+        
+        if (isVisible && !this.spriteDebugInitialized) {
+            this.setupSpriteDebug();
+            this.spriteDebugInitialized = true;
+        }
+    } else {
+ 
                     this.editMode = !this.editMode;
                     const panel = document.getElementById('editPanel'), btn = document.getElementById('editToggle'), ind = document.getElementById('editIndicator');
                     panel.classList.toggle('visible', this.editMode); btn.classList.toggle('active', this.editMode); ind.classList.toggle('visible', this.editMode);

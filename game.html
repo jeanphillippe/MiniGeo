@@ -15,6 +15,55 @@
     padding: 10px;
     border-radius: 5px;
     display: none;
+    min-width: 250px;
+}
+
+.pip-reference {
+    position: relative;
+    bottom: 0;
+    left: 0;
+    width: 64px;
+    height: 64px;
+    border: 2px solid #4CAF50;
+    border-radius: 5px;
+    background: rgba(0, 0, 0, 0.8);
+    
+    z-index: 200;
+}
+
+.pip-reference.visible {
+    display: block;
+}
+
+.pip-reference img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 3px;
+}
+
+.pip-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.3) 0px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.3) 0px, transparent 1px);
+    background-size: 15px 15px;
+    pointer-events: none;
+}
+
+.pip-label {
+    position: absolute;
+    bottom: -20px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 10px;
+    color: #ccc;
+    font-weight: bold;
 }
 #spriteDebugPanel input[type="number"] {
     background: rgba(255, 255, 255, 0.1);
@@ -67,24 +116,35 @@
     <div style="margin: 8px 0;">
         <label>U Offset:</label>
         <input type="number" id="uOffsetInput" step="0.01" value="0" style="width: 60px;">
-        <input type="range" id="uOffset" min="-20" max="20" step="0.01" value="0">
+        <input type="range" id="uOffset" min="-2" max="2" step="0.01" value="0">
     </div>
     <div style="margin: 8px 0;">
         <label>V Offset:</label>
         <input type="number" id="vOffsetInput" step="0.01" value="0" style="width: 60px;">
-        <input type="range" id="vOffset" min="-20" max="20" step="0.01" value="0">
+        <input type="range" id="vOffset" min="-2" max="2" step="0.01" value="0">
     </div>
     <div style="margin: 8px 0;">
         <label>U Scale:</label>
         <input type="number" id="uScaleInput" step="0.1" value="1" style="width: 60px;">
-        <input type="range" id="uScale" min="-30" max="30" step="0.01" value="1">
+        <input type="range" id="uScale" min="0.1" max="5" step="0.01" value="1">
     </div>
     <div style="margin: 8px 0;">
         <label>V Scale:</label>
         <input type="number" id="vScaleInput" step="0.1" value="1" style="width: 60px;">
-        <input type="range" id="vScale" min="-30" max="30" step="0.01" value="1">
+        <input type="range" id="vScale" min="0.1" max="5" step="0.01" value="1">
     </div>
+    <div style="margin: 8px 0;">
+        <button id="resetTextureBtn" style="background: #f44336;">Reset Texture</button>
+    </div>
+    <!-- Add this PIP reference image container -->
+<div id="pipReference" class="pip-reference">
+    <img id="pipImage" src="https://i.imgur.com/C4l87Xp.png" alt="Texture Reference">
+    <div class="pip-overlay"></div>
+    <div class="pip-label">Texture Atlas</div>
 </div>
+</div>
+
+
         
         <div id="editPanel" class="panel">
             <div><strong>Tile Editor</strong></div>
@@ -189,24 +249,34 @@ this.useTerrainSprites = USE_SPRITE_TERRAIN;
                 document.getElementById('lowerBtn').onclick = () => this.modifySelected(-1);
                 document.getElementById('clearBtn').onclick = () => confirm('Clear all terrain?') && this.clearTerrain();
             }
+
 setupSpriteDebug() {
     const terrainToggle = document.getElementById('terrainSpriteToggle');
-    
-    // Get all input elements
     const uOffset = document.getElementById('uOffset');
     const vOffset = document.getElementById('vOffset');
     const uScale = document.getElementById('uScale');
     const vScale = document.getElementById('vScale');
-    
     const uOffsetInput = document.getElementById('uOffsetInput');
     const vOffsetInput = document.getElementById('vOffsetInput');
     const uScaleInput = document.getElementById('uScaleInput');
     const vScaleInput = document.getElementById('vScaleInput');
+    const resetBtn = document.getElementById('resetTextureBtn');
 
     terrainToggle.textContent = `Terrain: ${this.useTerrainSprites ? 'Sprites' : '3D'}`;
     terrainToggle.onclick = () => this.toggleTerrainMode();
 
-    // Sync sliders with number inputs
+    // Reset button functionality
+    resetBtn.onclick = () => {
+        uOffset.value = uOffsetInput.value = "0";
+        vOffset.value = vOffsetInput.value = "0";
+        uScale.value = uScaleInput.value = "1";
+        vScale.value = vScaleInput.value = "1";
+        this.adjustTextureOffset('u', 0);
+        this.adjustTextureOffset('v', 0);
+        this.adjustTextureScale('u', 1);
+        this.adjustTextureScale('v', 1);
+    };
+
     const syncInputs = (slider, input, callback) => {
         slider.oninput = (e) => {
             const value = parseFloat(e.target.value);
@@ -225,6 +295,7 @@ setupSpriteDebug() {
     syncInputs(uScale, uScaleInput, (value) => this.adjustTextureScale('u', value));
     syncInputs(vScale, vScaleInput, (value) => this.adjustTextureScale('v', value));
 }
+
 adjustTextureOffset(axis, value) {
     if (!this.useTerrainSprites) return;
     
@@ -237,11 +308,13 @@ adjustTextureOffset(axis, value) {
                     } else {
                         child.material.map.offset.y = value;
                     }
+                    child.material.map.needsUpdate = true;
                 }
             });
         }
     });
 }
+
 
 adjustTextureScale(axis, value) {
     if (!this.useTerrainSprites) return;
@@ -255,11 +328,14 @@ adjustTextureScale(axis, value) {
                     } else {
                         child.material.map.repeat.y = value;
                     }
+                    child.material.map.needsUpdate = true;
                 }
             });
         }
     });
 }
+
+
 toggleTerrainMode(){
     this.useTerrainSprites = !this.useTerrainSprites;
     document.getElementById('terrainSpriteToggle').textContent = `Terrain: ${this.useTerrainSprites ? 'Sprites' : '3D'}`;
@@ -320,11 +396,14 @@ adjustSpriteHeight(height) {
         }
     } else {
  
-                    this.editMode = !this.editMode;
-                    const panel = document.getElementById('editPanel'), btn = document.getElementById('editToggle'), ind = document.getElementById('editIndicator');
-                    panel.classList.toggle('visible', this.editMode); btn.classList.toggle('active', this.editMode); ind.classList.toggle('visible', this.editMode);
-                    this.canvas.style.cursor = this.editMode ? 'crosshair' : 'grab';
-                    if (!this.editMode) this.clearSelection();
+                    this.editMode = !this.editMode;const panel = document.getElementById('editPanel'),
+              btn = document.getElementById('editToggle'),
+              ind = document.getElementById('editIndicator');
+        panel.classList.toggle('visible', this.editMode);
+        btn.classList.toggle('active', this.editMode);
+        ind.classList.toggle('visible', this.editMode);
+        this.canvas.style.cursor = this.editMode ? 'crosshair' : 'grab';
+        if (!this.editMode) this.clearSelection();
                 }
             }
 
@@ -1103,6 +1182,9 @@ showInteractionMessage(message) {
     this.terrainTexture = loader.load('https://i.imgur.com/C4l87Xp.png');
     this.terrainTexture.magFilter = THREE.NearestFilter;
     this.terrainTexture.minFilter = THREE.NearestFilter;
+          this.spriteSize = 96;
+    this.layerHeight = 96; // Height of each layer (top/left/right)
+    this.totalLayers = 3;  // 3 layers per terrain type
 }
             }
 
@@ -1155,39 +1237,37 @@ createSpriteTile(x, z, height) {
     const tileSize = this.tileSize * 0.9;
     const tileHeight = 0.5 + height * 0.5;
     
-    const spriteWidth = 1/8;
-    const spriteU = height * spriteWidth;
+    const spriteWidth = 1/8; // Still 8 terrain types horizontally
+const spriteU = height * spriteWidth;
 
-    const createFace = (width, height, rotX, rotY, rotZ, posX, posY, posZ) => {
-        const geometry = new THREE.PlaneGeometry(width, height);
-        const material = new THREE.MeshLambertMaterial({
-            map: this.terrainTexture,
-            transparent: true,
-            side: THREE.DoubleSide
-        });
-        
-        const uvs = geometry.attributes.uv;
-for (let i = 0; i < uvs.count; i++) {
-    uvs.setX(i, uvs.getX(i) * spriteWidth + spriteU - 0.13); // Apply U offset
-    uvs.setY(i, uvs.getY(i) + 0.69); // Apply V offset
-}
-        
-        const plane = new THREE.Mesh(geometry, material);
-        plane.rotation.x = rotX;
-        plane.rotation.y = rotY;
-        plane.rotation.z = rotZ;
-        plane.position.set(posX, posY, posZ);
-        return plane;
-    };
+const createFace = (width, height, rotX, rotY, rotZ, posX, posY, posZ, layerType) => {
+    const geometry = new THREE.PlaneGeometry(width, height);
+    const material = new THREE.MeshLambertMaterial({map: this.terrainTexture, transparent: true, side: THREE.DoubleSide});
+    const uvs = geometry.attributes.uv;
+    
+    // Calculate V offset based on layer type (0=top, 1=left, 2=right)
+    const layerV = layerType / this.totalLayers;
+    
+    for (let i = 0; i < uvs.count; i++) {
+        uvs.setX(i, uvs.getX(i) * spriteWidth + spriteU);
+        uvs.setY(i, uvs.getY(i) * (1/this.totalLayers) + layerV);
+    }
+    
+    const plane = new THREE.Mesh(geometry, material);
+    plane.rotation.x = rotX; plane.rotation.y = rotY; plane.rotation.z = rotZ;
+    plane.position.set(posX, posY, posZ);
+    return plane;
+};
 
     // Create all 6 faces of the box
-    const top = createFace(tileSize, tileSize, -Math.PI/2, 0, 0, 0, tileHeight, 0);
-    const bottom = createFace(tileSize, tileSize, Math.PI/2, 0, 0, 0, 0, 0);
-    
-    const front = createFace(tileSize, tileHeight, 0, 0, 0, 0, tileHeight/2, tileSize/2);
-    const back = createFace(tileSize, tileHeight, 0, Math.PI, 0, 0, tileHeight/2, -tileSize/2);
-    const left = createFace(tileSize, tileHeight, 0, -Math.PI/2, 0, -tileSize/2, tileHeight/2, 0);
-    const right = createFace(tileSize, tileHeight, 0, Math.PI/2, 0, tileSize/2, tileHeight/2, 0);
+   const top = createFace(tileSize, tileSize, -Math.PI/2, 0, 0, 0, tileHeight, 0, 2); // Layer 2 (was right, now top)
+const bottom = createFace(tileSize, tileSize, Math.PI/2, 0, 0, 0, 0, 0, 2); // Use same layer for bottom
+
+const front = createFace(tileSize, tileHeight, 0, 0, 0, 0, tileHeight/2, tileSize/2, 0); // Layer 0 (was top, now left)
+const back = createFace(tileSize, tileHeight, 0, Math.PI, 0, 0, tileHeight/2, -tileSize/2, 0);
+
+const left = createFace(tileSize, tileHeight, 0, -Math.PI/2, 0, -tileSize/2, tileHeight/2, 0, 1); // Layer 1 (was left, now right)
+const right = createFace(tileSize, tileHeight, 0, Math.PI/2, 0, tileSize/2, tileHeight/2, 0, 1);
 
     group.add(top, bottom, front, back, left, right);
 

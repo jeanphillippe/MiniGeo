@@ -1104,6 +1104,12 @@ showInteractionMessage(message) {
     generateTerrain(useSprites = false) {
         // Clear existing terrain if any
         this.dispose();
+        // Remove all existing terrain meshes from the group
+while (this.terrainGroup.children.length > 0) {
+    const child = this.terrainGroup.children.pop();
+    child.geometry?.dispose();
+    child.material?.dispose();
+}
         
         for (let x = 0; x < this.gridSize; x++) {
             this.tiles[x] = [];

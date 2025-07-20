@@ -64,7 +64,34 @@ this.useObjectSprites = false;
                 this.activeTooltip = null;
                 this.init();
             }
+clearScene() {
+        // Helper method to clear entire scene
+        while(this.scene.children.length > 0) { 
+            const object = this.scene.children[0];
+            this.scene.remove(object);
+            
+            if (object.geometry) {
+                object.geometry.dispose();
+            }
+            
+            if (object.material) {
+                if (Array.isArray(object.material)) {
+                    object.material.forEach(material => material.dispose());
+                } else {
+                    object.material.dispose();
+                }
+            }
+        }
+    }
 
+    reset() {
+        // Helper method to reset the game state
+        this.clearScene();
+        if (this.terrain) {
+            this.terrain.dispose();
+        }
+        this.init();
+    }
           init() {
     // Clear any existing state
     if (this.terrain) {
@@ -631,12 +658,14 @@ toggleTerrainMode() {
     document.getElementById('terrainSpriteToggle').textContent = 
         `Terrain: ${this.useTerrainSprites ? 'Sprites' : '3D'}`;
     
-    // Only rebuild if sprite texture is loaded (for sprite mode)
-    if (!this.useTerrainSprites || (this.useTerrainSprites && this.terrain.spriteTexture)) {
-        this.rebuildTerrain();
+    // Completely reinitialize the terrain
+    this.terrain.init(this.useTerrainSprites);
+    
+    // Force a garbage collection hint
+    if (window.gc) {
+        window.gc();
     }
 }
-
 toggleObjectMode() {
     this.useObjectSprites = !this.useObjectSprites;
     document.getElementById('objectSpriteToggle').textContent = 

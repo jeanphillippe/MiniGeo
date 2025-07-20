@@ -10,7 +10,29 @@
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
-    
+    <!-- Add below your tooltipContainer -->
+<div id="interactButton" style="
+    display:none;
+    position: absolute;
+    left: 50%;
+    bottom: 7%;
+    transform: translateX(-50%);
+    z-index: 200;
+    background: #4CAF50;
+    color: white;
+    font-size: 10px;
+    padding: 4px 11px;
+    border-radius: 10px;
+    font-size: 18px;
+    font-weight: bold;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    border: none;
+    cursor: pointer;
+    letter-spacing: 2px;
+    transition: background 0.2s;
+">
+    [E] INTERACT
+</div>
     <div class="ui-container">
         <button id="debugToggle" class="toggle-btn">Debug Info</button>
         <button id="editToggle" class="toggle-btn">Edit Mode</button>
@@ -253,20 +275,16 @@
     const touches = e.touches;
     if (touches.length === 1 && this.input.touch.active) {
         const delta = {
-            x: touches[0].clientX - this.input.touch.start.x,
-            y: touches[0].clientY - this.input.touch.start.y
+            x: (touches[0].clientX - this.input.touch.start.x) / window.innerWidth, // Normaliza el movimiento horizontal
+            y: (touches[0].clientY - this.input.touch.start.y) / window.innerHeight // Normaliza el movimiento vertical
         };
-        
+
         const distance = Math.hypot(delta.x, delta.y);
-        
-        // Only mark as moved for significant camera panning movements
-        if (distance > 30 && !this.editMode) {
+
+        // Ajusta el umbral para marcar el movimiento como significativo
+        if (distance > 0.02 && !this.editMode) {
             this.input.touch.moved = true;
-            this.panCamera(delta.x, delta.y);
-        }
-        // For edit mode, mark as moved for any significant movement
-        else if (distance > 20 && this.editMode) {
-            this.input.touch.moved = true;
+            this.panCamera(delta.x * 100, delta.y * 100); // Escala para mayor precisión
         }
     } else if (touches.length === 2) {
         const currentDist = Math.hypot(
@@ -321,14 +339,16 @@ handleTouchEnd(e) {
 }
 
             panCamera(deltaX, deltaY) {
-                const speed = 0.02 * this.zoomLevel;
-                const moveX = new THREE.Vector3(1, 0, -1).normalize(), moveY = new THREE.Vector3(1, 0, 1).normalize();
-                this.cameraTarget.add(moveX.clone().multiplyScalar(-deltaX * speed));
-                this.cameraTarget.add(moveY.clone().multiplyScalar(deltaY * speed));
-                const maxBounds = this.gridSize * this.tileSize / 2;
-                this.cameraTarget.x = Math.max(-maxBounds, Math.min(maxBounds, this.cameraTarget.x));
-                this.cameraTarget.z = Math.max(-maxBounds, Math.min(maxBounds, this.cameraTarget.z));
-            }
+    const speed = 0.01 * this.zoomLevel; // Reduce la velocidad para un movimiento más controlado
+    const moveX = new THREE.Vector3(1, 0, -1).normalize();
+    const moveY = new THREE.Vector3(1, 0, 1).normalize();
+    this.cameraTarget.add(moveX.clone().multiplyScalar(-deltaX * speed));
+    this.cameraTarget.add(moveY.clone().multiplyScalar(-deltaY * speed));
+
+    const maxBounds = this.gridSize * this.tileSize / 2;
+    this.cameraTarget.x = Math.max(-maxBounds, Math.min(maxBounds, this.cameraTarget.x));
+    this.cameraTarget.z = Math.max(-maxBounds, Math.min(maxBounds, this.cameraTarget.z));
+}
 
             zoomCamera(delta) {
                 this.zoomLevel = Math.max(0.3, Math.min(3, this.zoomLevel + delta));
@@ -600,26 +620,28 @@ removeGlowEffect(mesh) {
 
 updateTooltip(interactable) {
     const container = document.getElementById('tooltipContainer');
-    
+    const interactBtn = document.getElementById('interactButton');
     if (!interactable) {
         this.hideTooltip();
+        if (interactBtn) interactBtn.style.display = 'none';
         return;
     }
 
-    if (this.activeTooltip !== interactable) {
-        this.activeTooltip = interactable;
-        
-        const canInteract = this.getDistanceToInteractable(interactable) <= 1.5;
-        
-        container.innerHTML = `
-            <div class="tooltip ${canInteract ? 'interact' : ''} visible">
-                ${interactable.message}
-                ${canInteract ? `<div class="interact-prompt">${interactable.interact}</div>` : ''}
-            </div>
-        `;
+    this.activeTooltip = interactable;
+    const canInteract = this.getDistanceToInteractable(interactable) <= 1.5;
+    // Always show the message and prompt with styled background
+    container.innerHTML = `
+        <div class="tooltip interact visible">
+            <strong>${interactable.message}</strong>
+            <div class="interact-prompt">${interactable.interact}</div>
+        </div>
+    `;
+    this.positionTooltip(interactable);
 
-        // Position tooltip above the object
-        this.positionTooltip(interactable);
+    // Show/hide [E] button
+    if (interactBtn) {
+        interactBtn.style.display = canInteract ? 'block' : 'none';
+        interactBtn.onclick = canInteract ? () => this.handleInteraction() : null;
     }
 }
 

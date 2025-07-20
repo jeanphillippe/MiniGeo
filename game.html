@@ -806,7 +806,7 @@ showInteractionMessage(message) {
             initInput(){
     this.game.canvas.addEventListener('click',e=>{
         // Don't handle canvas clicks if there's an active interactable tooltip
-        if(this.game.editMode || this.game.activeTooltip) return;
+        //if(this.game.editMode || this.game.activeTooltip) return;
         
         const rect=this.game.canvas.getBoundingClientRect();
         this.game.mouse.set(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);

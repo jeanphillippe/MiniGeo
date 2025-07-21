@@ -424,7 +424,7 @@ handleTouchMove(e){
         // Remove the delay threshold - respond immediately to any movement
         if(distance > 0 && !this.editMode){
             this.input.touch.moved = true;
-            this.panCamera(delta.x * 50, delta.y * 50);
+            this.panCamera(delta.x * 70, delta.y * 70);
         }
     }else if(touches.length===2){
         const currentDist=Math.hypot(touches[0].clientX-touches[1].clientX,touches[0].clientY-touches[1].clientY);

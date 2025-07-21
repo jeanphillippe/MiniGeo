@@ -413,29 +413,35 @@ getTileFromMesh(mesh) {
                 }
             }
 
-           handleTouchMove(e) {
-    const touches = e.touches;
-    if (touches.length === 1 && this.input.touch.active) {
-        const delta = {
-            x: (touches[0].clientX - this.input.touch.start.x) / window.innerWidth, // Normaliza el movimiento horizontal
-            y: (touches[0].clientY - this.input.touch.start.y) / window.innerHeight // Normaliza el movimiento vertical
-        };
+          // In handleTouchMove function, replace this section:
 
-        const distance = Math.hypot(delta.x, delta.y);
+handleTouchMove(e){
+    const touches=e.touches;
+    if(touches.length===1&&this.input.touch.active){
+        // OLD CODE - feels weird:
+        // const delta={x:(touches[0].clientX-this.input.touch.start.x)/window.innerWidth,y:(touches[0].clientY-this.input.touch.start.y)/window.innerHeight};
+        // const distance=Math.hypot(delta.x,delta.y);
+        // if(distance>0.02&&!this.editMode){
+        //     this.input.touch.moved=!0;
+        //     this.panCamera(delta.x*100,delta.y*100)
+        // }
 
-        // Ajusta el umbral para marcar el movimiento como significativo
-        if (distance > 0.02 && !this.editMode) {
+        // NEW CODE - natural touch movement:
+        const deltaX = touches[0].clientX - this.input.touch.start.x;
+        const deltaY = touches[0].clientY - this.input.touch.start.y;
+        const distance = Math.hypot(deltaX, deltaY);
+        
+        if(distance > 10 && !this.editMode){ // Use pixel threshold instead of percentage
             this.input.touch.moved = true;
-            this.panCamera(delta.x * 100, delta.y * 100); // Escala para mayor precisión
+            this.panCamera(deltaX * 0.5, deltaY * 0.5); // Much gentler multiplier
+            // Update start position for continuous panning
+            this.input.touch.start = {x: touches[0].clientX, y: touches[0].clientY};
         }
-    } else if (touches.length === 2) {
-        const currentDist = Math.hypot(
-            touches[0].clientX - touches[1].clientX,
-            touches[0].clientY - touches[1].clientY
-        );
-        this.zoomCamera((this.input.touch.pinchDistance - currentDist) * 0.01);
-        this.input.touch.pinchDistance = currentDist;
-        this.input.touch.moved = true;
+    }else if(touches.length===2){
+        const currentDist=Math.hypot(touches[0].clientX-touches[1].clientX,touches[0].clientY-touches[1].clientY);
+        this.zoomCamera((this.input.touch.pinchDistance-currentDist)*0.01);
+        this.input.touch.pinchDistance=currentDist;
+        this.input.touch.moved=!0
     }
 }
 handleTouchEnd(e) {

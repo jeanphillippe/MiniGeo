@@ -6,7 +6,7 @@
     <title>Optimized Isometric Game</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="./debug.js"></script>
-  <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#2c3e50;overflow:hidden}#gameCanvas{display:block;width:100vw;height:100vh;touch-action:none;cursor:grab}#gameCanvas:active{cursor:grabbing}.ui-container{position:absolute;top:10px;left:10px;z-index:100}.toggle-btn{background:rgb(0 0 0 / .8);color:#fff;border:none;padding:8px 12px;border-radius:4px;cursor:pointer;font-size:9px;margin-bottom:5px}.toggle-btn:hover{background:rgb(0 0 0 / .9)}.toggle-btn.active{background:#4CAF50}.panel{color:#fff;background:rgb(0 0 0 / .8);padding:12px;border-radius:6px;font-size:12px;margin-bottom:5px;min-width:200px;display:none}.panel.visible{display:block}.panel button{background:#4CAF50;color:#fff;border:none;padding:6px 12px;border-radius:3px;cursor:pointer;font-size:11px;margin:2px}.panel button:hover{background:#45a049}.panel button:disabled{background:#666;cursor:not-allowed}.edit-indicator{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#ff6b6b;font-size:16px;font-weight:700;text-shadow:2px 2px 4px rgb(0 0 0 / .8);z-index:99;pointer-events:none;display:none}.edit-indicator.visible{display:block}.controls-text{font-size:10px;color:#ccc;margin-top:8px;line-height:1.3}.tooltip-container{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:auto;z-index:150}.tooltip{background:rgb(0 0 0 / .9);color:#fff;padding:8px 12px;border-radius:6px;font-size:14px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;white-space:nowrap;box-shadow:0 2px 8px rgb(0 0 0 / .4);border:1px solid rgb(255 255 255 / .2);opacity:0;transform:translateY(10px);transition:all 0.3s ease;cursor:pointer}.tooltip:hover{background:rgb(76 175 80 / .3);border-color:#4CAF50;transform:translateY(-2px);box-shadow:0 4px 12px rgb(0 0 0 / .6)}.tooltip.visible{opacity:1;transform:translateY(0)}.tooltip.interact{border-color:#4CAF50;background:rgb(76 175 80 / .2);backdrop-filter:blur(4px)}.interact-prompt{color:#fff;font-weight:700;font-size:12px;margin-top:4px}.sprite-debug-panel{position:relative;top:120px;right:20px;background:rgb(0 0 0 / .8);color:#fff;padding:10px;border-radius:5px;display:none;min-width:250px}.pip-reference{position:relative;bottom:0;left:0;width:64px;height:64px;border:2px solid #4CAF50;border-radius:5px;background:rgb(0 0 0 / .8);z-index:200}.pip-reference.visible{display:block}.pip-reference img{width:100%;height:100%;object-fit:cover;border-radius:3px}.pip-overlay{position:absolute;top:0;left:0;width:100%;height:100%;background-image:linear-gradient(to right,rgb(255 255 255 / .3) 0,transparent 1px),linear-gradient(to bottom,rgb(255 255 255 / .3) 0,transparent 1px);background-size:15px 15px;pointer-events:none}.pip-label{position:absolute;bottom:-20px;left:0;right:0;text-align:center;font-size:10px;color:#ccc;font-weight:700}#spriteDebugPanel input[type="number"]{background:rgb(255 255 255 / .1);border:1px solid rgb(255 255 255 / .3);color:#fff;padding:2px 4px;border-radius:2px;margin:0 5px}#spriteDebugPanel input[type="range"]{width:100px;margin:0 5px}#spriteDebugPanel label{display:inline-block;width:60px;font-size:11px}.sprite-debug-panel.visible{display:block}
+  <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#2c3e50;overflow:hidden}#gameCanvas{display:block;width:100vw;height:100vh;touch-action:none;cursor:grab}#gameCanvas:active{cursor:grabbing}.ui-container{position:absolute;top:10px;left:10px;z-index:100}.toggle-btn{background:rgb(0 0 0 / .8);color:#fff;border:none;padding:8px 12px;border-radius:4px;cursor:pointer;font-size:9px;margin-bottom:5px}.toggle-btn:hover{background:rgb(0 0 0 / .9)}.toggle-btn.active{background:#4CAF50}.panel{color:#fff;background:rgb(0 0 0 / .8);padding:12px;border-radius:6px;font-size:12px;margin-bottom:5px;min-width:200px;display:none}.panel.visible{display:block}.panel button{background:#4CAF50;color:#fff;border:none;padding:6px 12px;border-radius:3px;cursor:pointer;font-size:11px;margin:2px}.panel button:hover{background:#45a049}.panel button:disabled{background:#666;cursor:not-allowed}.edit-indicator{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#ff6b6b;font-size:16px;font-weight:700;text-shadow:2px 2px 4px rgb(0 0 0 / .8);z-index:99;pointer-events:none;display:none}.edit-indicator.visible{display:block}.controls-text{font-size:10px;color:#ccc;margin-top:8px;line-height:1.3}.tooltip-container{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:auto;z-index:150}.tooltip{background:rgb(0 0 0 / .9);color:#fff;padding:8px 12px;border-radius:6px;font-size:14px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;white-space:nowrap;box-shadow:0 2px 8px rgb(0 0 0 / .4);border:1px solid rgb(255 255 255 / .2);opacity:0;transform:translateY(10px);transition:all 0.3s ease;cursor:pointer}.tooltip:hover{background:rgb(76 175 80 / .3);border-color:#4CAF50;transform:translateY(-2px);box-shadow:0 4px 12px rgb(0 0 0 / .6)}.tooltip.visible{opacity:1;transform:translateY(0)}.tooltip.interact{border-color:#4CAF50;background:rgb(76 175 80 / .2);backdrop-filter:blur(4px)}.interact-prompt{color:#fff;font-weight:700;font-size:12px;margin-top:4px}.sprite-debug-panel{position:relative!important;top:120px;right:20px;background:rgb(0 0 0 / .8);color:#fff;padding:10px;border-radius:5px;display:none;min-width:250px}.pip-reference{position:relative;bottom:0;left:0;width:64px;height:64px;border:2px solid #4CAF50;border-radius:5px;background:rgb(0 0 0 / .8);z-index:200}.pip-reference.visible{display:block}.pip-reference img{width:100%;height:100%;object-fit:cover;border-radius:3px}.pip-overlay{position:absolute;top:0;left:0;width:100%;height:100%;background-image:linear-gradient(to right,rgb(255 255 255 / .3) 0,transparent 1px),linear-gradient(to bottom,rgb(255 255 255 / .3) 0,transparent 1px);background-size:15px 15px;pointer-events:none}.pip-label{position:absolute;bottom:-20px;left:0;right:0;text-align:center;font-size:10px;color:#ccc;font-weight:700}#spriteDebugPanel input[type="number"]{background:rgb(255 255 255 / .1);border:1px solid rgb(255 255 255 / .3);color:#fff;padding:2px 4px;border-radius:2px;margin:0 5px}#spriteDebugPanel input[type="range"]{width:100px;margin:0 5px}#spriteDebugPanel label{display:inline-block;width:60px;font-size:11px}.sprite-debug-panel.visible{display:block}
     </style>
 </head>
 <body>
@@ -32,6 +32,20 @@
             <button id="importBtn" style="font-size: 10px; padding: 4px 8px; margin: 2px;">Import</button>
         </div>
     </div>
+    <div class="light-control">
+        <label>Light X</label>
+<input id="lx" type="range" min="-100" max="100" step="0.5" value="50">
+<label>Light Y</label>
+<input id="ly" type="range" min="-100" max="100" step="0.5" value="50">
+<label>Light Z</label>
+<input id="lz" type="range" min="-100" max="100" step="0.5" value="25">
+<label>Color</label>
+<input id="lcolor" type="color" value="#fff6e0">
+
+    <label for="lightSlider">Light Power</label>
+<input id="lightSlider" type="range" min="0" max="2" step="0.01" value="0.95" />
+    </div>
+
     <div class="controls-text">
         <div><strong>Desktop:</strong> WASD/Arrows=Move | Wheel=Zoom | Drag=Pan</div>
         <div><strong>Mobile:</strong> Drag=Pan | Pinch=Zoom | Tap=Select</div>
@@ -133,11 +147,11 @@ this.useTerrainSprites = USE_SPRITE_TERRAIN;
 
             setupLighting() {
                 this.scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-                const light = new THREE.DirectionalLight(0xfff6e0, 0.95);
-                light.position.set(50, 50, 25); light.castShadow = true;
-                light.shadow.mapSize.setScalar(2048);
-                Object.assign(light.shadow.camera, { near: 0.1, far: 200, left: -50, right: 50, top: 50, bottom: -50 });
-                this.scene.add(light);
+                this.directionalLight = new THREE.DirectionalLight(0xfff6e0, 0.95);
+                this.directionalLight.position.set(50, 50, 25); this.directionalLight.castShadow = true;
+                this.directionalLight.shadow.mapSize.setScalar(2048);
+                Object.assign(this.directionalLight.shadow.camera, { near: 0.1, far: 200, left: -50, right: 50, top: 50, bottom: -50 });
+                this.scene.add(this.directionalLight);
             }
 
 
@@ -196,6 +210,17 @@ showMessage(text) {
     document.getElementById('raiseBtn').onclick = () => this.modifySelected(1);
     document.getElementById('lowerBtn').onclick = () => this.modifySelected(-1);
     document.getElementById('clearBtn').onclick = () => confirm('Clear all terrain?') && this.clearTerrain();
+const slider = document.getElementById('lightSlider');
+slider.oninput = e => {
+  this.directionalLight.intensity = parseFloat(e.target.value);
+};
+
+['lx','ly','lz'].forEach(axis => {
+  document.getElementById(axis).oninput = e =>
+    this.directionalLight.position[axis[1]] = parseFloat(e.target.value);
+});
+document.getElementById('lcolor').oninput = e =>
+  this.directionalLight.color.set(e.target.value);
 
             }
 
@@ -481,6 +506,25 @@ handleTouchEnd(e) {
                 if (keys['KeyS'] || keys['ArrowDown']) direction.add(new THREE.Vector3(1, 0, 1));
                 if (keys['KeyA'] || keys['ArrowLeft']) direction.add(new THREE.Vector3(-1, 0, 1));
                 if (keys['KeyD'] || keys['ArrowRight']) direction.add(new THREE.Vector3(1, 0, -1));
+                   if (this.input.keys.KeyI) {
+      this.directionalLight.intensity = Math.min(2.0, this.directionalLight.intensity + 0.01);
+    }
+    if (this.input.keys.KeyK) {
+      this.directionalLight.intensity = Math.max(0.0, this.directionalLight.intensity - 0.01);
+    }
+     if (this.input.keys.KeyJ) {
+      this._hue = (this._hue || 0) + 1;                  // keep a hue accumulator
+      this.directionalLight.color.setHSL((this._hue%360)/360, 1, 0.9);
+    }
+    if (this.input.keys.KeyL) {
+      this._hue = (this._hue || 0) - 1;
+      this.directionalLight.color.setHSL((this._hue%360)/360, 1, 0.9);
+    }
+    if (this.input.keys.KeyU) {
+      // back to neutral warm-white
+      this.directionalLight.color.set(0xfff6e0);
+      this._hue = undefined;
+    }
                 if (direction.lengthSq() > 0) {
                     direction.normalize().multiplyScalar(speed);
                     this.cameraTarget.add(direction);
@@ -1003,6 +1047,10 @@ showInteractionMessage(message) {
         class TerrainSystem {
             constructor(gridSize, tileSize, heightLevels) {
                 this.gridSize = gridSize; this.tileSize = tileSize; this.heightLevels = heightLevels;
+                let min = 1, max = 3.33;
+ this.heightScales = Array.from({ length: this.heightLevels }, (_, h) =>
+   min + (h/(this.heightLevels-1))*(max-min)
+);
                 this.terrainGroup = new THREE.Group(); this.tiles = [];
                 this.levelColors = [0x277da1, 0x4fc3f7, 0x43aa8b, 0x90be6d, 0xf9c74f, 0xf9844a, 0xf3722c, 0x577590];
                 if (USE_SPRITE_TERRAIN) {
@@ -1076,13 +1124,15 @@ loadFromSeed(seed) {
 }
 
 create3DTile(x, z, height) {
-    const geometry = new THREE.BoxGeometry(this.tileSize * 0.9, 0.5 + height * 0.5, this.tileSize * 0.9);
-    const material = new THREE.MeshLambertMaterial({ color: this.levelColors[height] });
-    const mesh = new THREE.Mesh(geometry, material);
-    
-    const worldX = (x - this.gridSize / 2) * this.tileSize;
-    const worldZ = (z - this.gridSize / 2) * this.tileSize;
-    mesh.position.set(worldX, (height * 0.5 + 0.1) / 2, worldZ);
+    const h = this.heightScales[height];
+  const geometry = new THREE.BoxGeometry(
+    this.tileSize * 0.9,
+    h,
+    this.tileSize * 0.9
+  );
+  const mesh = new THREE.Mesh(geometry, material);
+  // position so that bottom sits on y=0 (half of h) plus a tiny cushion if you like:
+  mesh.position.set(worldX, h/2 + 0.05, worldZ);
     mesh.userData = { x, z, height };
     return mesh;
 }
@@ -1090,7 +1140,8 @@ create3DTile(x, z, height) {
 createSpriteTile(x, z, height) {
     const group = new THREE.Group();
     const tileSize = this.tileSize * 0.9;
-    const tileHeight = 0.5 + height * 0.5;
+    const tileHeight = this.heightScales[height];
+
     
     const spriteWidth = 1/8; // Still 8 terrain types horizontally
 const spriteU = height * spriteWidth;
@@ -1146,7 +1197,7 @@ const right = createFace(tileSize, tileHeight, 0, Math.PI/2, 0, tileSize/2, tile
     raycastPlane.material.depthWrite = false;
   
   raycastPlane.castShadow    = false;
-  raycastPlane.receiveShadow = false;
+  raycastPlane.receiveShadow = true;
   raycastPlane.material.depthTest  = false;
     group.add(raycastPlane);
 

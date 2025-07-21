@@ -110,7 +110,9 @@ this.useTerrainSprites = USE_SPRITE_TERRAIN;
 
             init() {
                 this.setupRenderer(); this.setupCamera(); this.setupScene(); this.setupLighting();
-                this.setupClouds(); this.setupTerrain(); this.setupInput(); this.setupUI();this.setupInteractables();
+                this.setupClouds(); 
+                this.setupTerrain(); 
+                this.setupInput(); this.setupUI();this.setupInteractables();
                 this.player = new Player(this); this.start();
             }
 
@@ -156,7 +158,19 @@ showMessage(text) {
                 });
             }
 
-            setupTerrain() { this.terrain = new TerrainSystem(this.gridSize, this.tileSize, this.heightLevels); this.terrain.generateTerrain(); this.scene.add(this.terrain.terrainGroup); }
+            setupTerrain() {
+    this.terrain = new TerrainSystem(this.gridSize, this.tileSize, this.heightLevels);
+
+    // First generate dummy terrain so internal tile array exists
+    this.terrain.generateTerrain();
+
+    // Then load the seed to override the heights
+    const seed = "0000000000000000000003333332000000003344443320000003477777743200003473322337432003373222222373300347322222237430034722222222743003472222222274300347321111237430033732222223733000347332233743200023477777743200000233444433220000002333333200000000000000000000";
+    this.terrain.loadFromSeed(seed);
+
+    this.scene.add(this.terrain.terrainGroup);
+}
+
 
             setupInput() {
                 ['keydown', 'keyup'].forEach(evt => addEventListener(evt, e => this.input.keys[e.code] = evt === 'keydown'));

@@ -3,6 +3,7 @@ class Player {
         this.game = game;
         this.speed = 0.05;
         this.path = [];
+        this.facingLeft = false;
         this.progress = 0;
         this._vA = new THREE.Vector3();
         this._vB = new THREE.Vector3();
@@ -15,16 +16,16 @@ this.spriteRow = 0; // Player uses row 0 (first row)
 // Animation frame definitions for a typical sprite sheet
 this.animations = {
     idle: { 
-        frames: [{x: 0, y: 64}], // Single frame for idle
+        frames: [{x: 0, y: 128}], // Single frame for idle
         frameCount: 1,
         loop: true 
     },
     walking: { 
         frames: [
-            {x: 64, y: 64},   // Frame 1
-            {x: 128, y: 64},  // Frame 2  
-            {x: 192, y: 64},  // Frame 3
-            {x: 256, y: 64}   // Frame 4
+            {x: 64, y: 128},   // Frame 1
+            {x: 128, y: 128},  // Frame 2  
+            {x: 192, y: 128},  // Frame 3
+            {x: 256, y: 128}   // Frame 4
         ],
         frameCount: 4,
         loop: true 
@@ -54,10 +55,15 @@ this.animations = {
 
     setFrameUV(x, y, w, h, texW, texH) {
     if (this.sprite.material.map) {
-        this.sprite.material.map.offset.set(x / texW, 1 - (y + h) / texH);
-        this.sprite.material.map.repeat.set(w / texW, h / texH);
-    }
-}
+        // For flipped sprites, we need to adjust the UV mapping
+        if (this.facingLeft) {
+            this.sprite.material.map.offset.set((x + w) / texW, 1 - (y + h) / texH);
+            this.sprite.material.map.repeat.set(-w / texW, h / texH);
+        } else {
+            this.sprite.material.map.offset.set(x / texW, 1 - (y + h) / texH);
+            this.sprite.material.map.repeat.set(w / texW, h / texH);
+        }
+    }}
 updateAnimation(deltaTime) {
     if (!this.sprite || !this.sprite.material.map) return;
     
@@ -87,12 +93,16 @@ updateAnimation(deltaTime) {
 
 
     setPosition(x, z) {
-        const tile = this.game.terrain.getTile(x, z);
-        if (!tile || !this.sprite) return;
-        const height = 0.5 + tile.height * 0.5;
-        this.sprite.position.set(tile.mesh.position.x, height, tile.mesh.position.z);
-        this.pos = { x, z };
-    }
+    const tile = this.game.terrain.getTile(x, z);
+    if (!tile || !this.sprite) return;
+    
+    // Fix: Use the actual terrain height scale and add proper clearance
+    const tileHeight = this.game.terrain.heightScales[tile.height];
+    const height = tileHeight + 1.0; // Player positioned well above the tile surface
+    
+    this.sprite.position.set(tile.mesh.position.x, height, tile.mesh.position.z);
+    this.pos = { x, z };
+}
 
     initInput() {
         this.game.canvas.addEventListener('click', e => {
@@ -114,7 +124,7 @@ updateAnimation(deltaTime) {
     }
 
     update() {
-        if (!this.path.length || !this.sprite) {
+    if (!this.path.length || !this.sprite) {
         // Player is idle
         if (this.animationState !== 'idle') {
             this.animationState = 'idle';
@@ -132,33 +142,52 @@ updateAnimation(deltaTime) {
         this.animationTime = 0;
     }
         
-        const next = this.path[0];
-        const currentTile = this.game.terrain.getTile(this.pos.x, this.pos.z);
-        const nextTile = this.game.terrain.getTile(next.x, next.z);
+    const next = this.path[0];
+    const currentTile = this.game.terrain.getTile(this.pos.x, this.pos.z);
+    const nextTile = this.game.terrain.getTile(next.x, next.z);
+    
+    if (!nextTile || !currentTile) {
+        this.path = [];
+        return;
+    }
+
+    // NEW: Determine movement direction and flip sprite if needed
+    if (this.progress === 0) {
+    const deltaX = next.x - this.pos.x;
+    const deltaZ = next.z - this.pos.z;
+    
+    // Calculate screen-space movement direction
+    // In your isometric view, moving left on screen = negative X + positive Z
+    // Moving right on screen = positive X + negative Z
+    const screenDeltaX = deltaX - deltaZ;
+    
+    if (screenDeltaX !== 0) {
+        const shouldFaceLeft = screenDeltaX < 0;
         
-        if (!nextTile || !currentTile) {
-            this.path = [];
-            return;
+        if (shouldFaceLeft !== this.facingLeft) {
+            this.facingLeft = shouldFaceLeft;
+            // Use scale.x directly for sprite flipping
+            this.sprite.scale.x = Math.abs(this.sprite.scale.x) * (this.facingLeft ? -1 : 1);
         }
+    }
+    
+    const a = currentTile.mesh.position, b = nextTile.mesh.position;
+    this._vA.set(a.x, this.game.terrain.heightScales[currentTile.height] + 1.0, a.z);
+    this._vB.set(b.x, this.game.terrain.heightScales[nextTile.height] + 1.0, b.z);
+}
 
-        if (this.progress === 0) {
-            const a = currentTile.mesh.position, b = nextTile.mesh.position;
-            this._vA.set(a.x, 0.5 + currentTile.height * 0.5, a.z);
-            this._vB.set(b.x, 0.5 + nextTile.height * 0.5, b.z);
-        }
-
-        this.progress += this.speed;
-        if (this.progress >= 1) {
-            this.setPosition(next.x, next.z);
-            this.path.shift();
-            this.progress = 0;
-        } else {
-            this.sprite.position.lerpVectors(this._vA, this._vB, this.progress);
-            this.sprite.position.y += Math.sin(this.progress * Math.PI) * 0.5;
-        }
+    this.progress += this.speed;
+    if (this.progress >= 1) {
+        this.setPosition(next.x, next.z);
+        this.path.shift();
+        this.progress = 0;
+    } else {
+        this.sprite.position.lerpVectors(this._vA, this._vB, this.progress);
+        this.sprite.position.y += Math.sin(this.progress * Math.PI) * 0.5;
+    }
 
     this.updateAnimation();
-    }
+}
 
     findPath(start, end, callback) {
         setTimeout(() => {

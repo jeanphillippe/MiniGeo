@@ -7,13 +7,36 @@ class Player {
         this._vA = new THREE.Vector3();
         this._vB = new THREE.Vector3();
         this.pos = { x: 8, z: 8 };
+        this.animationState = 'idle'; // 'idle', 'walking'
+this.animationFrame = 0;
+this.animationTime = 0;
+this.animationSpeed = 0.15; // Adjust for faster/slower animation
+this.spriteRow = 0; // Player uses row 0 (first row)
+// Animation frame definitions for a typical sprite sheet
+this.animations = {
+    idle: { 
+        frames: [{x: 0, y: 64}], // Single frame for idle
+        frameCount: 1,
+        loop: true 
+    },
+    walking: { 
+        frames: [
+            {x: 64, y: 64},   // Frame 1
+            {x: 128, y: 64},  // Frame 2  
+            {x: 192, y: 64},  // Frame 3
+            {x: 256, y: 64}   // Frame 4
+        ],
+        frameCount: 4,
+        loop: true 
+    }
+};
 
         if (USE_SPRITE_PLAYER) {
             const loader = new THREE.TextureLoader();
-            loader.load('https://i.imgur.com/9QK0Xou.png', texture => {
+            loader.load('https://i.imgur.com/JDz4FCW.png', texture => {
                 texture.magFilter = texture.minFilter = THREE.NearestFilter;
                 this.sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true }));
-                this.sprite.scale.setScalar(1);
+                this.sprite.scale.setScalar(2);
                 this.setFrameUV(0, 0, 64, 64, 64, 64);
                 this.game.scene.add(this.sprite);
                 this.setPosition(this.pos.x, this.pos.z);
@@ -30,11 +53,38 @@ class Player {
     }
 
     setFrameUV(x, y, w, h, texW, texH) {
-        if (this.sprite.material.map) {
-            this.sprite.material.map.offset.set(x / texW, 1 - (y + h) / texH);
-            this.sprite.material.map.repeat.set(w / texW, h / texH);
+    if (this.sprite.material.map) {
+        this.sprite.material.map.offset.set(x / texW, 1 - (y + h) / texH);
+        this.sprite.material.map.repeat.set(w / texW, h / texH);
+    }
+}
+updateAnimation(deltaTime) {
+    if (!this.sprite || !this.sprite.material.map) return;
+    
+    const currentAnim = this.animations[this.animationState];
+    if (!currentAnim) return;
+    
+    // Update animation timer
+    this.animationTime += deltaTime || 0.016; // Default to ~60fps
+    
+    // Check if we should advance to next frame
+    if (this.animationTime >= this.animationSpeed) {
+        this.animationTime = 0;
+        
+        if (currentAnim.frameCount > 1) {
+            this.animationFrame++;
+            if (this.animationFrame >= currentAnim.frameCount) {
+                this.animationFrame = currentAnim.loop ? 0 : currentAnim.frameCount - 1;
+            }
         }
     }
+    
+    // Apply the current frame
+    const frame = currentAnim.frames[this.animationFrame];
+     this.setFrameUV(frame.x, frame.y, 64, 64, 320, 256); // 320px wide, 256px tall (4 rows × 64px)
+
+}
+
 
     setPosition(x, z) {
         const tile = this.game.terrain.getTile(x, z);
@@ -64,7 +114,23 @@ class Player {
     }
 
     update() {
-        if (!this.path.length || !this.sprite) return;
+        if (!this.path.length || !this.sprite) {
+        // Player is idle
+        if (this.animationState !== 'idle') {
+            this.animationState = 'idle';
+            this.animationFrame = 0;
+            this.animationTime = 0;
+        }
+        this.updateAnimation();
+        return;
+    }
+
+    // Player is moving - set walking animation
+    if (this.animationState !== 'walking') {
+        this.animationState = 'walking';
+        this.animationFrame = 0;
+        this.animationTime = 0;
+    }
         
         const next = this.path[0];
         const currentTile = this.game.terrain.getTile(this.pos.x, this.pos.z);
@@ -90,6 +156,8 @@ class Player {
             this.sprite.position.lerpVectors(this._vA, this._vB, this.progress);
             this.sprite.position.y += Math.sin(this.progress * Math.PI) * 0.5;
         }
+
+    this.updateAnimation();
     }
 
     findPath(start, end, callback) {

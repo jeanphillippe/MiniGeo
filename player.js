@@ -7,7 +7,7 @@ class Player {
         this.progress = 0;
         this._vA = new THREE.Vector3();
         this._vB = new THREE.Vector3();
-        this.pos = { x: 8, z: 8 };
+        this.pos = { x: 6, z: 5 };
         this.animationState = 'idle'; // 'idle', 'walking'
 this.animationFrame = 0;
 this.animationTime = 0;

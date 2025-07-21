@@ -16,7 +16,12 @@ class DebugSystem {
     setupUI() {
         // Debug panel toggle
         
-        document.getElementById('debugToggle').onclick = ({this.togglePanel('debug');document.getElementById('editToggle').style.display = 'inline-block';document.getElementById('spriteDebugToggle').style.display = 'inline-block';});
+        document.getElementById('debugToggle').onclick = () => {
+    this.togglePanel('debug');
+    document.getElementById('editToggle').style.display = 'inline-block';
+    document.getElementById('spriteDebugToggle').style.display = 'inline-block';
+};
+
         
         document.getElementById('spriteDebugToggle').onclick = () => this.togglePanel('spriteDebug');
         

@@ -15,16 +15,34 @@ class DebugSystem {
 
     setupUI() {
         // Debug panel toggle
-        document.getElementById('debugToggle').style.display = 'inline-block';
-        document.getElementById('spriteDebugToggle').style.display = 'inline-block';
-        document.getElementById('debugToggle').onclick = () => this.togglePanel('debug');
+        
+        document.getElementById('debugToggle').onclick = ({this.togglePanel('debug');document.getElementById('editToggle').style.display = 'inline-block';document.getElementById('spriteDebugToggle').style.display = 'inline-block';});
+        
         document.getElementById('spriteDebugToggle').onclick = () => this.togglePanel('spriteDebug');
         
         // Export/Import buttons
         document.getElementById('exportBtn').onclick = () => this.exportSeed();
         document.getElementById('importBtn').onclick = () => this.importSeed();
-    }
+        const raiseBtn = document.getElementById('raiseTile');
+    const lowerBtn = document.getElementById('lowerTile');
 
+if (raiseBtn && lowerBtn) {
+    [raiseBtn, lowerBtn].forEach(btn => {
+      btn.style.display = 'inline-block';          // make sure they’re visible
+      btn.onclick = () => 
+        this.selectTool(btn.id === 'raiseTile' ? 'raise' : 'lower');
+    });
+    this.selectTool('raise');                    // default
+}
+    }
+  selectTool(tool) {
+    this.currentTool = tool;
+    // toggle “active” class on the two buttons
+    document.getElementById('raiseTile')
+      .classList.toggle('active', tool === 'raise');
+    document.getElementById('lowerTile')
+      .classList.toggle('active', tool === 'lower');
+  }
     setupSpriteDebug() {
         const terrainToggle = document.getElementById('terrainSpriteToggle');
         const uOffset = document.getElementById('uOffset');
@@ -95,6 +113,8 @@ class DebugSystem {
         this.game.terrain.terrainGroup.children.forEach(tileGroup => {
             if (tileGroup.isGroup) {
                 tileGroup.children.forEach(child => {
+                    child.interactive = true;
+                    child.on('pointerdown', () => this.onTileClick(child));
                     if (child.material && child.material.map) {
                         if (axis === 'u') {
                             child.material.map.offset.x = value;
@@ -187,6 +207,13 @@ class DebugSystem {
             document.getElementById('fps').textContent = fps;
         }
     }
+      onTileClick(tile) {
+    if (this.currentTool === 'raise') {
+      this.game.raiseTile(tile);
+    } else {
+      this.game.lowerTile(tile);
+    }
+  }
 
     updateDebugInfo() {
         const update = () => {

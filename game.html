@@ -1345,7 +1345,7 @@ const createFace = (width, height, rotX, rotY, rotZ, posX, posY, posZ, layerType
 
     // Create all 6 faces of the box
    const top = createFace(tileSize, tileSize, -Math.PI/2, 0, 0, 0, tileHeight, 0, 2); // Layer 2 (was right, now top)
-const bottom = createFace(tileSize, tileSize, Math.PI/2, 0, 0, 0, 0, 0, 2); // Use same layer for bottom
+//const bottom = createFace(tileSize, tileSize, Math.PI/2, 0, 0, 0, 0, 0, 2); // Use same layer for bottom
 
 const front = createFace(tileSize, tileHeight, 0, 0, 0, 0, tileHeight/2, tileSize/2, 0); // Layer 0 (was top, now left)
 const back = createFace(tileSize, tileHeight, 0, Math.PI, 0, 0, tileHeight/2, -tileSize/2, 0);
@@ -1353,7 +1353,7 @@ const back = createFace(tileSize, tileHeight, 0, Math.PI, 0, 0, tileHeight/2, -t
 const left = createFace(tileSize, tileHeight, 0, -Math.PI/2, 0, -tileSize/2, tileHeight/2, 0, 1); // Layer 1 (was left, now right)
 const right = createFace(tileSize, tileHeight, 0, Math.PI/2, 0, tileSize/2, tileHeight/2, 0, 1);
 
-    group.add(top, bottom, front, back, left, right);
+    group.add(top, front, back, left, right);
 
     const worldX = (x - this.gridSize/2) * this.tileSize;
     const worldZ = (z - this.gridSize/2) * this.tileSize;
@@ -1371,6 +1371,11 @@ const right = createFace(tileSize, tileHeight, 0, Math.PI/2, 0, tileSize/2, tile
     raycastPlane.rotation.x = -Math.PI/2;
     raycastPlane.position.y = tileHeight + 0.01;
     raycastPlane.userData = {x, z, height};
+    raycastPlane.material.depthWrite = false;
+  
+  raycastPlane.castShadow    = false;
+  raycastPlane.receiveShadow = false;
+  raycastPlane.material.depthTest  = false;
     group.add(raycastPlane);
 
     return group;
@@ -1398,13 +1403,20 @@ const right = createFace(tileSize, tileHeight, 0, Math.PI/2, 0, tileSize/2, tile
     }
 
     const newMesh = this.createTile(x, z, newHeight);
+
     newMesh.castShadow = newMesh.receiveShadow = true;
-    if (newMesh.children) {
-        newMesh.children.forEach(child => {
-            child.castShadow = child.receiveShadow = true;
-        });
-    }
-    
+   if (newMesh.children) {
+    newMesh.children.forEach(child => {
+      // only shadow the visible art; skip the invisible raycast plane
+      if (child.material.opacity === 0) {
+        child.castShadow    = false;
+        child.receiveShadow = false;
+      } else {
+        child.castShadow    = false;
+        child.receiveShadow = false;
+      }
+    });
+  }
     tile.height = newHeight;
     tile.mesh = newMesh;
     this.terrainGroup.add(newMesh);

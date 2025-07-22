@@ -16,16 +16,16 @@ this.spriteRow = 0; // Player uses row 0 (first row)
 // Animation frame definitions for a typical sprite sheet
 this.animations = {
     idle: { 
-        frames: [{x: 0, y: 128}], // Single frame for idle
+        frames: [{x: 0, y: 0}], // Single frame for idle
         frameCount: 1,
         loop: true 
     },
     walking: { 
         frames: [
-            {x: 64, y: 128},   // Frame 1
-            {x: 128, y: 128},  // Frame 2  
-            {x: 192, y: 128},  // Frame 3
-            {x: 256, y: 128}   // Frame 4
+            {x: 64, y: 0},   // Frame 1
+            {x: 128, y: 0},  // Frame 2  
+            {x: 192, y: 0},  // Frame 3
+            {x: 256, y: 0}   // Frame 4
         ],
         frameCount: 4,
         loop: true 
@@ -34,11 +34,24 @@ this.animations = {
 
         if (USE_SPRITE_PLAYER) {
             const loader = new THREE.TextureLoader();
-            loader.load('https://i.imgur.com/JDz4FCW.png', texture => {
+            loader.load('https://i.imgur.com/dnYrApC.png', texture => {
                 texture.magFilter = texture.minFilter = THREE.NearestFilter;
                 this.sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true }));
                 this.sprite.scale.setScalar(2);
-                this.setFrameUV(0, 0, 64, 64, 64, 64);
+                
+  // ===> STORE THESE FOR LATER
+  this.texW = texture.image.width;   // e.g. 320
+  this.texH = texture.image.height;  // e.g. 384
+// NEW: use the first idle frame your animations table defines
+const idleFrame = this.animations.idle.frames[0];
+this.setFrameUV(
+  idleFrame.x,
+  idleFrame.y,
+  64, 64,
+  this.texW,
+  this.texH
+);
+
                 this.game.scene.add(this.sprite);
                 this.setPosition(this.pos.x, this.pos.z);
             });
@@ -87,7 +100,15 @@ updateAnimation(deltaTime) {
     
     // Apply the current frame
     const frame = currentAnim.frames[this.animationFrame];
-     this.setFrameUV(frame.x, frame.y, 64, 64, 320, 256); // 320px wide, 256px tall (4 rows × 64px)
+
+ this.setFrameUV(
+   frame.x,         // column X
+   frame.y,         // row Y (spriteRow * 64 for NPCs)
+   64, 64,
+   this.texW,       // full sheet width
+  this.texH        // full sheet height
+);
+
 
 }
 

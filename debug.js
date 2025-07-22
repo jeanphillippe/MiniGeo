@@ -15,7 +15,7 @@ class DebugSystem {
 
     setupUI() {
         // Debug panel toggle
-        
+        document.getElementById('debugToggle').style.display = 'inline-block';
         document.getElementById('debugToggle').onclick = () => {
     this.togglePanel('debug');
     document.getElementById('editToggle').style.display = 'inline-block';

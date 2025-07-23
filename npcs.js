@@ -118,10 +118,26 @@ class NPC extends Player{
             this.waitTime=0
         })
     }
+isPlayerNearby(radius = 2) {
+    if (!this.game.player || !this.game.player.pos) return false;
+    const dx = this.pos.x - this.game.player.pos.x;
+    const dz = this.pos.z - this.game.player.pos.z;
+    return Math.sqrt(dx * dx + dz * dz) < radius;
+}
 
     update(){
         if(!this.isPatrolling)return;
         
+          if (this.isPlayerNearby()) {
+        if (this.animationState !== 'idle') {
+            this.animationState = 'idle';
+            this.animationFrame = 0;
+            this.animationTime = 0;
+        }
+        this.updateAnimation();
+        return; // Stop moving if player is near
+    }
+    
         if(this.path.length>0){
             super.update();
             return

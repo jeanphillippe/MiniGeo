@@ -1,25 +1,24 @@
-// npcs.js - Include this file after your Player class
+// npcs.js - Enhanced with multiple patrol route types
 
 class NPC extends Player {
-    constructor(game, spriteRow, startX, startZ, spawnDelay = 0) {
+    constructor(game, spriteRow, startX, startZ, spawnDelay = 0, patrolType = 'circle', idleFrame = 0) {
         super(game);
         this.spriteRow = spriteRow;
         this.isNPC = true;
         this.patrolIndex = 0;
         this.startX = startX;
         this.startZ = startZ;
-        this.patrolPath = this.generateCirclePath(startX, startZ);
-        this.isPatrolling = false;
+        this.patrolType = patrolType;
+        this.patrolPath = patrolType !== 'none' ? this.generatePatrolPath(patrolType, startX, startZ) : [];
+        this.isPatrolling = patrolType !== 'none';
         this.waitTime = 0;
-        this.maxWaitTime = 1500 + Math.random() * 1000; // Random wait between 1.5-2.5 seconds
+        this.maxWaitTime = 1500 + Math.random() * 1000;
         
-        // Make NPCs move slower than the player for more natural movement
-        this.speed = 0.03 + Math.random() * 0.015; // Random speed between 0.03-0.045 (slower than player's 0.05)
+        this.speed = 0.03 + Math.random() * 0.015;
         
-        // Override sprite row for animations
         this.animations = {
             idle: { 
-                frames: [{x: 0, y: spriteRow * 64}], 
+                frames: [{x: idleFrame * 64, y: spriteRow * 64}], 
                 frameCount: 1,
                 loop: true 
             },
@@ -35,15 +34,34 @@ class NPC extends Player {
             }
         };
         
-        // Set initial position explicitly
         this.pos = { x: startX, z: startZ };
         this.setPosition(startX, startZ);
         
-        // Delay patrol start to ensure proper positioning and stagger NPCs
-        setTimeout(() => {
-            this.isPatrolling = true;
-            this.startPatrol();
-        }, 1000 + spawnDelay);
+        // Only start patrol if patrol type is not 'none'
+        if (this.isPatrolling) {
+            setTimeout(() => {
+                this.startPatrol();
+            }, 1000 + spawnDelay);
+        }
+    }
+    
+    generatePatrolPath(type, centerX, centerZ) {
+        switch(type) {
+            case 'none':
+                return [];
+            case 'circle':
+                return this.generateCirclePath(centerX, centerZ);
+            case 'square':
+                return this.generateSquarePath(centerX, centerZ);
+            case 'line':
+                return this.generateLinePath(centerX, centerZ);
+            case 'random':
+                return this.generateRandomPath(centerX, centerZ);
+            case 'figure8':
+                return this.generateFigure8Path(centerX, centerZ);
+            default:
+                return this.generateCirclePath(centerX, centerZ);
+        }
     }
     
     generateCirclePath(centerX, centerZ) {
@@ -59,6 +77,49 @@ class NPC extends Player {
         ];
     }
     
+    generateSquarePath(centerX, centerZ) {
+        return [
+            {x: centerX-2, z: centerZ-2},
+            {x: centerX+2, z: centerZ-2},
+            {x: centerX+2, z: centerZ+2},
+            {x: centerX-2, z: centerZ+2}
+        ];
+    }
+    
+    generateLinePath(centerX, centerZ) {
+        return [
+            {x: centerX-3, z: centerZ},
+            {x: centerX+3, z: centerZ},
+            {x: centerX, z: centerZ},
+            {x: centerX, z: centerZ-2},
+            {x: centerX, z: centerZ+2}
+        ];
+    }
+    
+     generateRandomPath(centerX, centerZ) {
+        const points = [];
+        for(let i = 0; i < 5; i++) {
+            points.push({
+                x: Math.floor(centerX + (Math.random() - 0.5) * 6),
+                z: Math.floor(centerZ + (Math.random() - 0.5) * 6)
+            });
+        }
+        return points;
+    }
+    
+    generateFigure8Path(centerX, centerZ) {
+        return [
+            {x: centerX, z: centerZ-2},
+            {x: centerX+1, z: centerZ-1},
+            {x: centerX, z: centerZ},
+            {x: centerX-1, z: centerZ+1},
+            {x: centerX, z: centerZ+2},
+            {x: centerX+1, z: centerZ+1},
+            {x: centerX, z: centerZ},
+            {x: centerX-1, z: centerZ-1}
+        ];
+    }
+    
     startPatrol() {
         if (!this.isPatrolling || this.patrolPath.length === 0) return;
         
@@ -66,33 +127,26 @@ class NPC extends Player {
         this.findPath(this.pos, target, path => {
             this.path = path;
             this.progress = 0;
-            this.waitTime = 0; // Reset wait time when starting new path
+            this.waitTime = 0;
         });
     }
     
     update() {
         if (!this.isPatrolling) return;
         
-        // If we have a path to follow, move along it
         if (this.path.length > 0) {
-            super.update(); // Call parent update to handle movement and animation
+            super.update();
             return;
         }
         
-        // If we're not moving and have a patrol path, wait then move to next point
         if (this.patrolPath.length > 0) {
-            this.waitTime += 30; // Assuming ~60fps (16ms per frame)
+            this.waitTime += 30;
             
             if (this.waitTime >= this.maxWaitTime) {
-                // Move to next patrol point
                 this.patrolIndex = (this.patrolIndex + 1) % this.patrolPath.length;
-                
-                // Add some randomization to make movement feel more natural
-                this.maxWaitTime = 1500 + Math.random() * 1000; // 1.5-2.5 seconds
-                
+                this.maxWaitTime = 1500 + Math.random() * 1000;
                 this.startPatrol();
             } else {
-                // Still waiting - make sure we're in idle state
                 if (this.animationState !== 'idle') {
                     this.animationState = 'idle';
                     this.animationFrame = 0;
@@ -103,26 +157,35 @@ class NPC extends Player {
         }
     }
     
-    initInput() {} // NPCs don't respond to clicks
+    initInput() {}
 }
 
-// Auto-initialize NPCs when file is included
+// Usage examples with different patrol types
 (function() {
-    // Wait for game to be available
     const initNPCs = () => {
         if (typeof game !== 'undefined' && game.terrain && game.scene) {
-            // Create NPCs with staggered spawn delays (in milliseconds)
-            const npc1 = new NPC(game, 2, 12, 5, 0);     // Row 3, position (12,5), no delay
-            const npc3 = new NPC(game, 3, 5, 5, 1000);     // Row 3, position (12,5), no delay
-            const npc2 = new NPC(game, 1, 7, 11, 2000);  // Row 4, position (7,11), 2 second delay
-            const npc4 = new NPC(game, 4, 9, 5, 1000);     // Row 3, position (12,5), no delay
+            // Create NPCs with different patrol routes and idle frames
+            // NPC Configuration: [layer, x, y, delay, patrolType, frame]
+            // layer: render layer (0-4)
+            // x, y: starting position coordinates
+            // delay: movement delay in milliseconds
+            // patrolType: 'circle', 'square', 'line', 'random', 'none'
+            // frame: sprite frame index
+            const npcConfigs = [
+                [0, 5, 5, 2000, 'circle', 0],      
+                [2, 9, 5, 2000, 'none', 0],      
+                [3, 5, 5, 2000, 'none', 1],      
+                [4, 14, 2, 0, 'random', 0],      
+                [4, 7, 11, 3000, 'circle', 0],   
+            ];
+
+            game.npcs = npcConfigs.map(config => new NPC(game, ...config));
+
+            console.log('NPCs created with patrol types and idle frames:');
+            game.npcs.forEach((npc, i) => {
+                console.log(`NPC${i+1}: ${npc.patrolType} patrol, idle frame ${npc.animations.idle.frames[0].x/64}`);
+            });
             
-            game.npcs = [npc1, npc2];
-            
-            console.log('NPCs created at positions:', npc1.pos, npc2.pos);
-            console.log('NPC spawn delays: 0ms, 2000ms');
-            
-            // Hook into existing update loop
             if (game.update) {
                 const originalUpdate = game.update;
                 game.update = function() {
@@ -131,13 +194,12 @@ class NPC extends Player {
                 };
             }
             
-            console.log('NPCs initialized with improved movement timing');
+            console.log('NPCs initialized with multiple patrol routes');
         } else {
-            setTimeout(initNPCs, 100); // Retry in 100ms
+            setTimeout(initNPCs, 100);
         }
     };
     
-    // Start initialization
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initNPCs);
     } else {

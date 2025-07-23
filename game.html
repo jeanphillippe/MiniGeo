@@ -155,7 +155,246 @@ this.useTerrainSprites = USE_SPRITE_TERRAIN;
                 Object.assign(this.directionalLight.shadow.camera, { near: 0.1, far: 200, left: -50, right: 50, top: 50, bottom: -50 });
                 this.scene.add(this.directionalLight);
             }
+showConfirmationDialog(interactable, callback) {
+    // Remove any existing dialog
+    const existingDialog = document.getElementById('confirmationDialog');
+    if (existingDialog) existingDialog.remove();
 
+    const dialog = document.createElement('div');
+    dialog.id = 'confirmationDialog';
+    dialog.style.cssText = `
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.95);
+        color: white;
+        padding: 20px;
+        border-radius: 12px;
+        border: 2px solid #4fc3f7;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+        z-index: 1000;
+        min-width: 280px;
+        text-align: center;
+        font-family: Arial, sans-serif;
+    `;
+
+    const message = this.getConfirmationMessage(interactable);
+    
+    dialog.innerHTML = `
+        <div style="font-size: 16px; margin-bottom: 16px; line-height: 1.4;">
+            <strong>${interactable.message}</strong>
+            <div style="margin-top: 8px; font-size: 14px; opacity: 0.9;">
+                ${message}
+            </div>
+        </div>
+        <div style="display: flex; gap: 12px; justify-content: center;">
+            <button id="confirmYes" style="
+                background: #43aa8b;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 14px;
+                transition: background 0.2s;
+            ">Yes</button>
+            <button id="confirmNo" style="
+                background: #f3722c;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 14px;
+                transition: background 0.2s;
+            ">No</button>
+        </div>
+    `;
+
+    document.body.appendChild(dialog);
+
+    // Add hover effects
+    const yesBtn = dialog.querySelector('#confirmYes');
+    const noBtn = dialog.querySelector('#confirmNo');
+    
+    yesBtn.onmouseover = () => yesBtn.style.background = '#4fc3f7';
+    yesBtn.onmouseout = () => yesBtn.style.background = '#43aa8b';
+    noBtn.onmouseover = () => noBtn.style.background = '#f9844a';
+    noBtn.onmouseout = () => noBtn.style.background = '#f3722c';
+
+    // Handle responses
+    yesBtn.onclick = () => {
+        dialog.remove();
+        callback(true);
+    };
+    
+    noBtn.onclick = () => {
+        dialog.remove();
+        callback(false);
+    };
+
+    // Allow ESC to cancel
+    const handleKeydown = (e) => {
+        if (e.key === 'Escape') {
+            dialog.remove();
+            document.removeEventListener('keydown', handleKeydown);
+            callback(false);
+        }
+    };
+    document.addEventListener('keydown', handleKeydown);
+}
+
+// Add this helper method to customize messages per interactable type
+
+getConfirmationMessage(interactable){
+    switch(interactable.type){
+        case 'npc':
+            return 'Do you want to talk to this NPC? They might have useful information or quests.';
+        case 'chest':
+            return 'Do you want to open this ancient chest? It might contain treasure... or traps.';
+        case 'tree':
+            return 'Do you want to examine this old tree? The whispers might reveal ancient secrets.';
+        case 'crystal':
+            return 'Do you want to collect this magical crystal? It will disappear forever.';
+        case 'shrine':
+            return 'Do you want to pray at this mysterious shrine? Ancient powers await.';
+        default:
+            return 'Do you want to interact with this object?';
+    }
+}
+
+
+showNPCQuestion(npc) {
+    const questions = [
+        "Would you like to know about the ancient ruins to the north?",
+        "Are you interested in purchasing some supplies?",
+        "Would you like to hear a tale of the old days?",
+        "Do you seek knowledge of the hidden paths?",
+        "Are you brave enough for a dangerous quest?"
+    ];
+    
+    const question = questions[Math.floor(Math.random() * questions.length)];
+    
+    const dialog = document.createElement('div');
+    dialog.id = 'npcQuestionDialog';
+    dialog.style.cssText = `
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.95);
+        color: white;
+        padding: 20px;
+        border-radius: 12px;
+        border: 2px solid #4fc3f7;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+        z-index: 1000;
+        min-width: 320px;
+        text-align: center;
+        font-family: Arial, sans-serif;
+    `;
+    
+    dialog.innerHTML = `
+        <div style="font-size: 16px; margin-bottom: 16px; line-height: 1.4;">
+            <strong>${npc.name || 'NPC'} asks:</strong>
+            <div style="margin-top: 8px; font-size: 14px; opacity: 0.9;">
+                ${question}
+            </div>
+        </div>
+        <div style="display: flex; gap: 12px; justify-content: center;">
+            <button id="npcYes" style="
+                background: #43aa8b;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 14px;
+                transition: background 0.2s;
+            ">Yes</button>
+            <button id="npcNo" style="
+                background: #f3722c;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 14px;
+                transition: background 0.2s;
+            ">No</button>
+        </div>
+    `;
+    
+    document.body.appendChild(dialog);
+    
+    const yesBtn = dialog.querySelector('#npcYes');
+    const noBtn = dialog.querySelector('#npcNo');
+    
+    yesBtn.onmouseover = () => yesBtn.style.background = '#4fc3f7';
+    yesBtn.onmouseout = () => yesBtn.style.background = '#43aa8b';
+    noBtn.onmouseover = () => noBtn.style.background = '#f9844a';
+    noBtn.onmouseout = () => noBtn.style.background = '#f3722c';
+    
+    yesBtn.onclick = () => {
+        dialog.remove();
+        // This is where you can trigger other things later
+        alert('You chose YES! (This will trigger other events later)');
+        // TODO: Add your custom logic here for "yes" responses
+    };
+    
+    noBtn.onclick = () => {
+        dialog.remove();
+        this.showInteractionMessage('The NPC nods understandingly.');
+    };
+    
+    const handleKeydown = (e) => {
+        if (e.key === 'Escape') {
+            dialog.remove();
+            document.removeEventListener('keydown', handleKeydown);
+        }
+    };
+    document.addEventListener('keydown', handleKeydown);
+}
+executeInteraction(interactable){
+    let message='';
+    switch(interactable.type){
+        case 'npc':
+            if(interactable.npcRef){
+                // Show NPC's message and then ask a question
+                const npcMessage = interactable.npcRef.message;
+                this.showInteractionMessage(npcMessage);
+                
+                // After showing the message, ask a follow-up question
+                setTimeout(() => {
+                    this.showNPCQuestion(interactable.npcRef);
+                }, 2000);
+            } else {
+                message="The NPC nods at you silently.";
+                this.showInteractionMessage(message);
+            }
+            break;
+        case 'chest':
+            message='You found 50 gold coins!';
+            this.showInteractionMessage(message);
+            break;
+        case 'tree':
+            message='The ancient tree whispers secrets of the forest...';
+            this.showInteractionMessage(message);
+            break;
+        case 'crystal':
+            message='The crystal glows brightly and fills you with energy!';
+            this.scene.remove(interactable.mesh);
+            this.interactables=this.interactables.filter(i=>i!==interactable);
+            this.hideTooltip();
+            this.showInteractionMessage(message);
+            break;
+        case 'shrine':
+            message='You feel blessed by an ancient power...';
+            this.showInteractionMessage(message);
+            break;
+    }
+}
 
 showMessage(text) {
     // Reuse existing interaction message system
@@ -581,36 +820,53 @@ handleTouchEnd(e) {
 
           
 
-            // Add new methods to GameEngine class
-setupInteractables() {
-    // Create some interactive objects
-    const interactableData = [
-        { x: 3, z: 3, type: 'chest', message: 'Ancient Chest', interact: 'Press E to open' },
-        { x: 12, z: 5, type: 'tree', message: 'Old Oak Tree', interact: 'Press E to examine' },
-        { x: 7, z: 11, type: 'crystal', message: 'Magic Crystal', interact: 'Press E to collect' },
-        { x: 14, z: 14, type: 'shrine', message: 'Mysterious Shrine', interact: 'Press E to pray' }
+
+setupInteractables(){
+    const interactableData=[
+        {x:3,z:3,type:'chest',message:'Ancient Chest',interact:'Press E to open'},
+        {x:12,z:5,type:'tree',message:'Old Oak Tree',interact:'Press E to examine'},
+        {x:7,z:11,type:'crystal',message:'Magic Crystal',interact:'Press E to collect'},
+        {x:14,z:14,type:'shrine',message:'Mysterious Shrine',interact:'Press E to pray'}
     ];
-
-    interactableData.forEach(data => {
-        const tile = this.terrain.getTile(data.x, data.z);
-        if (!tile) return;
-
-        const obj = this.createInteractableObject(data.type, data.x, data.z);
-        if (obj) {
+    
+    interactableData.forEach(data=>{
+        const tile=this.terrain.getTile(data.x,data.z);
+        if(!tile)return;
+        const obj=this.createInteractableObject(data.type,data.x,data.z);
+        if(obj){
             this.scene.add(obj);
             this.interactables.push({
-                mesh: obj,
-                x: data.x,
-                z: data.z,
-                type: data.type,
-                message: data.message,
-                interact: data.interact,
-                inRange: false
+                mesh:obj,
+                x:data.x,
+                z:data.z,
+                type:data.type,
+                message:data.message,
+                interact:data.interact,
+                inRange:!1
             });
         }
     });
+    
+    // Add NPCs to interactables after they're created
+    setTimeout(() => {
+        if (this.npcs) {
+            this.npcs.forEach(npc => {
+                if (npc.isInteractable) {
+                    this.interactables.push({
+                        mesh: npc.sprite,
+                        x: npc.pos.x,
+                        z: npc.pos.z,
+                        type: 'npc',
+                        message: npc.name || 'Friendly NPC',
+                        interact: 'Press E to talk',
+                        inRange: false,
+                        npcRef: npc
+                    });
+                }
+            });
+        }
+    }, 500);
 }
-
 createInteractableObject(type, x, z) {
     const tile = this.terrain.getTile(x, z);
     if (!tile) return null;
@@ -690,36 +946,38 @@ createInteractableObject(type, x, z) {
     return obj;
 }
 
-checkProximityInteractions() {
-    if (!this.player || !this.player.sprite) return;
 
-    let closestInteractable = null;
-    let minDistance = Infinity;
-
-    this.interactables.forEach(interactable => {
-        const distance = Math.sqrt(
-            Math.pow(this.player.pos.x - interactable.x, 2) + 
-            Math.pow(this.player.pos.z - interactable.z, 2)
-        );
-
-        const wasInRange = interactable.inRange;
-        interactable.inRange = distance <= this.proximityRadius;
-
-        // Add subtle glow effect for nearby objects
-        if (interactable.inRange && !wasInRange) {
+checkProximityInteractions(){
+    if(!this.player||!this.player.sprite)return;
+    let closestInteractable=null;
+    let minDistance=Infinity;
+    
+    this.interactables.forEach(interactable=>{
+        // Update NPC position if it's an NPC interactable
+        if (interactable.type === 'npc' && interactable.npcRef) {
+            interactable.x = interactable.npcRef.pos.x;
+            interactable.z = interactable.npcRef.pos.z;
+        }
+        
+        const distance=Math.sqrt(Math.pow(this.player.pos.x-interactable.x,2)+Math.pow(this.player.pos.z-interactable.z,2));
+        const wasInRange=interactable.inRange;
+        interactable.inRange=distance<=this.proximityRadius;
+        
+        if(interactable.inRange&&!wasInRange){
             this.addGlowEffect(interactable.mesh);
-        } else if (!interactable.inRange && wasInRange) {
+        }else if(!interactable.inRange&&wasInRange){
             this.removeGlowEffect(interactable.mesh);
         }
-
-        if (interactable.inRange && distance < minDistance) {
-            minDistance = distance;
-            closestInteractable = interactable;
+        
+        if(interactable.inRange&&distance<minDistance){
+            minDistance=distance;
+            closestInteractable=interactable;
         }
     });
-
+    
     this.updateTooltip(closestInteractable);
 }
+
 addGlowEffect(mesh) {
     if (mesh.userData.glowAdded) return;
 
@@ -866,38 +1124,49 @@ getDistanceToInteractable(interactable) {
     );
 }
 
-handleInteraction() {
-    if (!this.activeTooltip) return;
+
+handleInteraction(){
+    if(!this.activeTooltip)return;
+    const distance=this.getDistanceToInteractable(this.activeTooltip);
+    if(distance>1.5)return;
     
-    const distance = this.getDistanceToInteractable(this.activeTooltip);
-    if (distance > 1.5) return;
+    const obj=this.activeTooltip;
     
-    const obj = this.activeTooltip;
-    let message = '';
+    // Handle NPC interactions with confirmation dialog
+    if (obj.type === 'npc') {
+        this.showConfirmationDialog(obj, (confirmed) => {
+            if (confirmed) {
+                this.executeInteraction(obj);
+            }
+        });
+        return;
+    }
     
-    switch (obj.type) {
+    // Handle other interactions directly
+    let message='';
+    switch(obj.type){
         case 'chest':
-            message = 'You found 50 gold coins!';
+            message='You found 50 gold coins!';
             break;
         case 'tree':
-            message = 'The ancient tree whispers secrets of the forest...';
+            message='The ancient tree whispers secrets of the forest...';
             break;
         case 'crystal':
-            message = 'The crystal glows brightly and fills you with energy!';
-            // Remove crystal after interaction
+            message='The crystal glows brightly and fills you with energy!';
             this.scene.remove(obj.mesh);
-            this.interactables = this.interactables.filter(i => i !== obj);
+            this.interactables=this.interactables.filter(i=>i!==obj);
             this.hideTooltip();
             break;
         case 'shrine':
-            message = 'You feel blessed by an ancient power...';
+            message='You feel blessed by an ancient power...';
             break;
     }
     
-    if (message) {
+    if(message){
         this.showInteractionMessage(message);
     }
 }
+
 
 showInteractionMessage(message) {
     // Create temporary message overlay

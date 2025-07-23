@@ -171,7 +171,7 @@ showConfirmationDialog(interactable, callback) {
         color: white;
         padding: 20px;
         border-radius: 12px;
-        border: 2px solid #4fc3f7;
+        border: 0px solid #4fc3f7;
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
         z-index: 1000;
         min-width: 280px;
@@ -245,12 +245,13 @@ showConfirmationDialog(interactable, callback) {
     document.addEventListener('keydown', handleKeydown);
 }
 
-// Add this helper method to customize messages per interactable type
 
-getConfirmationMessage(interactable){
-    switch(interactable.type){
+getConfirmationMessage(interactable) {
+    switch(interactable.type) {
         case 'npc':
             return 'Do you want to talk to this NPC? They might have useful information or quests.';
+        case 'npc_confirmation': // Add this new case
+            return interactable.message; // Use the custom confirmation message
         case 'chest':
             return 'Do you want to open this ancient chest? It might contain treasure... or traps.';
         case 'tree':
@@ -287,7 +288,7 @@ showNPCQuestion(npc) {
         color: white;
         padding: 20px;
         border-radius: 12px;
-        border: 2px solid #4fc3f7;
+        border: 0px solid #4fc3f7;
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
         z-index: 1000;
         min-width: 320px;
@@ -356,44 +357,37 @@ showNPCQuestion(npc) {
     };
     document.addEventListener('keydown', handleKeydown);
 }
-executeInteraction(interactable){
-    let message='';
-    switch(interactable.type){
-        case 'npc':
-            if(interactable.npcRef){
-                // Show NPC's message and then ask a question
-                const npcMessage = interactable.npcRef.message;
-                this.showInteractionMessage(npcMessage);
-                
-                // After showing the message, ask a follow-up question
-                setTimeout(() => {
-                    this.showNPCQuestion(interactable.npcRef);
-                }, 2000);
-            } else {
-                message="The NPC nods at you silently.";
-                this.showInteractionMessage(message);
-            }
-            break;
-        case 'chest':
-            message='You found 50 gold coins!';
-            this.showInteractionMessage(message);
-            break;
-        case 'tree':
-            message='The ancient tree whispers secrets of the forest...';
-            this.showInteractionMessage(message);
-            break;
-        case 'crystal':
-            message='The crystal glows brightly and fills you with energy!';
-            this.scene.remove(interactable.mesh);
-            this.interactables=this.interactables.filter(i=>i!==interactable);
-            this.hideTooltip();
-            this.showInteractionMessage(message);
-            break;
-        case 'shrine':
-            message='You feel blessed by an ancient power...';
-            this.showInteractionMessage(message);
-            break;
-    }
+executeInteraction(interactable) {
+  let message = '';
+  switch (interactable.type) {
+    case 'npc':
+      if (interactable.npcRef) {
+        // Call the NPC's interact method to progress conversation
+        message = interactable.npcRef.interact();
+      } else {
+        message = "The NPC nods at you silently.";
+      }
+      break;
+    case 'chest':
+      message = 'You found 50 gold coins!';
+      break;
+    case 'tree':
+      message = 'The ancient tree whispers secrets of the forest...';
+      break;
+    case 'crystal':
+      message = 'The crystal glows brightly and fills you with energy!';
+      this.scene.remove(interactable.mesh);
+      this.interactables = this.interactables.filter(i => i !== interactable);
+      this.hideTooltip();
+      break;
+    case 'shrine':
+      message = 'You feel blessed by an ancient power...';
+      break;
+  }
+  
+  if (message) {
+    this.showInteractionMessage(message);
+  }
 }
 
 showMessage(text) {
@@ -946,13 +940,15 @@ createInteractableObject(type, x, z) {
     return obj;
 }
 
-
 checkProximityInteractions(){
     if(!this.player||!this.player.sprite)return;
     let closestInteractable=null;
     let minDistance=Infinity;
     
     this.interactables.forEach(interactable=>{
+        // Skip if mesh doesn't exist
+        if (!interactable.mesh) return;
+        
         // Update NPC position if it's an NPC interactable
         if (interactable.type === 'npc' && interactable.npcRef) {
             interactable.x = interactable.npcRef.pos.x;
@@ -979,10 +975,20 @@ checkProximityInteractions(){
 }
 
 addGlowEffect(mesh) {
+    // Initialize userData if it doesn't exist
+    if (!mesh.userData) {
+        mesh.userData = {};
+    }
+    
     if (mesh.userData.glowAdded) return;
 
     // Helper function to add glow to a mesh or group
     const addGlowTo = m => {
+        // Initialize userData for child meshes too
+        if (!m.userData) {
+            m.userData = {};
+        }
+        
         if (m.material && m.material.emissive) {
             const originalEmissive = m.material.emissive.clone();
             m.userData.originalEmissive = originalEmissive;
@@ -1011,8 +1017,18 @@ addGlowEffect(mesh) {
 }
 
 removeGlowEffect(mesh) {
+    // Initialize userData if it doesn't exist
+    if (!mesh.userData) {
+        mesh.userData = {};
+    }
+    
     // Helper function to remove glow from a mesh or group
     const removeGlowFrom = m => {
+        // Initialize userData for child meshes too
+        if (!m.userData) {
+            m.userData = {};
+        }
+        
         if (m.userData.glowAdded) {
             m.userData.glowAdded = false;
             if (m.material && m.material.emissive && m.userData.originalEmissive) {
@@ -1028,6 +1044,7 @@ removeGlowEffect(mesh) {
     }
     mesh.userData.glowAdded = false; // Mark group as processed
 }
+
 updateTooltip(interactable){
     const container=document.getElementById('tooltipContainer');
     if(!interactable){
@@ -1134,11 +1151,7 @@ handleInteraction(){
     
     // Handle NPC interactions with confirmation dialog
     if (obj.type === 'npc') {
-        this.showConfirmationDialog(obj, (confirmed) => {
-            if (confirmed) {
                 this.executeInteraction(obj);
-            }
-        });
         return;
     }
     

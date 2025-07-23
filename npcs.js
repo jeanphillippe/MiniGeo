@@ -1,203 +1,528 @@
-class NPC extends Player{
-    constructor(game,spriteRow,startX,startZ,spawnDelay=0,patrolType='circle',idleFrame=0,name=''){
-        super(game);
-        this.spriteRow=spriteRow;
-        this.isNPC=!0;
-        this.patrolIndex=0;
-        this.startX=startX;
-        this.startZ=startZ;
-        this.patrolType=patrolType;
-        this.patrolPath=patrolType!=='none'?this.generatePatrolPath(patrolType,startX,startZ):[];
-        this.isPatrolling=patrolType!=='none';
-        this.waitTime=0;
-        this.maxWaitTime=1500+Math.random()*1000;
-        this.isInteractable=!0;
-        this.message=this.generateRandomMessage();
-        this.interactionType='npc';
-        this.speed=0.03+Math.random()*0.015;
-        this.name=name||this.generateRandomName(); // Add name property
+// NPC Data Configuration
+const NPC_DATA = {
+  'elder_marcus': {
+        spriteRow: 0,
+        position: { x: 5, z: 5 },
+        spawnDelay: 2000,
+        patrolType: 'circle',
+        idleFrame: 0,
+        name: 'Elder Marcus',
+        conversations: [
+            {
+                message: "Greetings, young traveler. I sense great potential in you.",
+                action: null
+            },
+            {
+                message: "The ancient temple holds secrets... but first, prove your worth.",
+                action: { type: 'move', target: { x: 8, z: 8 }, speed: 0.02 },
+                requiresConfirmation: true, // Add this flag
+                confirmationMessage: "Do you wish to follow me to the ancient temple? The path may be dangerous."
+            },
+            {
+                message: "You followed me here. Good. The real treasure lies beneath the old oak.",
+                action: { type: 'disappear', delay: 3000 }
+            }
+        ]
+    },
+  'merchant_sara': {
+    spriteRow: 2,
+    position: {x: 9, z: 5},
+    spawnDelay: 2000,
+    patrolType: 'none',
+    idleFrame: 0,
+    name: 'Merchant Sara',
+    conversations: [
+      {
+        message: "Welcome to my shop! I have the finest wares in the land.",
+        action: null
+      },
+      {
+        message: "Hmm, you look like someone who appreciates quality. Follow me to my secret stash.",
+        action: {type: 'move', target: {x: 12, z: 8}, speed: 0.03}
+      },
+      {
+        message: "Here are my rarest items. Choose wisely, traveler.",
+        action: {type: 'disappear', delay: 3000}
+      }
+    ]
+  },
+  'wise_elena': {
+    spriteRow: 3,
+    position: {x: 5, z: 5},
+    spawnDelay: 2000,
+    patrolType: 'none',
+    idleFrame: 1,
+    name: 'Wise Elena',
+    conversations: [
+      {
+        message: "The spirits whisper of your arrival...",
+        action: null
+      },
+      {
+        message: "They tell me you seek knowledge. Come, let me show you the sacred grove.",
+        action: {type: 'move', target: {x: 2, z: 2}, speed: 0.025}
+      },
+      {
+        message: "This place holds ancient magic. Use it wisely.",
+        action: {type: 'patrol', patrolType: 'circle'}
+      }
+    ]
+  },
+  'scout_mike': {
+    spriteRow: 4,
+    position: {x: 14, z: 2},
+    spawnDelay: 0,
+    patrolType: 'random',
+    idleFrame: 0,
+    name: 'Scout Mike',
+    conversations: [
+      {
+        message: "I've been watching the perimeter. Strange movements in the eastern woods.",
+        action: null
+      },
+      {
+        message: "Come, I'll show you the patrol route. Stay close and stay quiet.",
+        action: {type: 'move', target: {x: 18, z: 6}, speed: 0.04}
+      },
+      {
+        message: "From here you can see the entire valley. Remember this vantage point.",
+        action: {type: 'patrol', patrolType: 'figure8'}
+      }
+    ]
+  },
+  'healer_rose': {
+    spriteRow: 4,
+    position: {x: 7, z: 11},
+    spawnDelay: 3000,
+    patrolType: 'circle',
+    idleFrame: 0,
+    name: 'Healer Rose',
+    conversations: [
+      {
+        message: "You look weary, traveler. Rest here a moment and let me tend to your wounds.",
+        action: null
+      },
+      {
+        message: "The healing herbs grow wild near the spring. Let me show you where to find them.",
+        action: {type: 'move', target: {x: 4, z: 14}, speed: 0.025}
+      },
+      {
+        message: "These plants will serve you well on your journey. May they keep you safe.",
+        action: {type: 'patrol', patrolType: 'line'}
+      }
+    ]
+  },
+  'guard_tom': {
+    spriteRow: 1,
+    position: {x: 10, z: 10},
+    spawnDelay: 1000,
+    patrolType: 'square',
+    idleFrame: 0,
+    name: 'Guard Tom',
+    conversations: [
+      {
+        message: "Halt! State your business in these lands.",
+        action: null
+      },
+      {
+        message: "Very well. But I must escort you to the checkpoint for verification.",
+        action: {type: 'move', target: {x: 13, z: 13}, speed: 0.035}
+      },
+      {
+        message: "You check out. But remember - I'll be watching.",
+        action: {type: 'patrol', patrolType: 'square'}
+      }
+    ]
+  },
+  'trader_jack': {
+    spriteRow: 5,
+    position: {x: 3, z: 8},
+    spawnDelay: 1500,
+    patrolType: 'line',
+    idleFrame: 0,
+    name: 'Trader Jack',
+    conversations: [
+      {
+        message: "Ah, a fellow traveler! I deal in rare goods and information.",
+        action: null
+      },
+      {
+        message: "I know of a hidden cache nearby. Care to make a deal?",
+        action: {type: 'move', target: {x: 1, z: 5}, speed: 0.03}
+      },
+      {
+        message: "Here's your share. May fortune favor your travels!",
+        action: {type: 'disappear', delay: 2000}
+      }
+    ]
+  }
+};
+
+class NPC extends Player {
+  constructor(game, npcId) {
+    super(game);
+    
+    // Load NPC data
+    const data = NPC_DATA[npcId];
+    if (!data) throw new Error(`NPC data not found for ID: ${npcId}`);
+    
+    this.npcId = npcId;
+    this.spriteRow = data.spriteRow;
+    this.isNPC = true;
+    this.patrolIndex = 0;
+    this.startX = data.position.x;
+    this.startZ = data.position.z;
+    this.patrolType = data.patrolType;
+    this.patrolPath = data.patrolType !== 'none' ? this.generatePatrolPath(data.patrolType, data.position.x, data.position.z) : [];
+    this.isPatrolling = data.patrolType !== 'none';
+    this.waitTime = 0;
+    this.maxWaitTime = 1500 + Math.random() * 1000;
+    this.isInteractable = true;
+    this.name = data.name;
+    this.speed = 0.03 + Math.random() * 0.015;
+    
+    // Conversation system
+    this.conversations = data.conversations;
+    this.conversationIndex = 0;
+    this.message = this.conversations[0].message;
+    this.interactionType = 'npc';
+    this.isExecutingAction = false;
+    
+    this.animations = {
+      idle: {
+        frames: [{x: data.idleFrame * 64, y: data.spriteRow * 64}],
+        frameCount: 1,
+        loop: true
+      },
+      walking: {
+        frames: [
+          {x: 64, y: data.spriteRow * 64},
+          {x: 128, y: data.spriteRow * 64},
+          {x: 192, y: data.spriteRow * 64},
+          {x: 256, y: data.spriteRow * 64}
+        ],
+        frameCount: 4,
+        loop: true
+      }
+    };
+    
+    this.pos = {x: data.position.x, z: data.position.z};
+    this.setPosition(data.position.x, data.position.z);
+    
+    if (this.isPatrolling) {
+      setTimeout(() => {
+        this.startPatrol();
+      }, 1000 + data.spawnDelay);
+    }
+  }
+
+  // Add interaction method to handle conversation progression
+  
+interact() {
+    if (this.conversationIndex < this.conversations.length - 1) {
+        const nextConversation = this.conversations[this.conversationIndex + 1];
         
-        this.animations={
-            idle:{frames:[{x:idleFrame*64,y:spriteRow*64}],frameCount:1,loop:!0},
-            walking:{frames:[{x:64,y:spriteRow*64},{x:128,y:spriteRow*64},{x:192,y:spriteRow*64},{x:256,y:spriteRow*64}],frameCount:4,loop:!0}
-        };
-        
-        this.pos={x:startX,z:startZ};
-        this.setPosition(startX,startZ);
-        
-        if(this.isPatrolling){
-            setTimeout(()=>{
-                this.startPatrol()
-            },1000+spawnDelay)
+        // Check if the next conversation requires confirmation
+        if (nextConversation.requiresConfirmation) {
+            // Create a mock interactable for the confirmation dialog
+            const mockInteractable = {
+                type: 'npc_confirmation',
+                message: nextConversation.confirmationMessage || "Are you sure you want to continue?",
+                npcRef: this
+            };
+            
+            // Show confirmation dialog
+            this.game.showConfirmationDialog(mockInteractable, (confirmed) => {
+                if (confirmed) {
+                    // User confirmed, proceed with the conversation
+                    this.proceedToNextConversation();
+                }
+                // If not confirmed, stay at current conversation
+            });
+            
+            return this.message; // Return current message, don't advance yet
+        } else {
+            // No confirmation needed, proceed normally
+            this.proceedToNextConversation();
         }
     }
+    
+    return this.message;
+}
 
-    generateRandomName(){
-        const names = [
-            "Elder Marcus", "Merchant Sara", "Guard Tom", 
-            "Wise Elena", "Trader Jack", "Hermit Ben",
-            "Priestess Anna", "Scout Mike", "Healer Rose"
-        ];
-        return names[Math.floor(Math.random() * names.length)];
+// Add this helper method to the NPC class
+proceedToNextConversation() {
+    this.conversationIndex++;
+    this.message = this.conversations[this.conversationIndex].message;
+    const action = this.conversations[this.conversationIndex].action;
+    if (action && !this.isExecutingAction) {
+        this.executeAction(action);
     }
+}
 
-    generateRandomMessage(){
-        const messages=[
-            "Hello, traveler! Care to trade?",
-            "I've seen strange lights in the forest...",
-            "The old temple holds many secrets.",
-            "Beware of the shadows at night!",
-            "I have information about hidden treasures.",
-            "The path ahead is dangerous, be careful!",
-            "Have you heard the legends of this place?",
-            "I can offer you guidance, for a price.",
-            "These lands hold ancient mysteries."
-        ];
-        return messages[Math.floor(Math.random()*messages.length)]
-    }
-
-    generatePatrolPath(type,centerX,centerZ){
-        switch(type){
-            case 'none':return[];
-            case 'circle':return this.generateCirclePath(centerX,centerZ);
-            case 'square':return this.generateSquarePath(centerX,centerZ);
-            case 'line':return this.generateLinePath(centerX,centerZ);
-            case 'random':return this.generateRandomPath(centerX,centerZ);
-            case 'figure8':return this.generateFigure8Path(centerX,centerZ);
-            default:return this.generateCirclePath(centerX,centerZ)
+  executeAction(action) {
+    console.log(`Executing action: ${action.type}`, action);
+    this.isExecutingAction = true;
+    
+    switch (action.type) {
+      case 'move':
+        console.log(`Moving from (${this.pos.x}, ${this.pos.z}) to (${action.target.x}, ${action.target.z})`);
+        this.isPatrolling = false; // Stop current patrol
+        this.speed = action.speed || this.speed;
+        this.findPath(this.pos, action.target, (path) => {
+          console.log(`Path found with ${path.length} steps:`, path);
+          this.path = path;
+          this.progress = 0;
+          this.onReachTarget = () => {
+            console.log(`Reached target at (${this.pos.x}, ${this.pos.z})`);
+            this.isExecutingAction = false;
+            this.onReachTarget = null;
+          };
+        });
+        break;
+        
+      case 'patrol':
+        console.log(`Changing patrol type to: ${action.patrolType}`);
+        this.patrolType = action.patrolType;
+        this.patrolPath = action.patrolType !== 'none' ? 
+          this.generatePatrolPath(action.patrolType, this.pos.x, this.pos.z) : [];
+        this.isPatrolling = action.patrolType !== 'none';
+        this.patrolIndex = 0;
+        if (this.isPatrolling) {
+          this.startPatrol();
         }
-    }
-
-    generateCirclePath(centerX,centerZ){
-        return[
-            {x:centerX+1,z:centerZ-1},{x:centerX+1,z:centerZ},{x:centerX+1,z:centerZ+1},
-            {x:centerX,z:centerZ+1},{x:centerX-1,z:centerZ+1},{x:centerX-1,z:centerZ},
-            {x:centerX-1,z:centerZ-1},{x:centerX,z:centerZ-1}
-        ]
-    }
-
-    generateSquarePath(centerX,centerZ){
-        return[
-            {x:centerX-2,z:centerZ-2},{x:centerX+2,z:centerZ-2},
-            {x:centerX+2,z:centerZ+2},{x:centerX-2,z:centerZ+2}
-        ]
-    }
-
-    generateLinePath(centerX,centerZ){
-        return[
-            {x:centerX-3,z:centerZ},{x:centerX+3,z:centerZ},
-            {x:centerX,z:centerZ},{x:centerX,z:centerZ-2},{x:centerX,z:centerZ+2}
-        ]
-    }
-
-    generateRandomPath(centerX,centerZ){
-        const points=[];
-        for(let i=0;i<5;i++){
-            points.push({
-                x:Math.floor(centerX+(Math.random()-0.5)*6),
-                z:Math.floor(centerZ+(Math.random()-0.5)*6)
-            })
+        this.isExecutingAction = false;
+        break;
+        
+      case 'disappear':
+  console.log(`Disappearing in ${action.delay || 0}ms`);
+  setTimeout(() => {
+    this.isInteractable = false;
+    this.isPatrolling = false;
+    
+    // Visual fade out animation
+    if (this.sprite) {
+      const fadeOut = () => {
+        if (!this.sprite.material) return;
+        
+        // Reduce opacity gradually
+        this.sprite.material.opacity -= 0.05;
+        
+        if (this.sprite.material.opacity <= 0) {
+          // Completely hidden - remove from scene and interactables
+          this.game.scene.remove(this.sprite);
+          
+          // Remove from interactables array
+          this.game.interactables = this.game.interactables.filter(
+            interactable => interactable.npcRef !== this
+          );
+          
+          this.isExecutingAction = false;
+          console.log('NPC disappeared');
+        } else {
+          // Continue fading
+          requestAnimationFrame(fadeOut);
         }
-        return points
+      };
+      
+      // Make sure material is transparent
+      this.sprite.material.transparent = true;
+      fadeOut();
+    } else {
+      this.isExecutingAction = false;
+      console.log('NPC disappeared (no sprite)');
     }
+  }, action.delay || 0);
+  break;
+    }
+  }
 
-    generateFigure8Path(centerX,centerZ){
-        return[
-            {x:centerX,z:centerZ-2},{x:centerX+1,z:centerZ-1},{x:centerX,z:centerZ},
-            {x:centerX-1,z:centerZ+1},{x:centerX,z:centerZ+2},{x:centerX+1,z:centerZ+1},
-            {x:centerX,z:centerZ},{x:centerX-1,z:centerZ-1}
-        ]
+  // Override update to handle action completion
+  update() {
+    if (!this.isPatrolling && !this.isExecutingAction) return;
+    
+    // If executing an action, don't let proximity stop movement
+    if (this.isExecutingAction) {
+      if (this.path.length > 0) {
+        super.update();
+        // Check if we reached target during action
+        if (this.onReachTarget && this.path.length === 0) {
+          this.onReachTarget();
+        }
+      }
+      return;
     }
+    
+    // Only stop for player proximity during normal patrol (not during actions)
+    if (this.isPlayerNearby() && !this.isExecutingAction) {
+      if (this.animationState !== 'idle') {
+        this.animationState = 'idle';
+        this.animationFrame = 0;
+        this.animationTime = 0;
+      }
+      this.updateAnimation();
+      return;
+    }
+    
+    if (this.path.length > 0) {
+      super.update();
+      return;
+    }
+    
+    if (this.patrolPath.length > 0 && this.isPatrolling) {
+      this.waitTime += 30;
+      if (this.waitTime >= this.maxWaitTime) {
+        this.patrolIndex = (this.patrolIndex + 1) % this.patrolPath.length;
+        this.maxWaitTime = 1500 + Math.random() * 1000;
+        this.startPatrol();
+      } else {
+        if (this.animationState !== 'idle') {
+          this.animationState = 'idle';
+          this.animationFrame = 0;
+          this.animationTime = 0;
+        }
+        this.updateAnimation();
+      }
+    }
+  }
 
-    startPatrol(){
-        if(!this.isPatrolling||this.patrolPath.length===0)return;
-        const target=this.patrolPath[this.patrolIndex];
-        this.findPath(this.pos,target,path=>{
-            this.path=path;
-            this.progress=0;
-            this.waitTime=0
-        })
+  // Keep existing methods unchanged
+  generatePatrolPath(type, centerX, centerZ) {
+    switch (type) {
+      case 'none': return [];
+      case 'circle': return this.generateCirclePath(centerX, centerZ);
+      case 'square': return this.generateSquarePath(centerX, centerZ);
+      case 'line': return this.generateLinePath(centerX, centerZ);
+      case 'random': return this.generateRandomPath(centerX, centerZ);
+      case 'figure8': return this.generateFigure8Path(centerX, centerZ);
+      default: return this.generateCirclePath(centerX, centerZ);
     }
-isPlayerNearby(radius = 2) {
+  }
+
+  generateCirclePath(centerX, centerZ) {
+    return [
+      {x: centerX + 1, z: centerZ - 1}, {x: centerX + 1, z: centerZ},
+      {x: centerX + 1, z: centerZ + 1}, {x: centerX, z: centerZ + 1},
+      {x: centerX - 1, z: centerZ + 1}, {x: centerX - 1, z: centerZ},
+      {x: centerX - 1, z: centerZ - 1}, {x: centerX, z: centerZ - 1}
+    ];
+  }
+
+  generateSquarePath(centerX, centerZ) {
+    return [
+      {x: centerX - 2, z: centerZ - 2}, {x: centerX + 2, z: centerZ - 2},
+      {x: centerX + 2, z: centerZ + 2}, {x: centerX - 2, z: centerZ + 2}
+    ];
+  }
+
+  generateLinePath(centerX, centerZ) {
+    return [
+      {x: centerX - 3, z: centerZ}, {x: centerX + 3, z: centerZ},
+      {x: centerX, z: centerZ}, {x: centerX, z: centerZ - 2}, {x: centerX, z: centerZ + 2}
+    ];
+  }
+
+  generateRandomPath(centerX, centerZ) {
+    const points = [];
+    for (let i = 0; i < 5; i++) {
+      points.push({
+        x: Math.floor(centerX + (Math.random() - 0.5) * 6),
+        z: Math.floor(centerZ + (Math.random() - 0.5) * 6)
+      });
+    }
+    return points;
+  }
+
+  generateFigure8Path(centerX, centerZ) {
+    return [
+      {x: centerX, z: centerZ - 2}, {x: centerX + 1, z: centerZ - 1},
+      {x: centerX, z: centerZ}, {x: centerX - 1, z: centerZ + 1},
+      {x: centerX, z: centerZ + 2}, {x: centerX + 1, z: centerZ + 1},
+      {x: centerX, z: centerZ}, {x: centerX - 1, z: centerZ - 1}
+    ];
+  }
+
+  startPatrol() {
+    if (!this.isPatrolling || this.patrolPath.length === 0) return;
+    const target = this.patrolPath[this.patrolIndex];
+    this.findPath(this.pos, target, (path) => {
+      this.path = path;
+      this.progress = 0;
+      this.waitTime = 0;
+    });
+  }
+
+  isPlayerNearby(radius = 2) {
     if (!this.game.player || !this.game.player.pos) return false;
     const dx = this.pos.x - this.game.player.pos.x;
     const dz = this.pos.z - this.game.player.pos.z;
     return Math.sqrt(dx * dx + dz * dz) < radius;
+  }
+
+  initInput() {}
 }
 
-    update(){
-        if(!this.isPatrolling)return;
-        
-          if (this.isPlayerNearby()) {
-        if (this.animationState !== 'idle') {
-            this.animationState = 'idle';
-            this.animationFrame = 0;
-            this.animationTime = 0;
+// Modified initialization
+(function() {
+  const initNPCs = () => {
+    if (typeof game !== 'undefined' && game.terrain && game.scene) {
+      // Create NPCs from data
+      const npcIds = ['elder_marcus', 'merchant_sara', 'wise_elena','scout_mike','healer_rose','guard_tom'];
+      game.npcs = npcIds.map(id => new NPC(game, id));
+      
+      console.log('NPCs created from data:');
+      game.npcs.forEach((npc, i) => {
+        console.log(`${npc.name}: ${npc.patrolType} patrol, conversations: ${npc.conversations.length}`);
+      });
+      
+      // Add NPCs to interactables system
+      game.npcs.forEach(npc => {
+        const tile = game.terrain.getTile(npc.pos.x, npc.pos.z);
+        if (tile) {
+          game.interactables.push({
+            mesh: npc.sprite || { position: { x: tile.mesh.position.x, y: tile.mesh.position.y + 1, z: tile.mesh.position.z } },
+            x: npc.pos.x,
+            z: npc.pos.z,
+            type: 'npc',
+            message: npc.name,
+            interact: 'Press E to talk',
+            inRange: false,
+            npcRef: npc
+          });
         }
-        this.updateAnimation();
-        return; // Stop moving if player is near
-    }
-    
-        if(this.path.length>0){
-            super.update();
-            return
-        }
-        
-        if(this.patrolPath.length>0){
-            this.waitTime+=30;
-            if(this.waitTime>=this.maxWaitTime){
-                this.patrolIndex=(this.patrolIndex+1)%this.patrolPath.length;
-                this.maxWaitTime=1500+Math.random()*1000;
-                this.startPatrol()
-            }else{
-                if(this.animationState!=='idle'){
-                    this.animationState='idle';
-                    this.animationFrame=0;
-                    this.animationTime=0
-                }
-                this.updateAnimation()
+      });
+      
+      if (game.update) {
+        const originalUpdate = game.update;
+        game.update = function() {
+          originalUpdate.call(this);
+          game.npcs.forEach(npc => npc.update());
+          
+          // Update NPC interactable positions
+          game.npcs.forEach(npc => {
+            const interactable = game.interactables.find(i => i.npcRef === npc);
+            if (interactable) {
+              interactable.x = npc.pos.x;
+              interactable.z = npc.pos.z;
+              const tile = game.terrain.getTile(npc.pos.x, npc.pos.z);
+              if (tile && interactable.mesh.position) {
+                interactable.mesh.position.x = tile.mesh.position.x;
+                interactable.mesh.position.z = tile.mesh.position.z;
+              }
             }
-        }
+          });
+        };
+      }
+      
+      console.log('NPCs initialized with conversation chains and actions');
+    } else {
+      setTimeout(initNPCs, 100);
     }
+  };
 
-    initInput(){}
-}
-
-(function(){
-    const initNPCs=()=>{
-        if(typeof game!=='undefined'&&game.terrain&&game.scene){
-            const npcConfigs=[
-                [0,5,5,2000,'circle',0,'Elder Marcus'],
-                [2,9,5,2000,'none',0,'Merchant Sara'],
-                [3,5,5,2000,'none',1,'Wise Elena'],
-                [4,14,2,0,'random',0,'Scout Mike'],
-                [4,7,11,3000,'circle',0,'Healer Rose'],
-            ];
-            
-            game.npcs=npcConfigs.map(config=>new NPC(game,...config));
-            
-            console.log('NPCs created with names and patrol types:');
-            game.npcs.forEach((npc,i)=>{
-                console.log(`${npc.name}: ${npc.patrolType} patrol, idle frame ${npc.animations.idle.frames[0].x/64}`)
-            });
-            
-            if(game.update){
-                const originalUpdate=game.update;
-                game.update=function(){
-                    originalUpdate.call(this);
-                    game.npcs.forEach(npc=>npc.update())
-                }
-            }
-            
-            console.log('NPCs initialized with names and interaction support')
-        }else{
-            setTimeout(initNPCs,100)
-        }
-    };
-    
-    if(document.readyState==='loading'){
-        document.addEventListener('DOMContentLoaded',initNPCs)
-    }else{
-        initNPCs()
-    }
-})()
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initNPCs);
+  } else {
+    initNPCs();
+  }
+})();

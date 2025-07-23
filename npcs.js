@@ -14,7 +14,7 @@ const NPC_DATA = {
             },
             {
                 message: "The ancient temple holds secrets... but first, prove your worth.",
-                action: { type: 'move', target: { x: 8, z: 8 }, speed: 0.02 },
+                action: { type: 'move', target: { x: 7, z: 0 }, speed: 0.05 },
                 requiresConfirmation: true, // Add this flag
                 confirmationMessage: "Do you wish to follow me to the ancient temple? The path may be dangerous."
             },
@@ -51,7 +51,7 @@ const NPC_DATA = {
     position: {x: 5, z: 5},
     spawnDelay: 2000,
     patrolType: 'none',
-    idleFrame: 1,
+    idleFrame: 0,
     name: 'Wise Elena',
     conversations: [
       {
@@ -293,7 +293,61 @@ proceedToNextConversation() {
         }
         this.isExecutingAction = false;
         break;
+        case 'drop':
+  console.log(`Dropping in ${action.delay || 0}ms`);
+  setTimeout(() => {
+    this.isInteractable = false;
+    this.isPatrolling = false;
+    
+    // Visual drop animation with physics
+    if (this.sprite) {
+      let velocity = 0;
+      const gravity = 0.01;
+      const rotationSpeed = 0.01;
+      const startY = this.sprite.position.y;
+      
+      const dropAnimation = () => {
+        if (!this.sprite.material) return;
         
+        // Apply gravity physics
+        velocity += gravity;
+        this.sprite.position.y -= velocity;
+        
+        // Add spinning effect while falling
+        this.sprite.rotation.z += rotationSpeed;
+        
+        // Optional: Slight fade as it falls (looks more dramatic)
+        if (this.sprite.position.y < startY - 3) {
+          this.sprite.material.opacity = Math.max(0, this.sprite.material.opacity - 0.02);
+        }
+        
+        // Remove when fallen far enough or fully transparent
+        if (this.sprite.position.y < startY - 8 || this.sprite.material.opacity <= 0) {
+          // Completely fallen - remove from scene and interactables
+          this.game.scene.remove(this.sprite);
+          
+          // Remove from interactables array
+          this.game.interactables = this.game.interactables.filter(
+            interactable => interactable.npcRef !== this
+          );
+          
+          this.isExecutingAction = false;
+          console.log('NPC dropped out of sight');
+        } else {
+          // Continue falling
+          requestAnimationFrame(dropAnimation);
+        }
+      };
+      
+      // Make sure material supports transparency for the fade effect
+      this.sprite.material.transparent = true;
+      dropAnimation();
+    } else {
+      this.isExecutingAction = false;
+      console.log('NPC dropped (no sprite)');
+    }
+  }, action.delay || 0);
+  break;
       case 'disappear':
   console.log(`Disappearing in ${action.delay || 0}ms`);
   setTimeout(() => {

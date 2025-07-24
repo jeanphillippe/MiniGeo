@@ -324,7 +324,13 @@ proceedToNextConversation() {
           };
         });
         break;
-        
+        case 'camera':
+    console.log(`Changing camera to: ${action.preset}`);
+    this.game.setCameraPreset(action.preset, action.smooth !== false, () => {
+        console.log(`Camera preset '${action.preset}' applied`);
+        this.isExecutingAction = false;
+    });
+    break;
       case 'patrol':
         console.log(`Changing patrol type to: ${action.patrolType}`);
         this.patrolType = action.patrolType;

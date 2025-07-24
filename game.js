@@ -1112,57 +1112,75 @@ removeGlowEffect(mesh) {
     mesh.userData.glowAdded = false; // Mark group as processed
 }
 
-updateTooltip(interactable){
-    const container=document.getElementById('tooltipContainer');
-    if(!interactable){
+updateTooltip(interactable) {
+    const container = document.getElementById('tooltipContainer');
+    if (!interactable) {
         this.hideTooltip();
         return;
     }
-    
-    this.activeTooltip=interactable;
-    const canInteract=this.getDistanceToInteractable(interactable)<=1.5;
-    const tooltipDiv=document.createElement('div');
-    tooltipDiv.className=`tooltip interact visible ${canInteract ? 'clickable' : ''}`;
-    tooltipDiv.innerHTML=`
+
+    this.activeTooltip = interactable;
+    const canInteract = this.getDistanceToInteractable(interactable) <= 1.5;
+    const tooltipDiv = document.createElement('div');
+    tooltipDiv.className = `tooltip interact visible ${canInteract ? 'clickable' : ''}`;
+    tooltipDiv.innerHTML = `
         <strong>${interactable.message}</strong>
         <div class="interact-prompt">${canInteract ? 'Click to interact' : interactable.interact}</div>
     `;
-    
-    const oldHandler=container._clickHandler;
-    if(oldHandler){
-        container.removeEventListener('click',oldHandler);
-        container.removeEventListener('mousedown',oldHandler);
+
+    const oldHandler = container._clickHandler;
+    if (oldHandler) {
+        container.removeEventListener('click', oldHandler);
+        container.removeEventListener('mousedown', oldHandler);
     }
-    
-    if(canInteract){
-        tooltipDiv.style.cursor='pointer';
-        container.style.pointerEvents='auto';
-        container.style.zIndex='999';
+
+    if (canInteract) {
+        tooltipDiv.style.cursor = 'pointer';
+        container.style.pointerEvents = 'auto';
+        container.style.zIndex = '999';
         
-        const handleInteraction=(e)=>{
+        const handleInteraction = (e) => {
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation();
-            console.log('Desktop interaction triggered!');
+            console.log('Mobile/Desktop interaction triggered!');
             
-            // Use executeInteraction instead of handleInteraction to avoid recursion
-            this.executeInteraction(this.activeTooltip);
+            // NEW: Handle NPCs the same way as desktop
+            if (this.activeTooltip.type === 'npc' && this.activeTooltip.npcRef) {
+                const message = this.activeTooltip.npcRef.interact();
+                if (message) {
+                    this.showInteractionMessage(message);
+                }
+            } else {
+                // For non-NPCs, use the original logic
+                this.executeInteraction(this.activeTooltip);
+            }
         };
-        
-        container.addEventListener('click',handleInteraction);
-        container.addEventListener('mousedown',handleInteraction);
-        container.addEventListener('touchstart',(e)=>{
+
+        container.addEventListener('click', handleInteraction);
+        container.addEventListener('mousedown', handleInteraction);
+        container.addEventListener('touchstart', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            this.executeInteraction(this.activeTooltip);
+            
+            // NEW: Handle NPCs the same way as desktop for touch
+            if (this.activeTooltip.type === 'npc' && this.activeTooltip.npcRef) {
+                const message = this.activeTooltip.npcRef.interact();
+                if (message) {
+                    this.showInteractionMessage(message);
+                }
+            } else {
+                // For non-NPCs, use the original logic
+                this.executeInteraction(this.activeTooltip);
+            }
         });
-        container._clickHandler=handleInteraction;
-    }else{
-        container.style.pointerEvents='auto';
-        tooltipDiv.style.cursor='default';
+        container._clickHandler = handleInteraction;
+    } else {
+        container.style.pointerEvents = 'auto';
+        tooltipDiv.style.cursor = 'default';
     }
-    
-    container.innerHTML='';
+
+    container.innerHTML = '';
     container.appendChild(tooltipDiv);
     this.positionTooltip(interactable);
 }
@@ -1206,44 +1224,47 @@ getDistanceToInteractable(interactable) {
 }
 
 
-handleInteraction(){
-    if(!this.activeTooltip)return;
-    const distance=this.getDistanceToInteractable(this.activeTooltip);
-    if(distance>1.5)return;
+
+handleInteraction() {
+    if (!this.activeTooltip) return;
+    const distance = this.getDistanceToInteractable(this.activeTooltip);
+    if (distance > 1.5) return;
+
+    const obj = this.activeTooltip;
     
-    const obj=this.activeTooltip;
-    
-    // Handle NPC interactions with confirmation dialog
-    if (obj.type === 'npc') {
-                this.executeInteraction(obj);
+    // Handle NPCs using their interact() method
+    if (obj.type === 'npc' && obj.npcRef) {
+        const message = obj.npcRef.interact();
+        if (message) {
+            this.showInteractionMessage(message);
+        }
         return;
     }
-    
-    // Handle other interactions directly
-    let message='';
-    switch(obj.type){
+
+    // Handle other interactables
+    let message = '';
+    switch (obj.type) {
         case 'chest':
-            message='You found 50 gold coins!';
+            message = 'You found 50 gold coins!';
             break;
         case 'tree':
-            message='The ancient tree whispers secrets of the forest...';
+            message = 'The ancient tree whispers secrets of the forest...';
             break;
         case 'crystal':
-            message='The crystal glows brightly and fills you with energy!';
+            message = 'The crystal glows brightly and fills you with energy!';
             this.scene.remove(obj.mesh);
-            this.interactables=this.interactables.filter(i=>i!==obj);
+            this.interactables = this.interactables.filter(i => i !== obj);
             this.hideTooltip();
             break;
         case 'shrine':
-            message='You feel blessed by an ancient power...';
+            message = 'You feel blessed by an ancient power...';
             break;
     }
-    
-    if(message){
+
+    if (message) {
         this.showInteractionMessage(message);
     }
 }
-
 
 showInteractionMessage(message) {
     // Create temporary message overlay

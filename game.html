@@ -199,7 +199,15 @@ this.currentCameraPreset = 'default';
     this.camera = new THREE.OrthographicCamera(frustumSize * aspect / -2, frustumSize * aspect / 2, frustumSize / 2, frustumSize / -2, -100, 1000);
     this.updateCameraPosition();
 }
+
+
 setCameraPreset(presetName, smooth = true, callback = null) {
+    // Close any dialogs that might interfere
+    const existingDialog = document.getElementById('confirmationDialog');
+    if (existingDialog) existingDialog.remove();
+    const npcDialog = document.getElementById('npcQuestionDialog');
+    if (npcDialog) npcDialog.remove();
+
     if (!this.cameraPresets[presetName]) {
         console.warn(`Camera preset '${presetName}' not found`);
         return;
@@ -207,29 +215,24 @@ setCameraPreset(presetName, smooth = true, callback = null) {
 
     const preset = this.cameraPresets[presetName];
     this.currentCameraPreset = presetName;
-    
+
+    // Switch camera type first if needed
+    if (preset.type !== this.getCameraType()) {
+        this.switchCameraType(preset.type, preset);
+    }
+
     if (smooth && this.camera) {
-        // Start smooth transition
         this.cameraTransition.active = true;
         this.cameraTransition.startTime = Date.now();
         this.cameraTransition.callback = callback;
-        
-        // Store current state
         this.cameraTransition.fromPosition.copy(this.camera.position);
         this.cameraTransition.fromTarget.copy(this.cameraTarget);
         this.cameraTransition.fromZoom = this.zoomLevel;
-        
-        // Calculate target state
+
         this.calculateCameraTarget(preset, this.cameraTransition.toTarget);
         this.cameraTransition.toPosition.copy(this.cameraTransition.toTarget).add(preset.offset);
         this.cameraTransition.toZoom = preset.zoom || 1.0;
-        
-        // Handle camera type change if needed
-        if (preset.type !== this.getCameraType()) {
-            this.switchCameraType(preset.type, preset);
-        }
     } else {
-        // Instant change
         this.applyCameraPreset(preset);
         if (callback) callback();
     }
@@ -269,7 +272,6 @@ switchCameraType(type, preset) {
     this.camera.position.copy(currentPos);
 }
 
-// Add this method to GameEngine class
 calculateCameraTarget(preset, targetVector) {
     if (preset.followPlayer && this.player && this.player.sprite) {
         targetVector.copy(this.player.sprite.position);
@@ -283,28 +285,27 @@ calculateCameraTarget(preset, targetVector) {
     }
 }
 
-// Add this method to GameEngine class
+
 applyCameraPreset(preset) {
     this.calculateCameraTarget(preset, this.cameraTarget);
     
     if (preset.type === 'perspective') {
         if (preset.followPlayer && this.player && this.player.sprite) {
+            this.camera.position.copy(this.player.sprite.position).add(preset.offset);
+            
             if (preset.lookAtPlayer) {
-                this.camera.position.copy(this.player.sprite.position).add(preset.offset);
                 this.camera.lookAt(this.player.sprite.position);
             } else if (preset.lookDirection) {
-                this.camera.position.copy(this.player.sprite.position).add(preset.offset);
-                const lookTarget = this.player.sprite.position.clone().add(preset.lookDirection);
+                // Fix: For first-person, use a much longer look distance
+                const lookTarget = this.player.sprite.position.clone().add(preset.lookDirection.clone().multiplyScalar(100));
                 this.camera.lookAt(lookTarget);
             }
         }
     } else {
-        // Orthographic camera
         this.zoomLevel = preset.zoom || 1.0;
         this.cameraOffset.copy(preset.offset);
         this.updateCameraPosition();
         
-        // Update orthographic camera properties
         const aspect = window.innerWidth / window.innerHeight;
         const frustumSize = 20 * this.zoomLevel;
         this.camera.left = frustumSize * aspect / -2;
@@ -436,128 +437,41 @@ getConfirmationMessage(interactable) {
 }
 
 
-showNPCQuestion(npc) {
-    const questions = [
-        "Would you like to know about the ancient ruins to the north?",
-        "Are you interested in purchasing some supplies?",
-        "Would you like to hear a tale of the old days?",
-        "Do you seek knowledge of the hidden paths?",
-        "Are you brave enough for a dangerous quest?"
-    ];
+executeInteraction(interactable){
+    let message='';
+    switch(interactable.type){
+        case 'npc':
+            if(interactable.npcRef){
+                message = interactable.npcRef.interact();
+                // Only show the message if it's not a confirmation dialog
+                if(message){
+                    this.showInteractionMessage(message);
+                }
+                return; // Important: return early to avoid showing generic message
+            }else{
+                message="The NPC nods at you silently.";
+            }
+            break;
+        case 'chest':
+            message='You found 50 gold coins!';
+            break;
+        case 'tree':
+            message='The ancient tree whispers secrets of the forest...';
+            break;
+        case 'crystal':
+            message='The crystal glows brightly and fills you with energy!';
+            this.scene.remove(interactable.mesh);
+            this.interactables=this.interactables.filter(i=>i!==interactable);
+            this.hideTooltip();
+            break;
+        case 'shrine':
+            message='You feel blessed by an ancient power...';
+            break;
+    }
     
-    const question = questions[Math.floor(Math.random() * questions.length)];
-    
-    const dialog = document.createElement('div');
-    dialog.id = 'npcQuestionDialog';
-    dialog.style.cssText = `
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: rgba(0, 0, 0, 0.95);
-        color: white;
-        padding: 20px;
-        border-radius: 12px;
-        border: 0px solid #4fc3f7;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
-        z-index: 1000;
-        min-width: 320px;
-        text-align: center;
-        font-family: Arial, sans-serif;
-    `;
-    
-    dialog.innerHTML = `
-        <div style="font-size: 16px; margin-bottom: 16px; line-height: 1.4;">
-            <strong>${npc.name || 'NPC'} asks:</strong>
-            <div style="margin-top: 8px; font-size: 14px; opacity: 0.9;">
-                ${question}
-            </div>
-        </div>
-        <div style="display: flex; gap: 12px; justify-content: center;">
-            <button id="npcYes" style="
-                background: #43aa8b;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 6px;
-                cursor: pointer;
-                font-size: 14px;
-                transition: background 0.2s;
-            ">Yes</button>
-            <button id="npcNo" style="
-                background: #f3722c;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 6px;
-                cursor: pointer;
-                font-size: 14px;
-                transition: background 0.2s;
-            ">No</button>
-        </div>
-    `;
-    
-    document.body.appendChild(dialog);
-    
-    const yesBtn = dialog.querySelector('#npcYes');
-    const noBtn = dialog.querySelector('#npcNo');
-    
-    yesBtn.onmouseover = () => yesBtn.style.background = '#4fc3f7';
-    yesBtn.onmouseout = () => yesBtn.style.background = '#43aa8b';
-    noBtn.onmouseover = () => noBtn.style.background = '#f9844a';
-    noBtn.onmouseout = () => noBtn.style.background = '#f3722c';
-    
-    yesBtn.onclick = () => {
-        dialog.remove();
-        // This is where you can trigger other things later
-        alert('You chose YES! (This will trigger other events later)');
-        // TODO: Add your custom logic here for "yes" responses
-    };
-    
-    noBtn.onclick = () => {
-        dialog.remove();
-        this.showInteractionMessage('The NPC nods understandingly.');
-    };
-    
-    const handleKeydown = (e) => {
-        if (e.key === 'Escape') {
-            dialog.remove();
-            document.removeEventListener('keydown', handleKeydown);
-        }
-    };
-    document.addEventListener('keydown', handleKeydown);
-}
-executeInteraction(interactable) {
-  let message = '';
-  switch (interactable.type) {
-    case 'npc':
-      if (interactable.npcRef) {
-        // Call the NPC's interact method to progress conversation
-        message = interactable.npcRef.interact();
-      } else {
-        message = "The NPC nods at you silently.";
-      }
-      break;
-    case 'chest':
-      message = 'You found 50 gold coins!';
-      break;
-    case 'tree':
-      message = 'The ancient tree whispers secrets of the forest...';
-      break;
-    case 'crystal':
-      message = 'The crystal glows brightly and fills you with energy!';
-      this.scene.remove(interactable.mesh);
-      this.interactables = this.interactables.filter(i => i !== interactable);
-      this.hideTooltip();
-      break;
-    case 'shrine':
-      message = 'You feel blessed by an ancient power...';
-      break;
-  }
-  
-  if (message) {
-    this.showInteractionMessage(message);
-  }
+    if(message){
+        this.showInteractionMessage(message);
+    }
 }
 
 showMessage(text) {
@@ -1049,25 +963,43 @@ if (this.cameraTransition && this.cameraTransition.active) {
 
 
 // Handle camera following for active presets
- const currentPreset = this.cameraPresets?.[this.currentCameraPreset];
+ 
+const currentPreset = this.cameraPresets?.[this.currentCameraPreset];
 if (currentPreset && currentPreset.followPlayer && this.player && this.player.sprite) {
     if (!this.cameraTransition.active) {
         if (currentPreset.type === 'perspective') {
+            this.camera.position.copy(this.player.sprite.position).add(currentPreset.offset);
+            
             if (currentPreset.lookAtPlayer) {
-                this.camera.position.copy(this.player.sprite.position).add(currentPreset.offset);
                 this.camera.lookAt(this.player.sprite.position);
             } else if (currentPreset.lookDirection) {
-                this.camera.position.copy(this.player.sprite.position).add(currentPreset.offset);
-                const lookTarget = this.player.sprite.position.clone().add(currentPreset.lookDirection);
+                // Fix: First-person - calculate direction based on player movement or facing
+                let lookDirection = new THREE.Vector3(0, 0, -1); // default forward
+                
+                if (this.player.path && this.player.path.length > 0) {
+                    // Player is moving - look in movement direction
+                    const next = this.player.path[0];
+                    const dx = next.x - this.player.pos.x;
+                    const dz = next.z - this.player.pos.z;
+                    if (dx !== 0 || dz !== 0) {
+                        lookDirection.set(dx, 0, dz).normalize();
+                    }
+                } else if (this.player.facingLeft !== undefined) {
+                    // Player is idle - use facing direction
+                    lookDirection.set(this.player.facingLeft ? -1 : 1, 0, 0);
+                }
+                
+                const lookTarget = this.player.sprite.position.clone().add(lookDirection.multiplyScalar(50));
                 this.camera.lookAt(lookTarget);
             }
         } else {
-            // Orthographic following
             this.cameraTarget.copy(this.player.sprite.position);
             this.cameraTarget.y = 0;
         }
     }
 }
+
+
 this.updateCameraPosition();
                 this.checkProximityInteractions();
                 this.cloudSprites.forEach(c => {
@@ -1341,40 +1273,37 @@ updateTooltip(interactable){
         <div class="interact-prompt">${canInteract ? 'Click to interact' : interactable.interact}</div>
     `;
     
-    // Clear any existing handlers from container
-    const oldHandler = container._clickHandler;
-    if(oldHandler) {
-        container.removeEventListener('click', oldHandler);
-        container.removeEventListener('mousedown', oldHandler);
+    const oldHandler=container._clickHandler;
+    if(oldHandler){
+        container.removeEventListener('click',oldHandler);
+        container.removeEventListener('mousedown',oldHandler);
     }
     
     if(canInteract){
         tooltipDiv.style.cursor='pointer';
-        container.style.pointerEvents = 'auto';
-        container.style.zIndex = '999';
+        container.style.pointerEvents='auto';
+        container.style.zIndex='999';
         
-        // Attach handler to container instead of tooltip
-        const handleInteraction = (e) => {
+        const handleInteraction=(e)=>{
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation();
-            console.log('Desktop interaction triggered!'); // Debug log
-            this.handleInteraction();
+            console.log('Desktop interaction triggered!');
+            
+            // Use executeInteraction instead of handleInteraction to avoid recursion
+            this.executeInteraction(this.activeTooltip);
         };
         
-        // Try both click and mousedown events
-        container.addEventListener('click', handleInteraction);
-        container.addEventListener('mousedown', handleInteraction);
+        container.addEventListener('click',handleInteraction);
+        container.addEventListener('mousedown',handleInteraction);
         container.addEventListener('touchstart',(e)=>{
             e.preventDefault();
             e.stopPropagation();
-            this.handleInteraction();
+            this.executeInteraction(this.activeTooltip);
         });
-        
-        // Store for cleanup
-        container._clickHandler = handleInteraction;
-    } else {
-        container.style.pointerEvents = 'auto';
+        container._clickHandler=handleInteraction;
+    }else{
+        container.style.pointerEvents='auto';
         tooltipDiv.style.cursor='default';
     }
     

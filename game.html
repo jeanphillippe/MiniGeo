@@ -115,13 +115,68 @@
                 this.cameraTarget = new THREE.Vector3(); this.cameraOffset = new THREE.Vector3(10, 10, 10); this.zoomLevel = 1.0;
                 this.editMode = false; this.selectedTile = null; this.raycaster = new THREE.Raycaster(); this.mouse = new THREE.Vector2();
                 this.input = { keys: {}, mouse: { x: 0, y: 0, pressed: false }, touch: { active: false, pinchDistance: 0, moved: false } };
-this.debugSystem = typeof DebugSystem !== 'undefined' ? new DebugSystem(this) : null;
-this.cloudSprites = [];
-this.useTerrainSprites = USE_SPRITE_TERRAIN;
+                this.debugSystem = typeof DebugSystem !== 'undefined' ? new DebugSystem(this) : null;
+                this.cloudSprites = [];
+                this.useTerrainSprites = USE_SPRITE_TERRAIN;
                 this.interactables = [];
                 this.proximityRadius = 2.5;
                 this.activeTooltip = null;
                 this.init();
+                this.cameraPresets = {
+    default: {
+        type: 'orthographic',
+        offset: new THREE.Vector3(10, 10, 10),
+        zoom: 1.0,
+        followPlayer: false,
+        lookAtTarget: true
+    },
+    followPlayer: {
+        type: 'orthographic',
+        offset: new THREE.Vector3(8, 8, 8),
+        zoom: 0.7,
+        followPlayer: true,
+        lookAtTarget: true
+    },
+    overview: {
+        type: 'orthographic',
+        offset: new THREE.Vector3(20, 25, 20),
+        zoom: 2.5,
+        followPlayer: false,
+        lookAtTarget: true,
+        centerTarget: true // Center on map
+    },
+    thirdPerson: {
+        type: 'perspective',
+        offset: new THREE.Vector3(3, 4, 3),
+        fov: 60,
+        followPlayer: true,
+        lookAtPlayer: true
+    },
+    firstPerson: {
+        type: 'perspective',
+        offset: new THREE.Vector3(0, 1.5, 0),
+        fov: 75,
+        followPlayer: true,
+        lookAtPlayer: false,
+        lookDirection: new THREE.Vector3(0, 0, -1)
+    }
+};
+
+this.cameraTransition = {
+    active: false,
+    duration: 2000, // 2 seconds
+    startTime: 0,
+    fromPosition: new THREE.Vector3(),
+    toPosition: new THREE.Vector3(),
+    fromTarget: new THREE.Vector3(),
+    toTarget: new THREE.Vector3(),
+    fromZoom: 1.0,
+    toZoom: 1.0,
+    callback: null
+};
+
+this.currentCameraPreset = 'default';
+
             }
 
             init() {
@@ -143,6 +198,121 @@ this.useTerrainSprites = USE_SPRITE_TERRAIN;
     const aspect = innerWidth / innerHeight, frustumSize = 20 * this.zoomLevel;
     this.camera = new THREE.OrthographicCamera(frustumSize * aspect / -2, frustumSize * aspect / 2, frustumSize / 2, frustumSize / -2, -100, 1000);
     this.updateCameraPosition();
+}
+setCameraPreset(presetName, smooth = true, callback = null) {
+    if (!this.cameraPresets[presetName]) {
+        console.warn(`Camera preset '${presetName}' not found`);
+        return;
+    }
+
+    const preset = this.cameraPresets[presetName];
+    this.currentCameraPreset = presetName;
+    
+    if (smooth && this.camera) {
+        // Start smooth transition
+        this.cameraTransition.active = true;
+        this.cameraTransition.startTime = Date.now();
+        this.cameraTransition.callback = callback;
+        
+        // Store current state
+        this.cameraTransition.fromPosition.copy(this.camera.position);
+        this.cameraTransition.fromTarget.copy(this.cameraTarget);
+        this.cameraTransition.fromZoom = this.zoomLevel;
+        
+        // Calculate target state
+        this.calculateCameraTarget(preset, this.cameraTransition.toTarget);
+        this.cameraTransition.toPosition.copy(this.cameraTransition.toTarget).add(preset.offset);
+        this.cameraTransition.toZoom = preset.zoom || 1.0;
+        
+        // Handle camera type change if needed
+        if (preset.type !== this.getCameraType()) {
+            this.switchCameraType(preset.type, preset);
+        }
+    } else {
+        // Instant change
+        this.applyCameraPreset(preset);
+        if (callback) callback();
+    }
+}
+
+// Add this method to GameEngine class
+getCameraType() {
+    return this.camera.isOrthographicCamera ? 'orthographic' : 'perspective';
+}
+
+// Add this method to GameEngine class
+switchCameraType(type, preset) {
+    const currentPos = this.camera.position.clone();
+    const aspect = window.innerWidth / window.innerHeight;
+    
+    if (type === 'perspective' && this.camera.isOrthographicCamera) {
+        // Switch to perspective camera
+        this.camera = new THREE.PerspectiveCamera(
+            preset.fov || 60,
+            aspect,
+            0.1,
+            1000
+        );
+    } else if (type === 'orthographic' && this.camera.isPerspectiveCamera) {
+        // Switch to orthographic camera
+        const frustumSize = 20 * (preset.zoom || 1.0);
+        this.camera = new THREE.OrthographicCamera(
+            frustumSize * aspect / -2,
+            frustumSize * aspect / 2,
+            frustumSize / 2,
+            frustumSize / -2,
+            -100,
+            1000
+        );
+    }
+    
+    this.camera.position.copy(currentPos);
+}
+
+// Add this method to GameEngine class
+calculateCameraTarget(preset, targetVector) {
+    if (preset.followPlayer && this.player && this.player.sprite) {
+        targetVector.copy(this.player.sprite.position);
+        targetVector.y = 0; // Keep target at ground level
+    } else if (preset.centerTarget) {
+        // Center on map
+        targetVector.set(0, 0, 0);
+    } else {
+        // Use current target or default
+        targetVector.copy(this.cameraTarget);
+    }
+}
+
+// Add this method to GameEngine class
+applyCameraPreset(preset) {
+    this.calculateCameraTarget(preset, this.cameraTarget);
+    
+    if (preset.type === 'perspective') {
+        if (preset.followPlayer && this.player && this.player.sprite) {
+            if (preset.lookAtPlayer) {
+                this.camera.position.copy(this.player.sprite.position).add(preset.offset);
+                this.camera.lookAt(this.player.sprite.position);
+            } else if (preset.lookDirection) {
+                this.camera.position.copy(this.player.sprite.position).add(preset.offset);
+                const lookTarget = this.player.sprite.position.clone().add(preset.lookDirection);
+                this.camera.lookAt(lookTarget);
+            }
+        }
+    } else {
+        // Orthographic camera
+        this.zoomLevel = preset.zoom || 1.0;
+        this.cameraOffset.copy(preset.offset);
+        this.updateCameraPosition();
+        
+        // Update orthographic camera properties
+        const aspect = window.innerWidth / window.innerHeight;
+        const frustumSize = 20 * this.zoomLevel;
+        this.camera.left = frustumSize * aspect / -2;
+        this.camera.right = frustumSize * aspect / 2;
+        this.camera.top = frustumSize / 2;
+        this.camera.bottom = frustumSize / -2;
+        this.camera.updateProjectionMatrix();
+    }
 }
 
             setupScene() { this.scene = new THREE.Scene(); this.scene.fog = new THREE.Fog(0x4FB3D9, 30, 100); }
@@ -736,6 +906,46 @@ handleTouchEnd(e) {
                 if (keys['KeyS'] || keys['ArrowDown']) direction.add(new THREE.Vector3(1, 0, 1));
                 if (keys['KeyA'] || keys['ArrowLeft']) direction.add(new THREE.Vector3(-1, 0, 1));
                 if (keys['KeyD'] || keys['ArrowRight']) direction.add(new THREE.Vector3(1, 0, -1));
+if (this.input.keys.Digit1 && !this.input.keys._1Pressed) {
+    this.input.keys._1Pressed = true;
+    this.setCameraPreset('default', true);
+    this.showInteractionMessage('Camera: Default View');
+} else if (!this.input.keys.Digit1) {
+    this.input.keys._1Pressed = false;
+}
+
+if (this.input.keys.Digit2 && !this.input.keys._2Pressed) {
+    this.input.keys._2Pressed = true;
+    this.setCameraPreset('followPlayer', true);
+    this.showInteractionMessage('Camera: Follow Player');
+} else if (!this.input.keys.Digit2) {
+    this.input.keys._2Pressed = false;
+}
+
+if (this.input.keys.Digit3 && !this.input.keys._3Pressed) {
+    this.input.keys._3Pressed = true;
+    this.setCameraPreset('overview', true);
+    this.showInteractionMessage('Camera: Overview');
+} else if (!this.input.keys.Digit3) {
+    this.input.keys._3Pressed = false;
+}
+
+if (this.input.keys.Digit4 && !this.input.keys._4Pressed) {
+    this.input.keys._4Pressed = true;
+    this.setCameraPreset('thirdPerson', true);
+    this.showInteractionMessage('Camera: Third Person');
+} else if (!this.input.keys.Digit4) {
+    this.input.keys._4Pressed = false;
+}
+
+if (this.input.keys.Digit5 && !this.input.keys._5Pressed) {
+    this.input.keys._5Pressed = true;
+    this.setCameraPreset('firstPerson', true);
+    this.showInteractionMessage('Camera: First Person');
+} else if (!this.input.keys.Digit5) {
+    this.input.keys._5Pressed = false;
+}
+
                    if (this.input.keys.KeyI) {
       this.directionalLight.intensity = Math.min(2.0, this.directionalLight.intensity + 0.01);
     }
@@ -788,7 +998,77 @@ handleTouchEnd(e) {
 }
 
             update() {
-                this.handleKeyboardInput(); this.updateCameraPosition();
+                this.handleKeyboardInput(); 
+
+// Handle camera transitions
+if (this.cameraTransition && this.cameraTransition.active) {
+
+    const elapsed = Date.now() - this.cameraTransition.startTime;
+    const progress = Math.min(elapsed / this.cameraTransition.duration, 1.0);
+    
+    // Smooth easing function
+    const easeProgress = 1 - Math.pow(1 - progress, 3);
+    
+    // Interpolate position and target
+    this.camera.position.lerpVectors(
+        this.cameraTransition.fromPosition,
+        this.cameraTransition.toPosition,
+        easeProgress
+    );
+    
+    this.cameraTarget.lerpVectors(
+        this.cameraTransition.fromTarget,
+        this.cameraTransition.toTarget,
+        easeProgress
+    );
+    
+    // Interpolate zoom for orthographic cameras
+    if (this.camera.isOrthographicCamera) {
+        this.zoomLevel = THREE.MathUtils.lerp(
+            this.cameraTransition.fromZoom,
+            this.cameraTransition.toZoom,
+            easeProgress
+        );
+        
+        const aspect = window.innerWidth / window.innerHeight;
+        const frustumSize = 20 * this.zoomLevel;
+        this.camera.left = frustumSize * aspect / -2;
+        this.camera.right = frustumSize * aspect / 2;
+        this.camera.top = frustumSize / 2;
+        this.camera.bottom = frustumSize / -2;
+        this.camera.updateProjectionMatrix();
+    }
+    
+    if (progress >= 1.0) {
+        this.cameraTransition.active = false;
+        if (this.cameraTransition.callback) {
+            this.cameraTransition.callback();
+        }
+    }
+}
+
+
+// Handle camera following for active presets
+ const currentPreset = this.cameraPresets?.[this.currentCameraPreset];
+if (currentPreset && currentPreset.followPlayer && this.player && this.player.sprite) {
+    if (!this.cameraTransition.active) {
+        if (currentPreset.type === 'perspective') {
+            if (currentPreset.lookAtPlayer) {
+                this.camera.position.copy(this.player.sprite.position).add(currentPreset.offset);
+                this.camera.lookAt(this.player.sprite.position);
+            } else if (currentPreset.lookDirection) {
+                this.camera.position.copy(this.player.sprite.position).add(currentPreset.offset);
+                const lookTarget = this.player.sprite.position.clone().add(currentPreset.lookDirection);
+                this.camera.lookAt(lookTarget);
+            }
+        } else {
+            // Orthographic following
+            this.cameraTarget.copy(this.player.sprite.position);
+            this.cameraTarget.y = 0;
+        }
+    }
+}
+this.updateCameraPosition();
                 this.checkProximityInteractions();
                 this.cloudSprites.forEach(c => {
                     c.position.x += c.userData.speed;

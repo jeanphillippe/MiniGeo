@@ -7,7 +7,7 @@ class Player {
         this.progress = 0;
         this._vA = new THREE.Vector3();
         this._vB = new THREE.Vector3();
-        this.pos = { x: 6, z: 5 };
+        this.pos = { x: 10, z: 9 };
         this.animationState = 'idle'; // 'idle', 'walking'
 this.animationFrame = 0;
 this.animationTime = 0;
@@ -34,7 +34,7 @@ this.animations = {
 
         if (USE_SPRITE_PLAYER) {
             const loader = new THREE.TextureLoader();
-            loader.load('https://i.imgur.com/VtxpMwY.png', texture => {
+            loader.load('https://i.imgur.com/4mVsVtw.png', texture => {
                 texture.magFilter = texture.minFilter = THREE.NearestFilter;
                 this.sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true }));
                 this.sprite.scale.setScalar(2);

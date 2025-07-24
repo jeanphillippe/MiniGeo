@@ -25,7 +25,7 @@ const NPC_DATA = {
         ]
     },
   'merchant_sara': {
-    spriteRow: 2,
+    spriteRow: 6,
     position: {x: 9, z: 5},
     spawnDelay: 2000,
     patrolType: 'none',
@@ -46,8 +46,30 @@ const NPC_DATA = {
       }
     ]
   },
+  'merchant_mara': {
+    spriteRow: 7,
+    position: {x: 1, z: 3},
+    spawnDelay: 2000,
+    patrolType: 'none',
+    idleFrame: 0,
+    name: 'Merchant Sara',
+    conversations: [
+      {
+        message: "Welcome to my shop! I have the finest wares in the land.",
+        action: null
+      },
+      {
+        message: "Hmm, you look like someone who appreciates quality. Follow me to my secret stash.",
+        action: {type: 'move', target: {x: 12, z: 8}, speed: 0.03}
+      },
+      {
+        message: "Here are my rarest items. Choose wisely, traveler.",
+        action: {type: 'disappear', delay: 3000}
+      }
+    ]
+  },
   'wise_elena': {
-    spriteRow: 3,
+    spriteRow: 5,
     position: {x: 5, z: 5},
     spawnDelay: 2000,
     patrolType: 'none',
@@ -91,7 +113,7 @@ const NPC_DATA = {
     ]
   },
   'healer_rose': {
-    spriteRow: 4,
+    spriteRow: 8,
     position: {x: 7, z: 11},
     spawnDelay: 3000,
     patrolType: 'circle',
@@ -135,12 +157,34 @@ const NPC_DATA = {
     ]
   },
   'trader_jack': {
-    spriteRow: 5,
+    spriteRow: 2,
     position: {x: 3, z: 8},
     spawnDelay: 1500,
     patrolType: 'line',
     idleFrame: 0,
     name: 'Trader Jack',
+    conversations: [
+      {
+        message: "Ah, a fellow traveler! I deal in rare goods and information.",
+        action: null
+      },
+      {
+        message: "I know of a hidden cache nearby. Care to make a deal?",
+        action: {type: 'move', target: {x: 1, z: 5}, speed: 0.03}
+      },
+      {
+        message: "Here's your share. May fortune favor your travels!",
+        action: {type: 'disappear', delay: 2000}
+      }
+    ]
+  },
+  'trader_jill': {
+    spriteRow: 3,
+    position: {x: 13, z: 8},
+    spawnDelay: 1500,
+    patrolType: 'line',
+    idleFrame: 0,
+    name: 'Trader Jull',
     conversations: [
       {
         message: "Ah, a fellow traveler! I deal in rare goods and information.",
@@ -521,7 +565,7 @@ proceedToNextConversation() {
   const initNPCs = () => {
     if (typeof game !== 'undefined' && game.terrain && game.scene) {
       // Create NPCs from data
-      const npcIds = ['elder_marcus', 'merchant_sara', 'wise_elena','scout_mike','healer_rose','guard_tom'];
+      const npcIds = ['elder_marcus', 'merchant_sara','merchant_mara', 'wise_elena','scout_mike','healer_rose','guard_tom','trader_jack','trader_jill'];
       game.npcs = npcIds.map(id => new NPC(game, id));
       
       console.log('NPCs created from data:');

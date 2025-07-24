@@ -1145,6 +1145,11 @@ updateTooltip(interactable) {
             e.stopImmediatePropagation();
             console.log('Mobile/Desktop interaction triggered!');
             
+            // Prevent double-interactions
+            if (this._isInteracting) return;
+            this._isInteracting = true;
+            setTimeout(() => this._isInteracting = false, 500);
+            
             // NEW: Handle NPCs the same way as desktop
             if (this.activeTooltip.type === 'npc' && this.activeTooltip.npcRef) {
                 const message = this.activeTooltip.npcRef.interact();
@@ -1162,6 +1167,11 @@ updateTooltip(interactable) {
         container.addEventListener('touchstart', (e) => {
             e.preventDefault();
             e.stopPropagation();
+            
+            // Prevent double-interactions
+            if (this._isInteracting) return;
+            this._isInteracting = true;
+            setTimeout(() => this._isInteracting = false, 500);
             
             // NEW: Handle NPCs the same way as desktop for touch
             if (this.activeTooltip.type === 'npc' && this.activeTooltip.npcRef) {
@@ -1184,7 +1194,6 @@ updateTooltip(interactable) {
     container.appendChild(tooltipDiv);
     this.positionTooltip(interactable);
 }
-
 positionTooltip(interactable) {
     const container = document.getElementById('tooltipContainer');
     const worldPos = new THREE.Vector3(

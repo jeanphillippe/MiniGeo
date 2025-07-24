@@ -1,3 +1,4 @@
+
         const USE_SPRITE_PLAYER = true; // Set to false for cylinder player
         const USE_SPRITE_TERRAIN = true; // Set to true for sprite terrain, false for 3D tiles
         class GameEngine {

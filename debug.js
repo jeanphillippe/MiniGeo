@@ -15,7 +15,8 @@ class DebugSystem {
 
     setupUI() {
         // Debug panel toggle
-        document.getElementById('debugToggle').style.display = 'inline-block';
+        
+    document.getElementById('debugToggle').style.display = 'inline-block';
         document.getElementById('debugToggle').onclick = () => {
     this.togglePanel('debug');
     document.getElementById('editToggle').style.display = 'inline-block';
@@ -153,15 +154,15 @@ if (raiseBtn && lowerBtn) {
     }
 
     toggleTerrainMode() {
-        this.game.useTerrainSprites = !this.game.useTerrainSprites;
-        document.getElementById('terrainSpriteToggle').textContent = `Terrain: ${this.game.useTerrainSprites ? 'Sprites' : '3D'}`;
-        
-        this.game.scene.remove(this.game.terrain.terrainGroup);
-        this.game.terrain = new TerrainSystem(this.game.gridSize, this.game.tileSize, this.game.heightLevels);
-        this.game.terrain.generateTerrain();
-        this.game.scene.add(this.game.terrain.terrainGroup);
-        window.USE_SPRITE_TERRAIN = this.game.useTerrainSprites;
-    }
+    this.game.terrainSystem.toggleTerrainMode();
+    document.getElementById('terrainSpriteToggle').textContent = 
+        `Terrain: ${this.game.terrainSystem.useSprites ? 'Sprites' : '3D'}`;
+    this.game.scene.remove(this.game.terrainSystem.terrainGroup);
+    this.game.terrainSystem = new TerrainSystem(this.game.gridSize, this.game.tileSize, this.game.heightLevels, this.game.terrainSystem.useSprites);
+    this.game.terrainSystem.generateTerrain();
+    this.game.scene.add(this.game.terrainSystem.terrainGroup);
+    window.USE_SPRITE_TERRAIN = this.game.terrainSystem.useSprites;
+}
 
     exportSeed() {
         const seed = this.game.terrain.generateSeed();

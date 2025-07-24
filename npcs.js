@@ -9,18 +9,30 @@ const NPC_DATA = {
         name: 'Elder Marcus',
         conversations: [
             {
-                message: "Greetings, young traveler. I sense great potential in you.",
-                action: null
+                message: "Greetings, young traveler. Let me show you a better view of our lands...",
+                requiresConfirmation: false, // Add this flag
+    action: {type: 'move', target: {x: 12, z: 8}, speed: 0.03}
             },
             {
                 message: "The ancient temple holds secrets... but first, prove your worth.",
-                action: { type: 'move', target: { x: 7, z: 0 }, speed: 0.05 },
+                action: {
+                        type: 'moveAndCamera',
+                        target: { x: 7, z: 0 },
+                        speed: 0.05,
+                        cameraPreset: 'thirdPerson',
+                        smooth: true
+                    },
                 requiresConfirmation: true, // Add this flag
                 confirmationMessage: "Do you wish to follow me to the ancient temple? The path may be dangerous."
             },
             {
                 message: "You followed me here. Good. The real treasure lies beneath the old oak.",
-                action: { type: 'disappear', delay: 3000 }
+                action: {
+                    type: 'camera',
+                    preset: 'overview',
+                requiresConfirmation: false, // Add this flag
+                    smooth: true
+                }
             }
         ]
     },
@@ -42,7 +54,12 @@ const NPC_DATA = {
       },
       {
         message: "Here are my rarest items. Choose wisely, traveler.",
-        action: {type: 'disappear', delay: 3000}
+        action: {
+                    type: 'camera',
+                    preset: 'overview',
+                requiresConfirmation: false, // Add this flag
+                    smooth: true
+                }
       }
     ]
   },
@@ -52,7 +69,7 @@ const NPC_DATA = {
     spawnDelay: 2000,
     patrolType: 'none',
     idleFrame: 0,
-    name: 'Merchant Sara',
+    name: 'Merchant Mara',
     conversations: [
       {
         message: "Welcome to my shop! I have the finest wares in the land.",
@@ -259,51 +276,50 @@ class NPC extends Player {
       }, 1000 + data.spawnDelay);
     }
   }
-
-  // Add interaction method to handle conversation progression
-  
-interact() {
-    if (this.conversationIndex < this.conversations.length - 1) {
-        const nextConversation = this.conversations[this.conversationIndex + 1];
-        
-        // Check if the next conversation requires confirmation
-        if (nextConversation.requiresConfirmation) {
-            // Create a mock interactable for the confirmation dialog
-            const mockInteractable = {
-                type: 'npc_confirmation',
-                message: nextConversation.confirmationMessage || "Are you sure you want to continue?",
-                npcRef: this
-            };
-            
-            // Show confirmation dialog
-            this.game.showConfirmationDialog(mockInteractable, (confirmed) => {
-                if (confirmed) {
-                    // User confirmed, proceed with the conversation
-                    this.proceedToNextConversation();
+  interact(){
+    // Get the current conversation
+    const currentConversation = this.conversations[this.conversationIndex];
+    
+    // If current conversation requires confirmation, show it first
+    if(currentConversation.requiresConfirmation){
+        const mockInteractable = {
+            type:'npc_confirmation',
+            message: currentConversation.confirmationMessage || "Are you sure you want to continue?",
+            npcRef: this
+        };
+        this.game.showConfirmationDialog(mockInteractable, (confirmed) => {
+            if(confirmed){
+                // Execute current conversation's action
+                if(currentConversation.action && !this.isExecutingAction){
+                    this.executeAction(currentConversation.action);
                 }
-                // If not confirmed, stay at current conversation
-            });
-            
-            return this.message; // Return current message, don't advance yet
-        } else {
-            // No confirmation needed, proceed normally
-            this.proceedToNextConversation();
-        }
+                // Advance to next conversation
+                this.advanceToNextConversation();
+            }
+        });
+        return this.message;
     }
     
-    return this.message;
+    // No confirmation needed for current conversation
+    // Execute the current conversation's action if it exists
+    if(currentConversation.action && !this.isExecutingAction){
+        this.executeAction(currentConversation.action);
+    }
+    
+    // Advance to next conversation for the NEXT interaction
+    this.advanceToNextConversation();
+    
+    // Return the message that was just shown (before advancing)
+    return currentConversation.message;
 }
 
-// Add this helper method to the NPC class
-proceedToNextConversation() {
-    this.conversationIndex++;
-    this.message = this.conversations[this.conversationIndex].message;
-    const action = this.conversations[this.conversationIndex].action;
-    if (action && !this.isExecutingAction) {
-        this.executeAction(action);
+advanceToNextConversation(){
+    // Only advance if there are more conversations
+    if(this.conversationIndex < this.conversations.length - 1){
+        this.conversationIndex++;
+        this.message = this.conversations[this.conversationIndex].message;
     }
 }
-
   executeAction(action) {
     console.log(`Executing action: ${action.type}`, action);
     this.isExecutingAction = true;
@@ -324,13 +340,42 @@ proceedToNextConversation() {
           };
         });
         break;
-        case 'camera':
-    console.log(`Changing camera to: ${action.preset}`);
-    this.game.setCameraPreset(action.preset, action.smooth !== false, () => {
-        console.log(`Camera preset '${action.preset}' applied`);
-        this.isExecutingAction = false;
+case 'moveAndCamera':
+    console.log(`Changing camera then moving`);
+    // Change camera first
+    this.game.setCameraPreset(action.cameraPreset, action.smooth !== false, () => {
+        console.log(`Camera changed, now moving`);
+        // After camera change completes, start movement
+        this.isPatrolling = false;
+        this.speed = action.speed || this.speed;
+        this.findPath(this.pos, action.target, (path) => {
+            this.path = path;
+            this.progress = 0;
+            this.onReachTarget = () => {
+                console.log(`Reached target after camera change`);
+                this.isExecutingAction = false;
+                this.onReachTarget = null;
+            };
+        });
     });
     break;
+    case 'camera':
+        console.log(`Changing camera to: ${action.preset}`);
+        
+        // Close any open dialogs first
+        const existingDialog = document.getElementById('confirmationDialog');
+        if (existingDialog) existingDialog.remove();
+        const npcDialog = document.getElementById('npcQuestionDialog');
+        if (npcDialog) npcDialog.remove();
+        
+        // Small delay to ensure dialogs are closed
+        setTimeout(() => {
+            this.game.setCameraPreset(action.preset, action.smooth !== false, () => {
+                console.log(`Camera preset '${action.preset}' applied`);
+                this.isExecutingAction = false;
+            });
+        }, 100);
+        break;
       case 'patrol':
         console.log(`Changing patrol type to: ${action.patrolType}`);
         this.patrolType = action.patrolType;
@@ -571,7 +616,8 @@ proceedToNextConversation() {
   const initNPCs = () => {
     if (typeof game !== 'undefined' && game.terrain && game.scene) {
       // Create NPCs from data
-      const npcIds = ['elder_marcus', 'merchant_sara','merchant_mara', 'wise_elena','scout_mike','healer_rose','guard_tom','trader_jack','trader_jill'];
+        //const npcIds = ['elder_marcus','merchant_sara','merchant_mara','wise_elena','scout_mike','healer_rose','guard_tom','trader_jack'];
+      const npcIds = ['elder_marcus','merchant_sara','merchant_mara','wise_elena','scout_mike','healer_rose','guard_tom','trader_jack'];
       game.npcs = npcIds.map(id => new NPC(game, id));
       
       console.log('NPCs created from data:');

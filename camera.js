@@ -4,47 +4,15 @@ class CameraSystem {
         this.cameraTarget = new THREE.Vector3();
         this.cameraOffset = new THREE.Vector3(10, 10, 10);
         this.zoomLevel = 1.0;
-        
         this.cameraPresets = {
-            default: {
-                type: 'orthographic',
-                offset: new THREE.Vector3(10, 10, 10),
-                zoom: 1.0,
-                followPlayer: false,
-                lookAtTarget: true
-            },
-            followPlayer: {
-                type: 'orthographic',
-                offset: new THREE.Vector3(8, 8, 8),
-                zoom: 0.7,
-                followPlayer: true,
-                lookAtTarget: true
-            },
-            overview: {
-                type: 'orthographic',
-                offset: new THREE.Vector3(20, 25, 20),
-                zoom: 2.5,
-                followPlayer: false,
-                lookAtTarget: true,
-                centerTarget: true
-            },
-            thirdPerson: {
-                type: 'perspective',
-                offset: new THREE.Vector3(3, 4, 3),
-                fov: 60,
-                followPlayer: true,
-                lookAtPlayer: true
-            },
-            firstPerson: {
-                type: 'perspective',
-                offset: new THREE.Vector3(0, 1.5, 0),
-                fov: 75,
-                followPlayer: true,
-                lookAtPlayer: false,
-                lookDirection: new THREE.Vector3(0, 0, -1)
-            }
+            default: { type: 'orthographic', offset: new THREE.Vector3(10, 10, 10), zoom: 1.0, followPlayer: false, lookAtTarget: true },
+            followPlayer: { type: 'orthographic', offset: new THREE.Vector3(8, 8, 8), zoom: 0.7, followPlayer: true, lookAtTarget: true },
+            overview: { type: 'orthographic', offset: new THREE.Vector3(20, 25, 20), zoom: 2.5, followPlayer: false, lookAtTarget: true, centerTarget: true },
+            thirdPerson: { type: 'perspective', offset: new THREE.Vector3(3, 4, 3), fov: 60, followPlayer: true, lookAtPlayer: true },
+            firstPerson: { type: 'perspective', offset: new THREE.Vector3(0, 1.5, 0), fov: 75, followPlayer: true, lookAtPlayer: false, lookDirection: new THREE.Vector3(0, 0, -1) }
         };
         
+        // Enhanced transition system for camera type switching
         this.cameraTransition = {
             active: false,
             duration: 2000,
@@ -55,29 +23,40 @@ class CameraSystem {
             toTarget: new THREE.Vector3(),
             fromZoom: 1.0,
             toZoom: 1.0,
+            fromFov: 60,
+            toFov: 60,
+            fromType: 'orthographic',
+            toType: 'orthographic',
             callback: null
         };
         
         this.currentCameraPreset = 'default';
-        this._hue = undefined; // For light color cycling
+        this._hue = undefined;
+        
+        // Store both camera types for smooth transitions
+        this.orthographicCamera = null;
+        this.perspectiveCamera = null;
     }
 
     setupCamera() {
         const aspect = window.innerWidth / window.innerHeight;
         const frustumSize = 20 * this.zoomLevel;
-        this.camera = new THREE.OrthographicCamera(
-            frustumSize * aspect / -2,
-            frustumSize * aspect / 2,
-            frustumSize / 2,
-            frustumSize / -2,
-            -100,
-            1000
+        
+        // Create both camera types
+        this.orthographicCamera = new THREE.OrthographicCamera(
+            frustumSize * aspect / -2, frustumSize * aspect / 2,
+            frustumSize / 2, frustumSize / -2,
+            -100, 1000
         );
+        
+        this.perspectiveCamera = new THREE.PerspectiveCamera(60, aspect, 0.1, 1000);
+        
+        // Start with orthographic
+        this.camera = this.orthographicCamera;
         this.updateCameraPosition();
     }
 
     setCameraPreset(presetName, smooth = true, callback = null) {
-        // Remove any existing dialogs
         const existingDialog = document.getElementById('confirmationDialog');
         if (existingDialog) existingDialog.remove();
         const npcDialog = document.getElementById('npcQuestionDialog');
@@ -91,50 +70,66 @@ class CameraSystem {
         const preset = this.cameraPresets[presetName];
         this.currentCameraPreset = presetName;
 
-        if (preset.type !== this.getCameraType()) {
-            this.switchCameraType(preset.type, preset);
-        }
-
         if (smooth && this.camera) {
-            this.cameraTransition.active = true;
-            this.cameraTransition.startTime = Date.now();
-            this.cameraTransition.callback = callback;
-            this.cameraTransition.fromPosition.copy(this.camera.position);
-            this.cameraTransition.fromTarget.copy(this.cameraTarget);
-            this.cameraTransition.fromZoom = this.zoomLevel;
-
-            this.calculateCameraTarget(preset, this.cameraTransition.toTarget);
-            this.cameraTransition.toPosition.copy(this.cameraTransition.toTarget).add(preset.offset);
-            this.cameraTransition.toZoom = preset.zoom || 1.0;
+            this.startSmoothTransition(preset, callback);
         } else {
             this.applyCameraPreset(preset);
             if (callback) callback();
         }
     }
 
-    getCameraType() {
-        return this.camera.isOrthographicCamera ? 'orthographic' : 'perspective';
+    startSmoothTransition(preset, callback) {
+        this.cameraTransition.active = true;
+        this.cameraTransition.startTime = Date.now();
+        this.cameraTransition.callback = callback;
+        
+        // Store current state
+        this.cameraTransition.fromPosition.copy(this.camera.position);
+        this.cameraTransition.fromTarget.copy(this.cameraTarget);
+        this.cameraTransition.fromZoom = this.zoomLevel;
+        this.cameraTransition.fromType = this.getCameraType();
+        this.cameraTransition.toType = preset.type;
+        
+        // Store FOV for perspective cameras
+        if (this.camera.isPerspectiveCamera) {
+            this.cameraTransition.fromFov = this.camera.fov;
+        } else {
+            this.cameraTransition.fromFov = 60; // Default FOV for transition
+        }
+        this.cameraTransition.toFov = preset.fov || 60;
+        
+        // Calculate target state
+        this.calculateCameraTarget(preset, this.cameraTransition.toTarget);
+        this.cameraTransition.toPosition.copy(this.cameraTransition.toTarget).add(preset.offset);
+        this.cameraTransition.toZoom = preset.zoom || 1.0;
+        
+        // If switching camera types, prepare the target camera
+        if (this.cameraTransition.fromType !== this.cameraTransition.toType) {
+            this.prepareTargetCamera(preset);
+        }
     }
 
-    switchCameraType(type, preset) {
-        const currentPos = this.camera.position.clone();
+    prepareTargetCamera(preset) {
         const aspect = window.innerWidth / window.innerHeight;
-
-        if (type === 'perspective' && this.camera.isOrthographicCamera) {
-            this.camera = new THREE.PerspectiveCamera(preset.fov || 60, aspect, 0.1, 1000);
-        } else if (type === 'orthographic' && this.camera.isPerspectiveCamera) {
+        
+        if (preset.type === 'perspective') {
+            this.perspectiveCamera.fov = preset.fov || 60;
+            this.perspectiveCamera.aspect = aspect;
+            this.perspectiveCamera.updateProjectionMatrix();
+            this.perspectiveCamera.position.copy(this.camera.position);
+        } else {
             const frustumSize = 20 * (preset.zoom || 1.0);
-            this.camera = new THREE.OrthographicCamera(
-                frustumSize * aspect / -2,
-                frustumSize * aspect / 2,
-                frustumSize / 2,
-                frustumSize / -2,
-                -100,
-                1000
-            );
+            this.orthographicCamera.left = frustumSize * aspect / -2;
+            this.orthographicCamera.right = frustumSize * aspect / 2;
+            this.orthographicCamera.top = frustumSize / 2;
+            this.orthographicCamera.bottom = frustumSize / -2;
+            this.orthographicCamera.updateProjectionMatrix();
+            this.orthographicCamera.position.copy(this.camera.position);
         }
+    }
 
-        this.camera.position.copy(currentPos);
+    getCameraType() {
+        return this.camera.isOrthographicCamera ? 'orthographic' : 'perspective';
     }
 
     calculateCameraTarget(preset, targetVector) {
@@ -150,15 +145,19 @@ class CameraSystem {
 
     applyCameraPreset(preset) {
         this.calculateCameraTarget(preset, this.cameraTarget);
-
+        
+        // Switch camera type if needed
+        if (preset.type !== this.getCameraType()) {
+            this.switchCameraTypeImmediate(preset);
+        }
+        
         if (preset.type === 'perspective') {
             if (preset.followPlayer && this.game.player && this.game.player.sprite) {
                 this.camera.position.copy(this.game.player.sprite.position).add(preset.offset);
                 if (preset.lookAtPlayer) {
                     this.camera.lookAt(this.game.player.sprite.position);
                 } else if (preset.lookDirection) {
-                    const lookTarget = this.game.player.sprite.position.clone()
-                        .add(preset.lookDirection.clone().multiplyScalar(100));
+                    const lookTarget = this.game.player.sprite.position.clone().add(preset.lookDirection.clone().multiplyScalar(100));
                     this.camera.lookAt(lookTarget);
                 }
             }
@@ -166,7 +165,6 @@ class CameraSystem {
             this.zoomLevel = preset.zoom || 1.0;
             this.cameraOffset.copy(preset.offset);
             this.updateCameraPosition();
-
             const aspect = window.innerWidth / window.innerHeight;
             const frustumSize = 20 * this.zoomLevel;
             this.camera.left = frustumSize * aspect / -2;
@@ -177,14 +175,98 @@ class CameraSystem {
         }
     }
 
+    switchCameraTypeImmediate(preset) {
+        const currentPos = this.camera.position.clone();
+        const aspect = window.innerWidth / window.innerHeight;
+
+        if (preset.type === 'perspective') {
+            this.camera = this.perspectiveCamera;
+            this.camera.fov = preset.fov || 60;
+            this.camera.aspect = aspect;
+            this.camera.updateProjectionMatrix();
+        } else {
+            this.camera = this.orthographicCamera;
+            const frustumSize = 20 * (preset.zoom || 1.0);
+            this.camera.left = frustumSize * aspect / -2;
+            this.camera.right = frustumSize * aspect / 2;
+            this.camera.top = frustumSize / 2;
+            this.camera.bottom = frustumSize / -2;
+            this.camera.updateProjectionMatrix();
+        }
+        
+        this.camera.position.copy(currentPos);
+    }
+
+    updateCameraTransition() {
+        if (this.cameraTransition && this.cameraTransition.active) {
+            const elapsed = Date.now() - this.cameraTransition.startTime;
+            const progress = Math.min(elapsed / this.cameraTransition.duration, 1.0);
+            const easeProgress = 1 - Math.pow(1 - progress, 3);
+
+            // Handle camera type transition
+            if (this.cameraTransition.fromType !== this.cameraTransition.toType) {
+                // Switch camera at halfway point for smoothest transition
+                if (progress >= 0.5 && this.getCameraType() === this.cameraTransition.fromType) {
+                    const targetCamera = this.cameraTransition.toType === 'perspective' ? 
+                        this.perspectiveCamera : this.orthographicCamera;
+                    
+                    // Copy current position to new camera
+                    targetCamera.position.copy(this.camera.position);
+                    this.camera = targetCamera;
+                }
+            }
+
+            // Interpolate position and target
+            this.camera.position.lerpVectors(
+                this.cameraTransition.fromPosition, 
+                this.cameraTransition.toPosition, 
+                easeProgress
+            );
+            this.cameraTarget.lerpVectors(
+                this.cameraTransition.fromTarget, 
+                this.cameraTransition.toTarget, 
+                easeProgress
+            );
+
+            // Handle camera-specific properties
+            if (this.camera.isOrthographicCamera) {
+                this.zoomLevel = THREE.MathUtils.lerp(
+                    this.cameraTransition.fromZoom, 
+                    this.cameraTransition.toZoom, 
+                    easeProgress
+                );
+                const aspect = window.innerWidth / window.innerHeight;
+                const frustumSize = 20 * this.zoomLevel;
+                this.camera.left = frustumSize * aspect / -2;
+                this.camera.right = frustumSize * aspect / 2;
+                this.camera.top = frustumSize / 2;
+                this.camera.bottom = frustumSize / -2;
+                this.camera.updateProjectionMatrix();
+            } else if (this.camera.isPerspectiveCamera) {
+                this.camera.fov = THREE.MathUtils.lerp(
+                    this.cameraTransition.fromFov,
+                    this.cameraTransition.toFov,
+                    easeProgress
+                );
+                this.camera.updateProjectionMatrix();
+            }
+
+            if (progress >= 1.0) {
+                this.cameraTransition.active = false;
+                if (this.cameraTransition.callback) {
+                    this.cameraTransition.callback();
+                }
+            }
+        }
+    }
+
+    // Keep all your existing methods (panCamera, zoomCamera, etc.) unchanged
     panCamera(deltaX, deltaY) {
         const speed = 0.01 * this.zoomLevel;
         const moveX = new THREE.Vector3(1, 0, -1).normalize();
         const moveY = new THREE.Vector3(1, 0, 1).normalize();
-
         this.cameraTarget.add(moveX.clone().multiplyScalar(-deltaX * speed));
         this.cameraTarget.add(moveY.clone().multiplyScalar(-deltaY * speed));
-
         const maxBounds = this.game.gridSize * this.game.tileSize / 2;
         this.cameraTarget.x = Math.max(-maxBounds, Math.min(maxBounds, this.cameraTarget.x));
         this.cameraTarget.z = Math.max(-maxBounds, Math.min(maxBounds, this.cameraTarget.z));
@@ -194,7 +276,6 @@ class CameraSystem {
         this.zoomLevel = Math.max(0.3, Math.min(3, this.zoomLevel + delta));
         const aspect = window.innerWidth / window.innerHeight;
         const frustumSize = 20 * this.zoomLevel;
-
         Object.assign(this.camera, {
             left: frustumSize * aspect / -2,
             right: frustumSize * aspect / 2,
@@ -213,13 +294,11 @@ class CameraSystem {
         const speed = 0.3;
         const keys = this.game.input.keys;
         const direction = new THREE.Vector3();
-
         if (keys.KeyW || keys.ArrowUp) direction.add(new THREE.Vector3(-1, 0, -1));
         if (keys.KeyS || keys.ArrowDown) direction.add(new THREE.Vector3(1, 0, 1));
         if (keys.KeyA || keys.ArrowLeft) direction.add(new THREE.Vector3(-1, 0, 1));
         if (keys.KeyD || keys.ArrowRight) direction.add(new THREE.Vector3(1, 0, -1));
-
-        // Camera preset hotkeys
+        
         if (this.game.input.keys.Digit1 && !this.game.input.keys._1Pressed) {
             this.game.input.keys._1Pressed = true;
             this.setCameraPreset('default', true);
@@ -227,7 +306,7 @@ class CameraSystem {
         } else if (!this.game.input.keys.Digit1) {
             this.game.input.keys._1Pressed = false;
         }
-
+        
         if (this.game.input.keys.Digit2 && !this.game.input.keys._2Pressed) {
             this.game.input.keys._2Pressed = true;
             this.setCameraPreset('followPlayer', true);
@@ -235,7 +314,7 @@ class CameraSystem {
         } else if (!this.game.input.keys.Digit2) {
             this.game.input.keys._2Pressed = false;
         }
-
+        
         if (this.game.input.keys.Digit3 && !this.game.input.keys._3Pressed) {
             this.game.input.keys._3Pressed = true;
             this.setCameraPreset('overview', true);
@@ -243,7 +322,7 @@ class CameraSystem {
         } else if (!this.game.input.keys.Digit3) {
             this.game.input.keys._3Pressed = false;
         }
-
+        
         if (this.game.input.keys.Digit4 && !this.game.input.keys._4Pressed) {
             this.game.input.keys._4Pressed = true;
             this.setCameraPreset('thirdPerson', true);
@@ -251,7 +330,7 @@ class CameraSystem {
         } else if (!this.game.input.keys.Digit4) {
             this.game.input.keys._4Pressed = false;
         }
-
+        
         if (this.game.input.keys.Digit5 && !this.game.input.keys._5Pressed) {
             this.game.input.keys._5Pressed = true;
             this.setCameraPreset('firstPerson', true);
@@ -259,8 +338,7 @@ class CameraSystem {
         } else if (!this.game.input.keys.Digit5) {
             this.game.input.keys._5Pressed = false;
         }
-
-        // Light controls
+        
         if (this.game.input.keys.KeyI) {
             this.game.directionalLight.intensity = Math.min(2.0, this.game.directionalLight.intensity + 0.01);
         }
@@ -279,61 +357,15 @@ class CameraSystem {
             this.game.directionalLight.color.set(0xfff6e0);
             this._hue = undefined;
         }
-
+        
         if (direction.lengthSq() > 0) {
             direction.normalize().multiplyScalar(speed);
             this.cameraTarget.add(direction);
         }
-
         if (keys.KeyQ) this.zoomCamera(0.02);
         if (keys.KeyE) this.zoomCamera(-0.02);
-
         const maxBounds = this.game.gridSize * this.game.tileSize / 2;
-        this.cameraTarget.clamp(
-            new THREE.Vector3(-maxBounds, 0, -maxBounds),
-            new THREE.Vector3(maxBounds, 0, maxBounds)
-        );
-    }
-
-    updateCameraTransition() {
-        if (this.cameraTransition && this.cameraTransition.active) {
-            const elapsed = Date.now() - this.cameraTransition.startTime;
-            const progress = Math.min(elapsed / this.cameraTransition.duration, 1.0);
-            const easeProgress = 1 - Math.pow(1 - progress, 3);
-
-            this.camera.position.lerpVectors(
-                this.cameraTransition.fromPosition,
-                this.cameraTransition.toPosition,
-                easeProgress
-            );
-            this.cameraTarget.lerpVectors(
-                this.cameraTransition.fromTarget,
-                this.cameraTransition.toTarget,
-                easeProgress
-            );
-
-            if (this.camera.isOrthographicCamera) {
-                this.zoomLevel = THREE.MathUtils.lerp(
-                    this.cameraTransition.fromZoom,
-                    this.cameraTransition.toZoom,
-                    easeProgress
-                );
-                const aspect = window.innerWidth / window.innerHeight;
-                const frustumSize = 20 * this.zoomLevel;
-                this.camera.left = frustumSize * aspect / -2;
-                this.camera.right = frustumSize * aspect / 2;
-                this.camera.top = frustumSize / 2;
-                this.camera.bottom = frustumSize / -2;
-                this.camera.updateProjectionMatrix();
-            }
-
-            if (progress >= 1.0) {
-                this.cameraTransition.active = false;
-                if (this.cameraTransition.callback) {
-                    this.cameraTransition.callback();
-                }
-            }
-        }
+        this.cameraTarget.clamp(new THREE.Vector3(-maxBounds, 0, -maxBounds), new THREE.Vector3(maxBounds, 0, maxBounds));
     }
 
     updateFollowPlayer() {
@@ -356,8 +388,7 @@ class CameraSystem {
                         } else if (this.game.player.facingLeft !== undefined) {
                             lookDirection.set(this.game.player.facingLeft ? -1 : 1, 0, 0);
                         }
-                        const lookTarget = this.game.player.sprite.position.clone()
-                            .add(lookDirection.multiplyScalar(50));
+                        const lookTarget = this.game.player.sprite.position.clone().add(lookDirection.multiplyScalar(50));
                         this.camera.lookAt(lookTarget);
                     }
                 } else {
@@ -370,15 +401,19 @@ class CameraSystem {
 
     handleResize() {
         const aspect = window.innerWidth / window.innerHeight;
+        
+        // Update both cameras
+        this.perspectiveCamera.aspect = aspect;
+        this.perspectiveCamera.updateProjectionMatrix();
+        
         const frustumSize = 20 * this.zoomLevel;
-
-        Object.assign(this.camera, {
+        Object.assign(this.orthographicCamera, {
             left: frustumSize * aspect / -2,
             right: frustumSize * aspect / 2,
             top: frustumSize / 2,
             bottom: frustumSize / -2
         });
-        this.camera.updateProjectionMatrix();
+        this.orthographicCamera.updateProjectionMatrix();
     }
 
     update() {

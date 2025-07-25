@@ -11,7 +11,7 @@ const NPC_DATA = {
             {
                 message: "Greetings, young traveler. Let me show you a better view of our lands...",
                 requiresConfirmation: false, // Add this flag
-    action: {type: 'move', target: {x: 12, z: 8}, speed: 0.03}
+    action: {type: 'move', target: {x: 12, z: 8}, speed: 0.05}
             },
             {
                 message: "The ancient temple holds secrets... but first, prove your worth.",
@@ -50,7 +50,7 @@ const NPC_DATA = {
       },
       {
         message: "Hmm, you look like someone who appreciates quality. Follow me to my secret stash.",
-        action: {type: 'move', target: {x: 12, z: 8}, speed: 0.03}
+        action: {type: 'move', target: {x: 12, z: 8}, speed: 0.05}
       },
       {
         message: "Here are my rarest items. Choose wisely, traveler.",
@@ -77,7 +77,7 @@ const NPC_DATA = {
       },
       {
         message: "Hmm, you look like someone who appreciates quality. Follow me to my secret stash.",
-        action: {type: 'move', target: {x: 12, z: 8}, speed: 0.03}
+        action: {type: 'move', target: {x: 12, z: 8}, speed: 0.05}
       },
       {
         message: "Here are my rarest items. Choose wisely, traveler.",
@@ -99,7 +99,7 @@ const NPC_DATA = {
       },
       {
         message: "They tell me you seek knowledge. Come, let me show you the sacred grove.",
-        action: {type: 'move', target: {x: 2, z: 2}, speed: 0.025}
+        action: {type: 'move', target: {x: 2, z: 2}, speed: 0.05}
       },
       {
         message: "This place holds ancient magic. Use it wisely.",
@@ -121,7 +121,7 @@ const NPC_DATA = {
       },
       {
         message: "Come, I'll show you the patrol route. Stay close and stay quiet.",
-        action: {type: 'move', target: {x: 10, z: 6}, speed: 0.04}
+        action: {type: 'move', target: {x: 10, z: 6}, speed: 0.05}
       },
       {
         message: "From here you can see the entire valley. Remember this vantage point.",
@@ -143,7 +143,7 @@ const NPC_DATA = {
       },
       {
         message: "The healing herbs grow wild near the spring. Let me show you where to find them.",
-        action: {type: 'move', target: {x: 4, z: 14}, speed: 0.025}
+        action: {type: 'move', target: {x: 4, z: 14}, speed: 0.05}
       },
       {
         message: "These plants will serve you well on your journey. May they keep you safe.",
@@ -165,7 +165,7 @@ const NPC_DATA = {
       },
       {
         message: "Very well. But I must escort you to the checkpoint for verification.",
-        action: {type: 'move', target: {x: 13, z: 13}, speed: 0.035}
+        action: {type: 'move', target: {x: 13, z: 13}, speed: 0.055}
       },
       {
         message: "You check out. But remember - I'll be watching.",
@@ -187,7 +187,7 @@ const NPC_DATA = {
       },
       {
         message: "I know of a hidden cache nearby. Care to make a deal?",
-        action: {type: 'move', target: {x: 1, z: 5}, speed: 0.03}
+        action: {type: 'move', target: {x: 1, z: 5}, speed: 0.05}
       },
       {
         message: "Here's your share. May fortune favor your travels!",
@@ -209,7 +209,7 @@ const NPC_DATA = {
       },
       {
         message: "I know of a hidden cache nearby. Care to make a deal?",
-        action: {type: 'move', target: {x: 1, z: 5}, speed: 0.03}
+        action: {type: 'move', target: {x: 1, z: 5}, speed: 0.05}
       },
       {
         message: "Here's your share. May fortune favor your travels!",
@@ -240,7 +240,7 @@ class NPC extends Player {
     this.maxWaitTime = 1500 + Math.random() * 1000;
     this.isInteractable = true;
     this.name = data.name;
-    this.speed = 0.03 + Math.random() * 0.015;
+    this.speed = 0.05 + Math.random() * 0.015;
     
     // Conversation system
     this.conversations = data.conversations;

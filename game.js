@@ -883,7 +883,7 @@ this.updateCameraPosition();
 
 setupInteractables(){
     const interactableData=[
-        {x:3,z:3,type:'chest',message:'Ancient Chest',interact:'Press E to open'},
+        {x:12,z:11,type:'chest',message:'Ancient Chest',interact:'Press E to open'},
         {x:7,z:11,type:'crystal',message:'Magic Crystal',interact:'Press E to collect'},
         {x:14,z:14,type:'shrine',message:'Mysterious Shrine',interact:'Press E to pray'}
     ];
@@ -935,7 +935,7 @@ createInteractableObject(type, x, z) {
 
     switch (type) {
         case 'chest':
-            geometry = new THREE.BoxGeometry(0.8, 0.6, 0.6);
+            geometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
             material = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
             obj = new THREE.Mesh(geometry, material);
             obj.position.set(tile.mesh.position.x, height + 0.3, tile.mesh.position.z);

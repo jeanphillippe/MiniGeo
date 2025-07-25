@@ -121,11 +121,11 @@ const NPC_DATA = {
       },
       {
         message: "Come, I'll show you the patrol route. Stay close and stay quiet.",
-        action: {type: 'move', target: {x: 18, z: 6}, speed: 0.04}
+        action: {type: 'move', target: {x: 10, z: 6}, speed: 0.04}
       },
       {
         message: "From here you can see the entire valley. Remember this vantage point.",
-        action: {type: 'patrol', patrolType: 'figure8'}
+        action: {type: 'patrol', patrolType: 'random'}
       }
     ]
   },
@@ -487,53 +487,51 @@ case 'moveAndCamera':
   }
 
   // Override update to handle action completion
-  update() {
-    if (!this.isPatrolling && !this.isExecutingAction) return;
+  update(){
+    if(!this.isPatrolling && !this.isExecutingAction) return;
     
-    // If executing an action, don't let proximity stop movement
-    if (this.isExecutingAction) {
-      if (this.path.length > 0) {
-        super.update();
-        // Check if we reached target during action
-        if (this.onReachTarget && this.path.length === 0) {
-          this.onReachTarget();
+    if(this.isExecutingAction){
+        if(this.path.length > 0){
+            super.update();
+            if(this.onReachTarget && this.path.length === 0){
+                this.onReachTarget();
+            }
         }
-      }
-      return;
+        return;
     }
     
-    // Only stop for player proximity during normal patrol (not during actions)
-    if (this.isPlayerNearby() && !this.isExecutingAction) {
-      if (this.animationState !== 'idle') {
-        this.animationState = 'idle';
-        this.animationFrame = 0;
-        this.animationTime = 0;
-      }
-      this.updateAnimation();
-      return;
-    }
-    
-    if (this.path.length > 0) {
-      super.update();
-      return;
-    }
-    
-    if (this.patrolPath.length > 0 && this.isPatrolling) {
-      this.waitTime += 30;
-      if (this.waitTime >= this.maxWaitTime) {
-        this.patrolIndex = (this.patrolIndex + 1) % this.patrolPath.length;
-        this.maxWaitTime = 1500 + Math.random() * 1000;
-        this.startPatrol();
-      } else {
-        if (this.animationState !== 'idle') {
-          this.animationState = 'idle';
-          this.animationFrame = 0;
-          this.animationTime = 0;
+    // Only stop for nearby player if NOT executing an action
+    if(this.isPlayerNearby() && !this.isExecutingAction){
+        if(this.animationState !== 'idle'){
+            this.animationState = 'idle';
+            this.animationFrame = 0;
+            this.animationTime = 0;
         }
         this.updateAnimation();
-      }
+        return;
     }
-  }
+    
+    if(this.path.length > 0){
+        super.update();
+        return;
+    }
+    
+    if(this.patrolPath.length > 0 && this.isPatrolling){
+        this.waitTime += 30;
+        if(this.waitTime >= this.maxWaitTime){
+            this.patrolIndex = (this.patrolIndex + 1) % this.patrolPath.length;
+            this.maxWaitTime = 1500 + Math.random() * 1000;
+            this.startPatrol();
+        } else {
+            if(this.animationState !== 'idle'){
+                this.animationState = 'idle';
+                this.animationFrame = 0;
+                this.animationTime = 0;
+            }
+            this.updateAnimation();
+        }
+    }
+}
 
   // Keep existing methods unchanged
   generatePatrolPath(type, centerX, centerZ) {

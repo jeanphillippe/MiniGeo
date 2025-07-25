@@ -218,68 +218,34 @@ const NPC_DATA = {
     ]
   }
 };
-const STATIC_OBJECTS_DATA = {
-    'statue_1': {
-        spriteRow: 8,
-        spriteCol: 0,
-        position: { x: 12, z: 2 },
-        name: 'Ancient Statue'
-    },
-    'statue_2': {
-        spriteRow: 8,
-        spriteCol: 1,
-        position: { x: 12, z: 3 },
-        name: 'Stone Monument'
-    },
-    'statue_3': {
-        spriteRow: 8,
-        spriteCol: 2,
-        position: { x: 12, z: 4 },
-        name: 'Mystic Pillar'
-    },
-    'statue_4': {
-        spriteRow: 8,
-        spriteCol: 3,
-        position: { x: 12, z: 5 },
-        name: 'Guardian Statue'
-    },
-    'statue_5': {
-        spriteRow: 8,
-        spriteCol: 4,
-        position: { x: 12, z:6 },
-        name: 'Guardian Statue'
-    },'statue_6': {
-    spriteRow: 9,
-    spriteCol: 0,
-    position: { x: 12, z: 7 },
-    name: 'Ancient Idol'
-},
-'statue_7': {
-    spriteRow: 9,
-    spriteCol: 1,
-    position: { x: 12, z: 8 },
-    name: 'Runed Obelisk'
-},
-'statue_8': {
-    spriteRow: 9,
-    spriteCol: 2,
-    position: { x: 12, z: 9 },
-    name: 'Marbled Sentinel'
-},
-'statue_9': {
-    spriteRow: 9,
-    spriteCol: 3,
-    position: { x: 12, z: 10 },
-    name: 'Forest Watcher'
-},
-'statue_10': {
-    spriteRow: 9,
-    spriteCol: 4,
-    position: { x: 12, z: 11 },
-    name: 'Sacred Totem'
-}
-
+const STATIC_OBJECT_TEMPLATES = {
+    'statue_fish': {spriteRow: 8, spriteCol: 0, name: 'Ancient Statue'},
+    'statue_dog': {spriteRow: 8, spriteCol: 1, name: 'Stone Monument'},
+    'statue_turtle': {spriteRow: 8, spriteCol: 2, name: 'Mystic Pillar'},
+    'house': {spriteRow: 8, spriteCol: 3, name: 'Guardian Statue'},
+    'singlepine': {spriteRow: 8, spriteCol: 4, name: 'Guardian Statue'},
+    'finishline': {spriteRow: 9, spriteCol: 0, name: 'Ancient Idol'},
+    'forest_round': {spriteRow: 9, spriteCol: 1, name: 'Runed Obelisk'},
+    'forest_pines': {spriteRow: 9, spriteCol: 2, name: 'Marbled Sentinel'},
+    'mountain': {spriteRow: 9, spriteCol: 3, name: 'Forest Watcher'},
+    'crate': {spriteRow: 9, spriteCol: 4, name: 'Sacred Totem'}
 };
+
+const STATIC_OBJECT_INSTANCES = [
+    {template: 'statue_fish', position: {x: 12, z: 2}},
+    {template: 'statue_dog', position: {x: 12, z: 3}},
+    {template: 'statue_turtle', position: {x: 12, z: 4}},
+    {template: 'house', position: {x: 12, z: 5}},
+    {template: 'singlepine', position: {x: 12, z: 6}},
+    {template: 'finishline', position: {x: 12, z: 7}},
+    {template: 'forest_round', position: {x: 12, z: 8}},
+    {template: 'forest_pines', position: {x: 12, z: 9}},
+    {template: 'forest_pines', position: {x: 8, z: 15}},
+    {template: 'forest_pines', position: {x: 3, z: 7}},
+    {template: 'mountain', position: {x: 12, z: 10}},
+    {template: 'crate', position: {x: 12, z: 11}}
+];
+
 class NPC extends Player {
   constructor(game, npcId) {
     super(game);
@@ -669,36 +635,30 @@ case 'moveAndCamera':
   initInput() {}
 }
 class StaticObject extends NPC {
-    constructor(game, objectId) {
-        // Crear un objeto temporal que simule NPC_DATA para el constructor padre
-        const staticData = STATIC_OBJECTS_DATA[objectId];
-        if (!staticData) throw new Error(`Static object data not found for ID: ${objectId}`);
+     constructor(game, template, position, instanceId) {
+        const templateData = STATIC_OBJECT_TEMPLATES[template];
+        if (!templateData) throw new Error(`Static object template not found: ${template}`);
         
-        // Simular datos de NPC para el constructor padre con una conversación dummy
+        const uniqueId = `${template}_${instanceId}`;
         const fakeNpcData = {
-            spriteRow: staticData.spriteRow,
-            position: staticData.position,
+            spriteRow: templateData.spriteRow,
+            position: position,
             spawnDelay: 0,
             patrolType: 'none',
-            idleFrame: staticData.spriteCol, // Usar la columna específica
-            name: staticData.name,
-            conversations: [{ message: "", action: null }] // Conversación dummy para evitar errores
+            idleFrame: templateData.spriteCol,
+            name: templateData.name,
+            conversations: [{message: "", action: null}]
         };
         
-        // Temporalmente agregar a NPC_DATA
-        NPC_DATA[objectId] = fakeNpcData;
+        NPC_DATA[uniqueId] = fakeNpcData;
+        super(game, uniqueId);
+        delete NPC_DATA[uniqueId];
         
-        super(game, objectId);
-        
-        // Limpiar datos temporales
-        delete NPC_DATA[objectId];
-        
-        // Marcar como objeto estático y limpiar conversaciones
         this.isStatic = true;
         this.isInteractable = false;
         this.isPatrolling = false;
-        this.conversations = []; // Limpiar conversaciones después de la inicialización
-        this.message = ""; // Limpiar mensaje
+        this.conversations = [];
+        this.message = "";
     }
     
     // Sobrescribir métodos para evitar comportamiento de NPC
@@ -718,23 +678,13 @@ class StaticObject extends NPC {
       // Create NPCs from data
         //const npcIds = ['elder_marcus','merchant_sara','merchant_mara','wise_elena','scout_mike','healer_rose','guard_tom','trader_jack'];
       const npcIds = ['elder_marcus', 'merchant_sara', 'merchant_mara', 'wise_elena', 'scout_mike', 'healer_rose', 'guard_tom', 'trader_jack'];
-const staticObjectIds = [
-    'statue_1',
-    'statue_2',
-    'statue_3',
-    'statue_4',
-    'statue_5',
-    'statue_6',
-    'statue_7',
-    'statue_8',
-    'statue_9',
-    'statue_10'
-];
+//const staticObjectIds = [   'statue_fish',   'statue_dog',   'statue_turtle',   'house',   'singlepine',   'finishline',  'forest_round',   'forest_pines',   'mountain',   'crate'];
 
 
 game.npcs = npcIds.map(id => new NPC(game, id));
-game.staticObjects = staticObjectIds.map(id => new StaticObject(game, id));
-
+game.staticObjects = STATIC_OBJECT_INSTANCES.map((instance, index) => 
+    new StaticObject(game, instance.template, instance.position, index)
+);
 console.log('Static objects created:');
 game.staticObjects.forEach((obj) => {
     console.log(`${obj.name} at (${obj.pos.x}, ${obj.pos.z})`);

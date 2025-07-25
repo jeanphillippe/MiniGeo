@@ -486,7 +486,6 @@ case 'moveAndCamera':
     }
   }
 
-  // Override update to handle action completion
   update(){
     if(!this.isPatrolling && !this.isExecutingAction) return;
     

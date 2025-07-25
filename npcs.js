@@ -65,7 +65,7 @@ const NPC_DATA = {
   },
   'merchant_mara': {
     spriteRow: 7,
-    position: {x: 1, z: 3},
+    position: {x: 1, z: 5},
     spawnDelay: 2000,
     patrolType: 'none',
     idleFrame: 0,
@@ -187,7 +187,7 @@ const NPC_DATA = {
       },
       {
         message: "I know of a hidden cache nearby. Care to make a deal?",
-        action: {type: 'move', target: {x: 1, z: 5}, speed: 0.05}
+        action: {type: 'move', target: {x: 2, z: 5}, speed: 0.05}
       },
       {
         message: "Here's your share. May fortune favor your travels!",
@@ -238,6 +238,7 @@ const STATIC_OBJECT_INSTANCES = [
     {template: 'house', position: {x: 11, z: 4}},
     {template: 'singlepine', position: {x: 10, z: 5}},
     {template: 'singlepine', position: {x: 2, z: 13}},
+    {template: 'singlepine', position: {x: 14, z: 2}},
     {template: 'finishline', position: {x: 2, z: 11},mirrored: true},
     {template: 'forest_round', position: {x: 4, z: 10}},
     {template: 'forest_round', position: {x: 4, z: 1}},
@@ -248,6 +249,8 @@ const STATIC_OBJECT_INSTANCES = [
     {template: 'forest_pines', position: {x: 2, z: 12}},
     {template: 'forest_pines', position: {x: 3, z: 13}},
     {template: 'forest_pines', position: {x: 3, z: 14}},
+    {template: 'forest_pines', position: {x: 14, z: 3}},
+    {template: 'forest_pines', position: {x: 13, z: 2}},
     {template: 'mountain', position: {x: 14, z: 1}},
     {template: 'mountain', position: {x: 13, z: 1}},
     {template: 'crate', position: {x: 12, z: 11}}

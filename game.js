@@ -1,3 +1,4 @@
+
         const USE_SPRITE_PLAYER = true; // Set to false for cylinder player
         const USE_SPRITE_TERRAIN = true; // Set to true for sprite terrain, false for 3D tiles
         class GameEngine {
@@ -884,7 +885,6 @@ this.updateCameraPosition();
 setupInteractables(){
     const interactableData=[
         {x:3,z:3,type:'chest',message:'Ancient Chest',interact:'Press E to open'},
-        {x:10,z:5,type:'tree',message:'Old Oak Tree',interact:'Press E to examine'},
         {x:7,z:11,type:'crystal',message:'Magic Crystal',interact:'Press E to collect'},
         {x:14,z:14,type:'shrine',message:'Mysterious Shrine',interact:'Press E to pray'}
     ];

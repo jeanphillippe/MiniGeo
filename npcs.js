@@ -232,17 +232,24 @@ const STATIC_OBJECT_TEMPLATES = {
 };
 
 const STATIC_OBJECT_INSTANCES = [
-    {template: 'statue_fish', position: {x: 12, z: 2}},
-    {template: 'statue_dog', position: {x: 12, z: 3}},
-    {template: 'statue_turtle', position: {x: 12, z: 4}},
-    {template: 'house', position: {x: 12, z: 5}},
-    {template: 'singlepine', position: {x: 12, z: 6}},
-    {template: 'finishline', position: {x: 12, z: 7}},
-    {template: 'forest_round', position: {x: 12, z: 8}},
-    {template: 'forest_pines', position: {x: 12, z: 9}},
-    {template: 'forest_pines', position: {x: 8, z: 15}},
-    {template: 'forest_pines', position: {x: 3, z: 7}},
-    {template: 'mountain', position: {x: 12, z: 10}},
+    {template: 'statue_fish', position: {x: 1, z: 1},mirrored: true},
+    {template: 'statue_dog', position: {x: 2, z: 1}},
+    {template: 'statue_turtle', position: {x: 1, z: 2}},
+    {template: 'house', position: {x: 11, z: 4}},
+    {template: 'singlepine', position: {x: 10, z: 5}},
+    {template: 'singlepine', position: {x: 2, z: 13}},
+    {template: 'finishline', position: {x: 2, z: 11},mirrored: true},
+    {template: 'forest_round', position: {x: 4, z: 10}},
+    {template: 'forest_round', position: {x: 4, z: 1}},
+    {template: 'forest_round', position: {x: 3, z: 1}},
+    {template: 'forest_round', position: {x: 1, z: 4}},
+    {template: 'forest_round', position: {x: 1, z: 3}},
+    {template: 'forest_pines', position: {x: 1, z: 12}},
+    {template: 'forest_pines', position: {x: 2, z: 12}},
+    {template: 'forest_pines', position: {x: 3, z: 13}},
+    {template: 'forest_pines', position: {x: 3, z: 14}},
+    {template: 'mountain', position: {x: 14, z: 1}},
+    {template: 'mountain', position: {x: 13, z: 1}},
     {template: 'crate', position: {x: 12, z: 11}}
 ];
 
@@ -634,8 +641,9 @@ case 'moveAndCamera':
 
   initInput() {}
 }
+
 class StaticObject extends NPC {
-     constructor(game, template, position, instanceId) {
+    constructor(game, template, position, instanceId, mirrored = false) {
         const templateData = STATIC_OBJECT_TEMPLATES[template];
         if (!templateData) throw new Error(`Static object template not found: ${template}`);
         
@@ -659,17 +667,56 @@ class StaticObject extends NPC {
         this.isPatrolling = false;
         this.conversations = [];
         this.message = "";
+        
+        // Set mirroring and apply it
+        this.shouldMirror = mirrored;
+        console.log(`StaticObject ${this.name} created, shouldMirror: ${mirrored}`);
+        
+        if (this.shouldMirror) {
+            this.applyMirroringWhenReady();
+        }
     }
     
-    // Sobrescribir métodos para evitar comportamiento de NPC
-    interact() {
-        return null; // Sin interacción
+    applyMirroringWhenReady() {
+        console.log(`Attempting to mirror ${this.name}`);
+        
+        const checkAndApply = () => {
+            console.log(`Checking sprite for ${this.name}:`, {
+                hasSprite: !!this.sprite,
+                hasMaterial: !!(this.sprite && this.sprite.material),
+                hasMap: !!(this.sprite && this.sprite.material && this.sprite.material.map),
+                currentScaleX: this.sprite ? this.sprite.scale.x : 'no sprite'
+            });
+            
+            if (this.sprite && this.sprite.material && this.sprite.material.map) {
+                // Try multiple approaches
+                console.log(`Before mirroring - scale.x: ${this.sprite.scale.x}`);
+                
+                // Approach 1: Scale flip
+                this.sprite.scale.x = Math.abs(this.sprite.scale.x) * -1;
+                console.log(`After scale flip - scale.x: ${this.sprite.scale.x}`);
+                
+                // Approach 2: Also try UV flipping if we have the UV method
+                if (this.setFrameUV && this.texW && this.texH) {
+                    this.facingLeft = true;
+                    const frame = this.animations.idle.frames[0];
+                    this.setFrameUV(frame.x, frame.y, 64, 64, this.texW, this.texH);
+                    console.log(`Applied UV flipping for ${this.name}`);
+                }
+                
+                console.log(`✓ Applied mirroring to ${this.name}`);
+                return;
+            } else {
+                // Keep checking until sprite is ready
+                setTimeout(checkAndApply, 100);
+            }
+        };
+        
+        checkAndApply();
     }
     
-    update() {
-        // Sin updates - completamente estático
-        return;
-    }
+    interact() { return null; }
+    update() { return; }
 }
 // Modified initialization
 (function() {
@@ -683,7 +730,7 @@ class StaticObject extends NPC {
 
 game.npcs = npcIds.map(id => new NPC(game, id));
 game.staticObjects = STATIC_OBJECT_INSTANCES.map((instance, index) => 
-    new StaticObject(game, instance.template, instance.position, index)
+    new StaticObject(game, instance.template, instance.position, index, instance.mirrored)
 );
 console.log('Static objects created:');
 game.staticObjects.forEach((obj) => {

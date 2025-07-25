@@ -223,23 +223,32 @@ const STATIC_OBJECT_TEMPLATES = {
     'statue_dog': {spriteRow: 8, spriteCol: 1, name: 'Stone Monument'},
     'statue_turtle': {spriteRow: 8, spriteCol: 2, name: 'Mystic Pillar'},
     'house': {spriteRow: 8, spriteCol: 3, name: 'Guardian Statue'},
-    'singlepine': {spriteRow: 8, spriteCol: 4, name: 'Guardian Statue'},
     'finishline': {spriteRow: 9, spriteCol: 0, name: 'Ancient Idol'},
+    'singlepine': {spriteRow: 8, spriteCol: 4, name: 'Guardian Statue'},
+    'bush': {spriteRow: 11, spriteCol: 0, name: 'bush'},
+    'crate': {spriteRow: 9, spriteCol: 4, name: 'crate'},
+    'cactus': {spriteRow: 11, spriteCol: 2, name: 'cactus'},
     'forest_round': {spriteRow: 9, spriteCol: 1, name: 'Runed Obelisk'},
     'forest_pines': {spriteRow: 9, spriteCol: 2, name: 'Marbled Sentinel'},
     'mountain': {spriteRow: 9, spriteCol: 3, name: 'Forest Watcher'},
-    'crate': {spriteRow: 9, spriteCol: 4, name: 'Sacred Totem'}
+    'boat1': {spriteRow: 10, spriteCol: 0, name: 'boat1'},
+    'boat2': {spriteRow: 10, spriteCol: 4, name: 'boat2'},
+    'check1': {spriteRow: 10, spriteCol: 1, name: 'check1'},
+    'check2': {spriteRow: 10, spriteCol: 2, name: 'check2'},
+    'check3': {spriteRow: 10, spriteCol: 3, name: 'check3'},
+    'check4': {spriteRow: 11, spriteCol: 1, name: 'check4'},
+    
 };
 
 const STATIC_OBJECT_INSTANCES = [
-    {template: 'statue_fish', position: {x: 1, z: 1},mirrored: true},
+    {template: 'statue_fish', position: {x: 1, z: 1}, mirrored: true},
     {template: 'statue_dog', position: {x: 2, z: 1}},
     {template: 'statue_turtle', position: {x: 1, z: 2}},
     {template: 'house', position: {x: 11, z: 4}},
     {template: 'singlepine', position: {x: 10, z: 5}},
     {template: 'singlepine', position: {x: 2, z: 13}},
     {template: 'singlepine', position: {x: 14, z: 2}},
-    {template: 'finishline', position: {x: 2, z: 11},mirrored: true},
+    {template: 'finishline', position: {x: 2, z: 11}, mirrored: true},
     {template: 'forest_round', position: {x: 4, z: 10}},
     {template: 'forest_round', position: {x: 4, z: 1}},
     {template: 'forest_round', position: {x: 3, z: 1}},
@@ -253,8 +262,17 @@ const STATIC_OBJECT_INSTANCES = [
     {template: 'forest_pines', position: {x: 13, z: 2}},
     {template: 'mountain', position: {x: 14, z: 1}},
     {template: 'mountain', position: {x: 13, z: 1}},
-    {template: 'crate', position: {x: 12, z: 11}}
+    {template: 'crate', position: {x: 12, z: 11}},
+    {template: 'boat1', position: {x: 7, z: 8}},
+    {template: 'boat2', position: {x: 7, z: 7}},
+    {template: 'check1', position: {x: 7, z: 12}},
+    {template: 'check2', position: {x: 7, z: 5}},
+    {template: 'check3', position: {x: 4, z: 12}},
+    {template: 'check4', position: {x: 10, z: 12}},
+    {template: 'bush', position: {x: 7, z: 2}},
+    {template: 'cactus', position: {x: 7, z: 1}}
 ];
+
 
 class NPC extends Player {
   constructor(game, npcId) {

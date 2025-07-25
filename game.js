@@ -1,4 +1,3 @@
-
         const USE_SPRITE_PLAYER = true; // Set to false for cylinder player
         const USE_SPRITE_TERRAIN = true; // Set to true for sprite terrain, false for 3D tiles
         class GameEngine {
@@ -72,7 +71,9 @@ this.currentCameraPreset = 'default';
             }
 
             init() {
-                this.setupRenderer(); this.setupCamera(); this.setupScene(); this.setupLighting();
+                this.setupRenderer(); this.setupCamera(); this.setupScene(); 
+                this.setupSkybox('https://i.imgur.com/x7Q6Z4c.jpg');
+                this.setupLighting();
                 this.setupClouds(); 
                 this.setupTerrain(); 
                 this.setupInput(); this.setupUI();this.setupInteractables();
@@ -210,6 +211,42 @@ applyCameraPreset(preset) {
 
             setupScene() { this.scene = new THREE.Scene(); this.scene.fog = new THREE.Fog(0x4FB3D9, 30, 100); }
 
+
+setupSkybox(imageUrl) {
+    const loader = new THREE.TextureLoader();
+    loader.crossOrigin = 'anonymous';
+    
+    loader.load(imageUrl, (texture) => {
+        console.log('Skybox texture loaded successfully');
+        
+        // Remove any existing skybox
+        const existingSkybox = this.scene.getObjectByName('skybox');
+        if (existingSkybox) {
+            this.scene.remove(existingSkybox);
+        }
+        
+        // Create a much larger skybox that's within camera's far plane (1000)
+        const skyGeometry = new THREE.SphereGeometry(500, 32, 32);
+        const skyMaterial = new THREE.MeshBasicMaterial({
+            map: texture,
+            side: THREE.BackSide,
+            fog: false,
+            depthWrite: false,
+            depthTest: false
+        });
+        
+        const skybox = new THREE.Mesh(skyGeometry, skyMaterial);
+        skybox.name = 'skybox';
+        skybox.renderOrder = -1; // Render first
+        
+        this.scene.add(skybox);
+        this.skybox = skybox;
+        
+        console.log('Skybox added to scene with scale:', skybox.scale);
+    }, undefined, (error) => {
+        console.error('Error loading skybox texture:', error);
+    });
+}
             setupLighting() {
                 this.scene.add(new THREE.AmbientLight(0xffffff, 0.4));
                 this.directionalLight = new THREE.DirectionalLight(0xfff6e0, 0.95);
@@ -856,6 +893,9 @@ if (currentPreset && currentPreset.followPlayer && this.player && this.player.sp
 
 
 this.updateCameraPosition();
+if (this.skybox) {
+    this.skybox.position.copy(this.camera.position);
+}
                 this.checkProximityInteractions();
                 this.cloudSprites.forEach(c => {
                     c.position.x += c.userData.speed;

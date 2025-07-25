@@ -71,9 +71,7 @@ this.currentCameraPreset = 'default';
             }
 
             init() {
-                this.setupRenderer(); this.setupCamera(); this.setupScene(); 
-                this.setupSkybox('https://i.imgur.com/x7Q6Z4c.jpg');
-                this.setupLighting();
+                this.setupRenderer(); this.setupCamera(); this.setupScene(); this.setupLighting();
                 this.setupClouds(); 
                 this.setupTerrain(); 
                 this.setupInput(); this.setupUI();this.setupInteractables();
@@ -211,42 +209,6 @@ applyCameraPreset(preset) {
 
             setupScene() { this.scene = new THREE.Scene(); this.scene.fog = new THREE.Fog(0x4FB3D9, 30, 100); }
 
-
-setupSkybox(imageUrl) {
-    const loader = new THREE.TextureLoader();
-    loader.crossOrigin = 'anonymous';
-    
-    loader.load(imageUrl, (texture) => {
-        console.log('Skybox texture loaded successfully');
-        
-        // Remove any existing skybox
-        const existingSkybox = this.scene.getObjectByName('skybox');
-        if (existingSkybox) {
-            this.scene.remove(existingSkybox);
-        }
-        
-        // Create a much larger skybox that's within camera's far plane (1000)
-        const skyGeometry = new THREE.SphereGeometry(500, 32, 32);
-        const skyMaterial = new THREE.MeshBasicMaterial({
-            map: texture,
-            side: THREE.BackSide,
-            fog: false,
-            depthWrite: false,
-            depthTest: false
-        });
-        
-        const skybox = new THREE.Mesh(skyGeometry, skyMaterial);
-        skybox.name = 'skybox';
-        skybox.renderOrder = -1; // Render first
-        
-        this.scene.add(skybox);
-        this.skybox = skybox;
-        
-        console.log('Skybox added to scene with scale:', skybox.scale);
-    }, undefined, (error) => {
-        console.error('Error loading skybox texture:', error);
-    });
-}
             setupLighting() {
                 this.scene.add(new THREE.AmbientLight(0xffffff, 0.4));
                 this.directionalLight = new THREE.DirectionalLight(0xfff6e0, 0.95);
@@ -893,9 +855,6 @@ if (currentPreset && currentPreset.followPlayer && this.player && this.player.sp
 
 
 this.updateCameraPosition();
-if (this.skybox) {
-    this.skybox.position.copy(this.camera.position);
-}
                 this.checkProximityInteractions();
                 this.cloudSprites.forEach(c => {
                     c.position.x += c.userData.speed;
@@ -925,7 +884,7 @@ if (this.skybox) {
 setupInteractables(){
     const interactableData=[
         {x:3,z:3,type:'chest',message:'Ancient Chest',interact:'Press E to open'},
-        {x:12,z:5,type:'tree',message:'Old Oak Tree',interact:'Press E to examine'},
+        {x:10,z:5,type:'tree',message:'Old Oak Tree',interact:'Press E to examine'},
         {x:7,z:11,type:'crystal',message:'Magic Crystal',interact:'Press E to collect'},
         {x:14,z:14,type:'shrine',message:'Mysterious Shrine',interact:'Press E to pray'}
     ];

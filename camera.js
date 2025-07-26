@@ -36,14 +36,14 @@ class CameraSystem {
             },
             thirdPerson: {
                 type: 'perspective',
-                offset: new THREE.Vector3(3, 4, 3),
+                offset: new THREE.Vector3(3, 30, 3),
                 fov: 60,
                 followPlayer: true,
                 lookAtPlayer: true
             },
             firstPerson: {
                 type: 'perspective',
-                offset: new THREE.Vector3(0, 1.5, 0),
+                offset: new THREE.Vector3(1, 1.5, 1),
                 fov: 75,
                 followPlayer: true,
                 lookAtPlayer: false,
@@ -376,36 +376,35 @@ class CameraSystem {
             }
         }
     }
-updateFollowPlayer() {
-    const currentPreset = this.cameraPresets?.[this.currentCameraPreset];
-    if (currentPreset && currentPreset.followPlayer) {
-        const target = this.followTarget || this.game.player;
-        if (target && target.sprite) {
-            if (!this.cameraTransition.active) {
-                if (currentPreset.type === 'perspective') {
-                    this.camera.position.copy(target.sprite.position).add(currentPreset.offset);
-                    if (currentPreset.lookAtPlayer) {
-                        this.camera.lookAt(target.sprite.position);
-                    } else if (currentPreset.lookDirection) {
-                        let lookDirection = new THREE.Vector3(0, 0, -1);
-                        if (target.path && target.path.length > 0) {
-                            const next = target.path[0];
-                            const dx = next.x - target.pos.x;
-                            const dz = next.z - target.pos.z;
-                            if (dx !== 0 || dz !== 0) {
-                                lookDirection.set(dx, 0, dz).normalize();
-                            }
-                        } else if (target.facingLeft !== undefined) {
-                            lookDirection.set(target.facingLeft ? -1 : 1, 0, 0);
+updateFollowPlayer(){
+    const currentPreset=this.cameraPresets?.[this.currentCameraPreset];
+    if(currentPreset&&currentPreset.followPlayer&&this.game.player&&this.game.player.sprite){
+        if(!this.cameraTransition.active){
+            if(currentPreset.type==='perspective'){
+                this.camera.position.copy(this.game.player.sprite.position).add(currentPreset.offset);
+                if(currentPreset.lookAtPlayer){
+                    this.camera.lookAt(this.game.player.sprite.position)
+                }else if(currentPreset.lookDirection){
+                    let lookDirection=new THREE.Vector3(0,0,-1);
+                    if(this.game.player.path&&this.game.player.path.length>0){
+                        const next=this.game.player.path[0];
+                        const dx=next.x-this.game.player.pos.x;
+                        const dz=next.z-this.game.player.pos.z;
+                        if(dx!==0||dz!==0){
+                            lookDirection.set(dx,0,dz).normalize()
                         }
-                        const lookTarget = target.sprite.position.clone().add(lookDirection.multiplyScalar(50));
-                        this.camera.lookAt(lookTarget);
+                    }else if(this.game.player.facingLeft!==undefined){
+                        lookDirection.set(this.game.player.facingLeft?-1:1,0,0)
                     }
-                } else {
-                    this.cameraTarget.copy(target.sprite.position);
-                    this.cameraTarget.y = 0;
-                    this.cameraOffset.copy(currentPreset.offset);
+                    const lookTarget=this.game.player.sprite.position.clone().add(lookDirection.multiplyScalar(50));
+                    this.camera.lookAt(lookTarget)
                 }
+            }else{
+                // For orthographic camera, use the target and offset system
+                this.cameraTarget.copy(this.game.player.sprite.position);
+                this.cameraTarget.y=0;
+                // Don't override the offset - keep using the preset offset
+                // this.cameraOffset.copy(currentPreset.offset); // This line was causing the issue
             }
         }
     }

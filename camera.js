@@ -22,7 +22,7 @@ class CameraSystem {
             followPlayer: {
                 type: 'orthographic',
                 offset: new THREE.Vector3(10, 10, 10),
-                zoom: 0.953,
+                zoom: 0.853,
                 followPlayer: true,
                 lookAtTarget: true
             },
@@ -36,7 +36,7 @@ class CameraSystem {
             },
             thirdPerson: {
                 type: 'perspective',
-                offset: new THREE.Vector3(3, 30, 3),
+                offset: new THREE.Vector3(3, 10, 3),
                 fov: 60,
                 followPlayer: true,
                 lookAtPlayer: true

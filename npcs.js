@@ -15,7 +15,10 @@ const NPC_DATA = {
             },
             {
                 message: "The ancient temple holds secrets... but first, prove your worth.",
-                action: {type: 'moveAndCamera', target: {x: 7, z: 0}, speed: 0.05, cameraPreset: 'thirdPerson', smooth: true},
+                action: { type: 'followAndMove',
+        target: { x: 7, z: 0 },
+        speed: 0.05,
+        smooth: true},
                 requiresConfirmation: true,
                 confirmationMessage: "Do you wish to follow me to the ancient temple? The path may be dangerous."
             },
@@ -341,7 +344,30 @@ class NPC extends Player {
                 }
                 this.isExecutingAction = false;
                 break;
-
+             case 'followAndMove':
+            console.log(`Setting camera to follow NPC and moving`);
+            // Set this NPC as the follow target
+            this.game.cameraSystem.setFollowTarget(this);
+            this.game.setCameraPreset('followPlayer', action.smooth !== false, () => {
+                console.log(`Camera now following NPC, starting movement`);
+                this.isPatrolling = false;
+                this.speed = action.speed || this.speed;
+                this.findPath(this.pos, action.target, (path) => {
+                    this.path = path;
+                    this.progress = 0;
+                    this.onReachTarget = () => {
+                        console.log(`NPC reached target, restoring to initial camera state`);
+                        // Restore camera to the exact initial state
+                        this.game.cameraSystem.clearFollowTarget();
+                        this.game.cameraSystem.restoreToInitialState(true, () => {
+                            this.isExecutingAction = false;
+                            this.onReachTarget = null;
+                        });
+                    };
+                });
+            });
+            break;
+                
             case 'drop':
                 console.log(`Dropping in ${action.delay || 0}ms`);
                 setTimeout(() => {

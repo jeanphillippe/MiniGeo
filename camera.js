@@ -4,7 +4,13 @@ class CameraSystem {
         this.cameraTarget = new THREE.Vector3();
         this.cameraOffset = new THREE.Vector3(10, 10, 10);
         this.zoomLevel = 1.0;
-        
+        this.followTarget = null;
+         this.initialCameraState = {
+        position: new THREE.Vector3(),
+        target: new THREE.Vector3(),
+        zoom: 1.0,
+        preset: 'default'
+    };
         this.cameraPresets = {
             default: {
                 type: 'orthographic',
@@ -15,7 +21,7 @@ class CameraSystem {
             },
             followPlayer: {
                 type: 'orthographic',
-                offset: new THREE.Vector3(8, 8, 8),
+                offset: new THREE.Vector3(8, 19, 8),
                 zoom: 0.7,
                 followPlayer: true,
                 lookAtTarget: true
@@ -155,15 +161,20 @@ class CameraSystem {
     }
 
     calculateCameraTarget(preset, targetVector) {
-        if (preset.followPlayer && this.game.player && this.game.player.sprite) {
-            targetVector.copy(this.game.player.sprite.position);
-            targetVector.y = 0;
-        } else if (preset.centerTarget) {
-            targetVector.set(0, 0, 0);
-        } else {
-            targetVector.copy(this.cameraTarget);
-        }
+    if (preset.followPlayer && this.followTarget) {
+        // Follow the specified target (could be player or NPC)
+        targetVector.copy(this.followTarget.sprite.position);
+        targetVector.y = 0;
+    } else if (preset.followPlayer && this.game.player && this.game.player.sprite) {
+        // Default to following player
+        targetVector.copy(this.game.player.sprite.position);
+        targetVector.y = 0;
+    } else if (preset.centerTarget) {
+        targetVector.set(0, 0, 0);
+    } else {
+        targetVector.copy(this.cameraTarget);
     }
+}
 
     applyCameraPreset(preset) {
         this.calculateCameraTarget(preset, this.cameraTarget);
@@ -365,41 +376,97 @@ class CameraSystem {
             }
         }
     }
-
-    updateFollowPlayer() {
-        const currentPreset = this.cameraPresets?.[this.currentCameraPreset];
-        if (currentPreset && currentPreset.followPlayer && this.game.player && this.game.player.sprite) {
+updateFollowPlayer() {
+    const currentPreset = this.cameraPresets?.[this.currentCameraPreset];
+    if (currentPreset && currentPreset.followPlayer) {
+        const target = this.followTarget || this.game.player;
+        if (target && target.sprite) {
             if (!this.cameraTransition.active) {
                 if (currentPreset.type === 'perspective') {
-                    this.camera.position.copy(this.game.player.sprite.position).add(currentPreset.offset);
-                    
+                    this.camera.position.copy(target.sprite.position).add(currentPreset.offset);
                     if (currentPreset.lookAtPlayer) {
-                        this.camera.lookAt(this.game.player.sprite.position);
+                        this.camera.lookAt(target.sprite.position);
                     } else if (currentPreset.lookDirection) {
                         let lookDirection = new THREE.Vector3(0, 0, -1);
-                        
-                        if (this.game.player.path && this.game.player.path.length > 0) {
-                            const next = this.game.player.path[0];
-                            const dx = next.x - this.game.player.pos.x;
-                            const dz = next.z - this.game.player.pos.z;
+                        if (target.path && target.path.length > 0) {
+                            const next = target.path[0];
+                            const dx = next.x - target.pos.x;
+                            const dz = next.z - target.pos.z;
                             if (dx !== 0 || dz !== 0) {
                                 lookDirection.set(dx, 0, dz).normalize();
                             }
-                        } else if (this.game.player.facingLeft !== undefined) {
-                            lookDirection.set(this.game.player.facingLeft ? -1 : 1, 0, 0);
+                        } else if (target.facingLeft !== undefined) {
+                            lookDirection.set(target.facingLeft ? -1 : 1, 0, 0);
                         }
-
-                        const lookTarget = this.game.player.sprite.position.clone()
-                            .add(lookDirection.multiplyScalar(50));
+                        const lookTarget = target.sprite.position.clone().add(lookDirection.multiplyScalar(50));
                         this.camera.lookAt(lookTarget);
                     }
                 } else {
-                    this.cameraTarget.copy(this.game.player.sprite.position);
+                    this.cameraTarget.copy(target.sprite.position);
                     this.cameraTarget.y = 0;
+                    this.cameraOffset.copy(currentPreset.offset);
                 }
             }
         }
     }
+}
+
+// In camera.js - Add this method to set follow target:
+setFollowTarget(target) {
+    this.followTarget = target;
+}
+saveInitialCameraState() {
+    if (this.camera) {
+        this.initialCameraState.position.copy(this.camera.position);
+        this.initialCameraState.target.copy(this.cameraTarget);
+        this.initialCameraState.zoom = this.zoomLevel;
+        this.initialCameraState.preset = this.currentCameraPreset;
+        console.log('Initial camera state saved:', this.initialCameraState);
+    }
+}
+restoreToInitialState(smooth = true, callback = null) {
+    console.log('Restoring to initial camera state');
+    
+    if (smooth && this.camera) {
+        this.cameraTransition.active = true;
+        this.cameraTransition.startTime = Date.now();
+        this.cameraTransition.callback = callback;
+        this.cameraTransition.fromPosition.copy(this.camera.position);
+        this.cameraTransition.fromTarget.copy(this.cameraTarget);
+        this.cameraTransition.fromZoom = this.zoomLevel;
+        
+        this.cameraTransition.toPosition.copy(this.initialCameraState.position);
+        this.cameraTransition.toTarget.copy(this.initialCameraState.target);
+        this.cameraTransition.toZoom = this.initialCameraState.zoom;
+        
+        // Set the preset without applying it immediately (transition handles it)
+        this.currentCameraPreset = this.initialCameraState.preset;
+    } else {
+        // Immediate restore
+        this.camera.position.copy(this.initialCameraState.position);
+        this.cameraTarget.copy(this.initialCameraState.target);
+        this.zoomLevel = this.initialCameraState.zoom;
+        this.currentCameraPreset = this.initialCameraState.preset;
+        this.updateCameraPosition();
+        
+        if (this.camera.isOrthographicCamera) {
+            const aspect = window.innerWidth / window.innerHeight;
+            const frustumSize = 20 * this.zoomLevel;
+            this.camera.left = frustumSize * aspect / -2;
+            this.camera.right = frustumSize * aspect / 2;
+            this.camera.top = frustumSize / 2;
+            this.camera.bottom = frustumSize / -2;
+            this.camera.updateProjectionMatrix();
+        }
+        
+        if (callback) callback();
+    }
+}
+// In camera.js - Add this method to clear follow target:
+clearFollowTarget() {
+    this.followTarget = null;
+}
+
 
     handleResize() {
         const aspect = window.innerWidth / window.innerHeight;

@@ -59,7 +59,7 @@ class CameraSystem {
         };
         
         this.currentCameraPreset = 'default';
-        this._hue = undefined; // For light color cycling
+        this._hue = undefined;
     }
 
     setupCamera() {
@@ -77,11 +77,19 @@ class CameraSystem {
     }
 
     setCameraPreset(presetName, smooth = true, callback = null) {
-        // Remove any existing dialogs
+        console.log(`CameraSystem: Setting camera preset to ${presetName}`);
+        
+        // Clean up any existing dialogs - moved here to ensure it happens
         const existingDialog = document.getElementById('confirmationDialog');
-        if (existingDialog) existingDialog.remove();
+        if (existingDialog) {
+            console.log('CameraSystem: Removing existing dialog');
+            existingDialog.remove();
+        }
         const npcDialog = document.getElementById('npcQuestionDialog');
-        if (npcDialog) npcDialog.remove();
+        if (npcDialog) {
+            console.log('CameraSystem: Removing NPC dialog');
+            npcDialog.remove();
+        }
 
         if (!this.cameraPresets[presetName]) {
             console.warn(`Camera preset '${presetName}' not found`);
@@ -90,12 +98,17 @@ class CameraSystem {
 
         const preset = this.cameraPresets[presetName];
         this.currentCameraPreset = presetName;
+        
+        console.log(`CameraSystem: Applying preset ${presetName}`, preset);
 
+        // Switch camera type if needed
         if (preset.type !== this.getCameraType()) {
+            console.log(`CameraSystem: Switching camera type to ${preset.type}`);
             this.switchCameraType(preset.type, preset);
         }
 
         if (smooth && this.camera) {
+            console.log('CameraSystem: Starting smooth transition');
             this.cameraTransition.active = true;
             this.cameraTransition.startTime = Date.now();
             this.cameraTransition.callback = callback;
@@ -107,6 +120,7 @@ class CameraSystem {
             this.cameraTransition.toPosition.copy(this.cameraTransition.toTarget).add(preset.offset);
             this.cameraTransition.toZoom = preset.zoom || 1.0;
         } else {
+            console.log('CameraSystem: Applying preset immediately');
             this.applyCameraPreset(preset);
             if (callback) callback();
         }
@@ -135,6 +149,9 @@ class CameraSystem {
         }
 
         this.camera.position.copy(currentPos);
+        
+        // Update the game's camera reference
+        this.game.camera = this.camera;
     }
 
     calculateCameraTarget(preset, targetVector) {
@@ -154,6 +171,7 @@ class CameraSystem {
         if (preset.type === 'perspective') {
             if (preset.followPlayer && this.game.player && this.game.player.sprite) {
                 this.camera.position.copy(this.game.player.sprite.position).add(preset.offset);
+                
                 if (preset.lookAtPlayer) {
                     this.camera.lookAt(this.game.player.sprite.position);
                 } else if (preset.lookDirection) {
@@ -181,10 +199,10 @@ class CameraSystem {
         const speed = 0.01 * this.zoomLevel;
         const moveX = new THREE.Vector3(1, 0, -1).normalize();
         const moveY = new THREE.Vector3(1, 0, 1).normalize();
-
+        
         this.cameraTarget.add(moveX.clone().multiplyScalar(-deltaX * speed));
         this.cameraTarget.add(moveY.clone().multiplyScalar(-deltaY * speed));
-
+        
         const maxBounds = this.game.gridSize * this.game.tileSize / 2;
         this.cameraTarget.x = Math.max(-maxBounds, Math.min(maxBounds, this.cameraTarget.x));
         this.cameraTarget.z = Math.max(-maxBounds, Math.min(maxBounds, this.cameraTarget.z));
@@ -194,13 +212,14 @@ class CameraSystem {
         this.zoomLevel = Math.max(0.3, Math.min(3, this.zoomLevel + delta));
         const aspect = window.innerWidth / window.innerHeight;
         const frustumSize = 20 * this.zoomLevel;
-
+        
         Object.assign(this.camera, {
             left: frustumSize * aspect / -2,
             right: frustumSize * aspect / 2,
             top: frustumSize / 2,
             bottom: frustumSize / -2
         });
+        
         this.camera.updateProjectionMatrix();
     }
 
@@ -214,12 +233,13 @@ class CameraSystem {
         const keys = this.game.input.keys;
         const direction = new THREE.Vector3();
 
+        // Camera movement
         if (keys.KeyW || keys.ArrowUp) direction.add(new THREE.Vector3(-1, 0, -1));
         if (keys.KeyS || keys.ArrowDown) direction.add(new THREE.Vector3(1, 0, 1));
         if (keys.KeyA || keys.ArrowLeft) direction.add(new THREE.Vector3(-1, 0, 1));
         if (keys.KeyD || keys.ArrowRight) direction.add(new THREE.Vector3(1, 0, -1));
 
-        // Camera preset hotkeys
+        // Camera preset keys
         if (this.game.input.keys.Digit1 && !this.game.input.keys._1Pressed) {
             this.game.input.keys._1Pressed = true;
             this.setCameraPreset('default', true);
@@ -260,34 +280,41 @@ class CameraSystem {
             this.game.input.keys._5Pressed = false;
         }
 
-        // Light controls
+        // Lighting controls
         if (this.game.input.keys.KeyI) {
             this.game.directionalLight.intensity = Math.min(2.0, this.game.directionalLight.intensity + 0.01);
         }
+
         if (this.game.input.keys.KeyK) {
             this.game.directionalLight.intensity = Math.max(0.0, this.game.directionalLight.intensity - 0.01);
         }
+
         if (this.game.input.keys.KeyJ) {
             this._hue = (this._hue || 0) + 1;
             this.game.directionalLight.color.setHSL((this._hue % 360) / 360, 1, 0.9);
         }
+
         if (this.game.input.keys.KeyL) {
             this._hue = (this._hue || 0) - 1;
             this.game.directionalLight.color.setHSL((this._hue % 360) / 360, 1, 0.9);
         }
+
         if (this.game.input.keys.KeyU) {
             this.game.directionalLight.color.set(0xfff6e0);
             this._hue = undefined;
         }
 
+        // Apply movement
         if (direction.lengthSq() > 0) {
             direction.normalize().multiplyScalar(speed);
             this.cameraTarget.add(direction);
         }
 
+        // Zoom controls
         if (keys.KeyQ) this.zoomCamera(0.02);
         if (keys.KeyE) this.zoomCamera(-0.02);
 
+        // Clamp camera bounds
         const maxBounds = this.game.gridSize * this.game.tileSize / 2;
         this.cameraTarget.clamp(
             new THREE.Vector3(-maxBounds, 0, -maxBounds),
@@ -306,6 +333,7 @@ class CameraSystem {
                 this.cameraTransition.toPosition,
                 easeProgress
             );
+            
             this.cameraTarget.lerpVectors(
                 this.cameraTransition.fromTarget,
                 this.cameraTransition.toTarget,
@@ -318,6 +346,7 @@ class CameraSystem {
                     this.cameraTransition.toZoom,
                     easeProgress
                 );
+                
                 const aspect = window.innerWidth / window.innerHeight;
                 const frustumSize = 20 * this.zoomLevel;
                 this.camera.left = frustumSize * aspect / -2;
@@ -328,6 +357,7 @@ class CameraSystem {
             }
 
             if (progress >= 1.0) {
+                console.log('CameraSystem: Transition completed');
                 this.cameraTransition.active = false;
                 if (this.cameraTransition.callback) {
                     this.cameraTransition.callback();
@@ -342,10 +372,12 @@ class CameraSystem {
             if (!this.cameraTransition.active) {
                 if (currentPreset.type === 'perspective') {
                     this.camera.position.copy(this.game.player.sprite.position).add(currentPreset.offset);
+                    
                     if (currentPreset.lookAtPlayer) {
                         this.camera.lookAt(this.game.player.sprite.position);
                     } else if (currentPreset.lookDirection) {
                         let lookDirection = new THREE.Vector3(0, 0, -1);
+                        
                         if (this.game.player.path && this.game.player.path.length > 0) {
                             const next = this.game.player.path[0];
                             const dx = next.x - this.game.player.pos.x;
@@ -356,6 +388,7 @@ class CameraSystem {
                         } else if (this.game.player.facingLeft !== undefined) {
                             lookDirection.set(this.game.player.facingLeft ? -1 : 1, 0, 0);
                         }
+
                         const lookTarget = this.game.player.sprite.position.clone()
                             .add(lookDirection.multiplyScalar(50));
                         this.camera.lookAt(lookTarget);
@@ -371,13 +404,14 @@ class CameraSystem {
     handleResize() {
         const aspect = window.innerWidth / window.innerHeight;
         const frustumSize = 20 * this.zoomLevel;
-
+        
         Object.assign(this.camera, {
             left: frustumSize * aspect / -2,
             right: frustumSize * aspect / 2,
             top: frustumSize / 2,
             bottom: frustumSize / -2
         });
+        
         this.camera.updateProjectionMatrix();
     }
 

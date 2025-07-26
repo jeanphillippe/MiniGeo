@@ -21,8 +21,8 @@ class CameraSystem {
             },
             followPlayer: {
                 type: 'orthographic',
-                offset: new THREE.Vector3(8, 19, 8),
-                zoom: 0.7,
+                offset: new THREE.Vector3(10, 10, 10),
+                zoom: 0.953,
                 followPlayer: true,
                 lookAtTarget: true
             },

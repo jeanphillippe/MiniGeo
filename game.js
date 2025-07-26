@@ -10,7 +10,12 @@ class GameEngine {
         this.selectedTile = null;
         this.raycaster = new THREE.Raycaster();
         this.mouse = new THREE.Vector2();
-        
+         this.initialCameraState = {
+        position: new THREE.Vector3(),
+        target: new THREE.Vector3(),
+        zoom: 1.0,
+        preset: 'default'
+    };
         this.input = {
             keys: {},
             mouse: { x: 0, y: 0, pressed: false },

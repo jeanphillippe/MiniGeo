@@ -42,9 +42,30 @@ class GameEngine {
         this.setupUI();
         this.setupInteractables();
         this.player = new Player(this);
+        this.setupIntro(); // Add this line
         this.start();
     }
-
+setupIntro() {
+    // Set overview camera immediately for intro
+    this.cameraSystem.setCameraPreset('overview', false);
+    
+    const introOverlay = document.getElementById('introOverlay');
+    const startButton = document.getElementById('startButton');
+    
+    startButton.onclick = () => {
+        // Start camera transition to default
+        this.cameraSystem.setCameraPreset('default', true, () => {
+            // Camera transition completed
+            console.log('Camera transition to default completed');
+        });
+        
+        // Fade out intro overlay
+        introOverlay.classList.add('hidden');
+        setTimeout(() => {
+            introOverlay.style.display = 'none';
+        }, 500);
+    };
+}
     setupRenderer() {
         this.canvas = document.getElementById('gameCanvas');
         this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });

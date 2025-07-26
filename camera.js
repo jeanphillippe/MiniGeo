@@ -21,7 +21,7 @@ class CameraSystem {
             },
             followPlayer: {
                 type: 'orthographic',
-                offset: new THREE.Vector3(10, 10, 10),
+                offset: new THREE.Vector3(6, 9, 10),
                 zoom: 0.753,
                 followPlayer: true,
                 lookAtTarget: true
@@ -41,14 +41,14 @@ class CameraSystem {
                 followPlayer: true,
                 lookAtPlayer: true
             },
-            firstPerson: {
-                type: 'perspective',
-                offset: new THREE.Vector3(1, 1.5, 1),
-                fov: 75,
-                followPlayer: true,
-                lookAtPlayer: false,
-                lookDirection: new THREE.Vector3(0, 0, -1)
-            }
+            followAndMove: {
+    type: 'perspective',
+    offset: new THREE.Vector3(5, 8, 5),
+    fov: 60,
+    followPlayer: true,
+    lookAtPlayer: true,
+    smoothFollow: true
+}
         };
         
         this.cameraTransition = {
@@ -160,15 +160,20 @@ class CameraSystem {
         this.game.camera = this.camera;
     }
 
-    calculateCameraTarget(preset, targetVector) {
-    if (preset.followPlayer && this.followTarget) {
-        // Follow the specified target (could be player or NPC)
-        targetVector.copy(this.followTarget.sprite.position);
-        targetVector.y = 0;
-    } else if (preset.followPlayer && this.game.player && this.game.player.sprite) {
-        // Default to following player
+calculateCameraTarget(preset, targetVector) {
+    if (preset.followPlayer && this.game.player && this.game.player.sprite) {
         targetVector.copy(this.game.player.sprite.position);
         targetVector.y = 0;
+        
+        // Add screen offset for followPlayer preset to show player lower on screen
+        if (this.currentCameraPreset === 'followPlayer') {
+            // Offset the target so player appears lower on screen
+            // Adjust these values to control where the player appears
+            const screenOffsetX = -2;  // Negative moves player right on screen
+            const screenOffsetZ = 3;   // Positive moves player down on screen
+            targetVector.x += screenOffsetX;
+            targetVector.z += screenOffsetZ;
+        }
     } else if (preset.centerTarget) {
         targetVector.set(0, 0, 0);
     } else {
@@ -400,16 +405,20 @@ updateFollowPlayer(){
                     this.camera.lookAt(lookTarget)
                 }
             }else{
-                // For orthographic camera, use the target and offset system
+                // For orthographic isometric camera
                 this.cameraTarget.copy(this.game.player.sprite.position);
                 this.cameraTarget.y=0;
-                // Don't override the offset - keep using the preset offset
-                // this.cameraOffset.copy(currentPreset.offset); // This line was causing the issue
+                
+                // Offset the target in isometric coordinates to show player lower on screen
+                if(this.currentCameraPreset === 'followPlayer') {
+                    // In isometric view, to move player down on screen we need to move target forward
+                    this.cameraTarget.x += -5;  // Move target forward (player appears lower)
+                    this.cameraTarget.z += -5;  // Move target forward (player appears lower)
+                }
             }
         }
     }
 }
-
 // In camera.js - Add this method to set follow target:
 setFollowTarget(target) {
     this.followTarget = target;

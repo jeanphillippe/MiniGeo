@@ -898,37 +898,68 @@ setupIntro() {
     }
 
     showConfirmationDialog(interactable, callback) {
-        const existingDialog = document.getElementById('confirmationDialog');
-        if (existingDialog) existingDialog.remove();
-        
-        const dialog = document.createElement('div');
-        dialog.id = 'confirmationDialog';
-        dialog.style.cssText = `
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.95);
-            color: white;
-            padding: 20px;
-            border-radius: 12px;
-            border: 0px solid #4fc3f7;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
-            z-index: 1000;
-            min-width: 280px;
-            text-align: center;
-            font-family: Arial, sans-serif;
-        `;
-        
-        const message = this.getConfirmationMessage(interactable);
-        dialog.innerHTML = `
-            <div style="font-size: 16px; margin-bottom: 16px; line-height: 1.4;">
-                <strong>${interactable.message}</strong>
-                <div style="margin-top: 8px; font-size: 14px; opacity: 0.9;">
-                    ${message}
-                </div>
+    const existingDialog = document.getElementById('confirmationDialog');
+    if (existingDialog) existingDialog.remove();
+
+    const dialog = document.createElement('div');
+    dialog.id = 'confirmationDialog';
+    dialog.style.cssText = `
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.95);
+        color: white;
+        padding: 20px;
+        border-radius: 12px;
+        border: 0px solid #4fc3f7;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+        z-index: 1000;
+        min-width: 320px;
+        text-align: center;
+        font-family: Arial, sans-serif;
+    `;
+
+    const message = this.getConfirmationMessage(interactable);
+    
+    // Check if this is a story choice (has confirmationAlternative)
+    const isStoryChoice = interactable.confirmationMessage && interactable.confirmationAlternative;
+    
+    let buttonSection;
+    if (isStoryChoice) {
+        // Custom choice buttons for story NPCs
+        buttonSection = `
+            <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 16px;">
+                <button id="choiceA" style="
+                    background: #43aa8b;
+                    color: white;
+                    border: none;
+                    padding: 12px 16px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    transition: background 0.2s;
+                    text-align: left;
+                    line-height: 1.3;
+                ">${interactable.confirmationMessage}</button>
+                <button id="choiceB" style="
+                    background: #f3722c;
+                    color: white;
+                    border: none;
+                    padding: 12px 16px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    transition: background 0.2s;
+                    text-align: left;
+                    line-height: 1.3;
+                ">${interactable.confirmationAlternative}</button>
             </div>
-            <div style="display: flex; gap: 12px; justify-content: center;">
+        `;
+    } else {
+        // Standard Yes/No buttons for regular confirmations
+        buttonSection = `
+            <div style="display: flex; gap: 12px; justify-content: center; margin-top: 16px;">
                 <button id="confirmYes" style="
                     background: #43aa8b;
                     color: white;
@@ -951,9 +982,38 @@ setupIntro() {
                 ">No</button>
             </div>
         `;
+    }
+
+    dialog.innerHTML = `
+        <div style="font-size: 16px; margin-bottom: 16px; line-height: 1.4;">
+            <strong>${interactable.message || interactable.name || 'NPC'}</strong>
+            <div style="margin-top: 8px; font-size: 14px; opacity: 0.9;">
+                ${message}
+            </div>
+        </div>
+        ${buttonSection}
+    `;
+
+    document.body.appendChild(dialog);
+
+    if (isStoryChoice) {
+        const choiceA = dialog.querySelector('#choiceA');
+        const choiceB = dialog.querySelector('#choiceB');
         
-        document.body.appendChild(dialog);
-        
+        choiceA.onmouseover = () => choiceA.style.background = '#4fc3f7';
+        choiceA.onmouseout = () => choiceA.style.background = '#43aa8b';
+        choiceB.onmouseover = () => choiceB.style.background = '#f9844a';
+        choiceB.onmouseout = () => choiceB.style.background = '#f3722c';
+
+        choiceA.onclick = () => {
+            dialog.remove();
+            callback(true); // Choice A (Success path)
+        };
+        choiceB.onclick = () => {
+            dialog.remove();
+            callback(false); // Choice B (Failure path)
+        };
+    } else {
         const yesBtn = dialog.querySelector('#confirmYes');
         const noBtn = dialog.querySelector('#confirmNo');
         
@@ -961,46 +1021,49 @@ setupIntro() {
         yesBtn.onmouseout = () => yesBtn.style.background = '#43aa8b';
         noBtn.onmouseover = () => noBtn.style.background = '#f9844a';
         noBtn.onmouseout = () => noBtn.style.background = '#f3722c';
-        
+
         yesBtn.onclick = () => {
             dialog.remove();
             callback(true);
         };
-        
         noBtn.onclick = () => {
             dialog.remove();
             callback(false);
         };
-        
-        const handleKeydown = (e) => {
-            if (e.key === 'Escape') {
-                dialog.remove();
-                document.removeEventListener('keydown', handleKeydown);
-                callback(false);
-            }
-        };
-        
-        document.addEventListener('keydown', handleKeydown);
     }
 
-    getConfirmationMessage(interactable) {
-        switch (interactable.type) {
-            case 'npc':
-                return 'Do you want to talk to this NPC? They might have useful information or quests.';
-            case 'npc_confirmation':
-                return interactable.message;
-            case 'chest':
-                return 'Do you want to open this ancient chest? It might contain treasure... or traps.';
-            case 'tree':
-                return 'Do you want to examine this old tree? The whispers might reveal ancient secrets.';
-            case 'crystal':
-                return 'Do you want to collect this magical crystal? It will disappear forever.';
-            case 'shrine':
-                return 'Do you want to pray at this mysterious shrine? Ancient powers await.';
-            default:
-                return 'Do you want to interact with this object?';
+    const handleKeydown = (e) => {
+        if (e.key === 'Escape') {
+            dialog.remove();
+            document.removeEventListener('keydown', handleKeydown);
+            callback(false);
         }
+    };
+    document.addEventListener('keydown', handleKeydown);
+}
+
+
+    
+getConfirmationMessage(interactable) {
+    switch (interactable.type) {
+        case 'npc_choice':
+            return '¿Qué eliges?'; // What do you choose?
+        case 'npc':
+            return 'Do you want to talk to this NPC? They might have useful information or quests.';
+        case 'npc_confirmation':
+            return interactable.message;
+        case 'chest':
+            return 'Do you want to open this ancient chest? It might contain treasure... or traps.';
+        case 'tree':
+            return 'Do you want to examine this old tree? The whispers might reveal ancient secrets.';
+        case 'crystal':
+            return 'Do you want to collect this magical crystal? It will disappear forever.';
+        case 'shrine':
+            return 'Do you want to pray at this mysterious shrine? Ancient powers await.';
+        default:
+            return 'Do you want to interact with this object?';
     }
+}
 }
 
 window.game = new GameEngine();

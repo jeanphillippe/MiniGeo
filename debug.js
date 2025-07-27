@@ -221,13 +221,19 @@ if (raiseBtn && lowerBtn) {
     }
   }
 
-    updateDebugInfo() {
-        const update = () => {
-            const pos = this.game.cameraTarget;
-            document.getElementById('cameraPos').textContent = `${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)}`;
-            document.getElementById('zoomLevel').textContent = this.game.zoomLevel.toFixed(1);
-            requestAnimationFrame(update);
-        };
-        update();
-    }
+    
+updateDebugInfo(){
+    const update=()=>{
+        // Access camera target through the camera system
+        const pos = this.game.cameraSystem ? this.game.cameraSystem.cameraTarget : { x: 0, y: 0, z: 0 };
+        document.getElementById('cameraPos').textContent=`${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)}`;
+        
+        // Access zoom level through the camera system
+        const zoomLevel = this.game.cameraSystem ? this.game.cameraSystem.zoomLevel : 1.0;
+        document.getElementById('zoomLevel').textContent=zoomLevel.toFixed(1);
+        
+        requestAnimationFrame(update);
+    };
+    update();
+}
 }

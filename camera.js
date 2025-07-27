@@ -41,14 +41,9 @@ class CameraSystem {
                 followPlayer: true,
                 lookAtPlayer: true
             },
-            followAndMove: {
-    type: 'perspective',
-    offset: new THREE.Vector3(5, 8, 5),
-    fov: 60,
-    followPlayer: true,
-    lookAtPlayer: true,
-    smoothFollow: true
-}
+                followAndMove:{type:'orthographic',offset:new THREE.Vector3(6,9,10),zoom:0.753,followPlayer:!0,lookAtTarget:!0},
+                followAndMovePerspective:{type:'perspective',offset:new THREE.Vector3(3,8,3),fov:22,followPlayer:!0,lookAtPlayer:!0}
+
         };
         
         this.cameraTransition = {
@@ -168,9 +163,9 @@ calculateCameraTarget(preset, targetVector) {
         // Add screen offset for followPlayer preset to show player lower on screen
         if (this.currentCameraPreset === 'followPlayer') {
             // Offset the target so player appears lower on screen
-            // Adjust these values to control where the player appears
-            const screenOffsetX = -2;  // Negative moves player right on screen
-            const screenOffsetZ = 3;   // Positive moves player down on screen
+            // remember to change on updateFollowPlayer also
+            const screenOffsetX = -5;  // Negative moves player right on screen
+            const screenOffsetZ = -5;   // Positive moves player down on screen
             targetVector.x += screenOffsetX;
             targetVector.z += screenOffsetZ;
         }
@@ -381,44 +376,49 @@ calculateCameraTarget(preset, targetVector) {
             }
         }
     }
+
 updateFollowPlayer(){
     const currentPreset=this.cameraPresets?.[this.currentCameraPreset];
-    if(currentPreset&&currentPreset.followPlayer&&this.game.player&&this.game.player.sprite){
-        if(!this.cameraTransition.active){
-            if(currentPreset.type==='perspective'){
-                this.camera.position.copy(this.game.player.sprite.position).add(currentPreset.offset);
-                if(currentPreset.lookAtPlayer){
-                    this.camera.lookAt(this.game.player.sprite.position)
-                }else if(currentPreset.lookDirection){
-                    let lookDirection=new THREE.Vector3(0,0,-1);
-                    if(this.game.player.path&&this.game.player.path.length>0){
-                        const next=this.game.player.path[0];
-                        const dx=next.x-this.game.player.pos.x;
-                        const dz=next.z-this.game.player.pos.z;
-                        if(dx!==0||dz!==0){
-                            lookDirection.set(dx,0,dz).normalize()
+    if(currentPreset&&currentPreset.followPlayer){
+        // Check if we're following an NPC instead of the player
+        const target = this.followTarget || this.game.player;
+        
+        if(target && target.sprite){
+            if(!this.cameraTransition.active){
+                if(currentPreset.type==='perspective'){
+                    this.camera.position.copy(target.sprite.position).add(currentPreset.offset);
+                    if(currentPreset.lookAtPlayer){
+                        this.camera.lookAt(target.sprite.position);
+                    }else if(currentPreset.lookDirection){
+                        let lookDirection=new THREE.Vector3(0,0,-1);
+                        if(target.path&&target.path.length>0){
+                            const next=target.path[0];
+                            const dx=next.x-target.pos.x;
+                            const dz=next.z-target.pos.z;
+                            if(dx!==0||dz!==0){
+                                lookDirection.set(dx,0,dz).normalize();
+                            }
+                        }else if(target.facingLeft!==undefined){
+                            lookDirection.set(target.facingLeft?-1:1,0,0);
                         }
-                    }else if(this.game.player.facingLeft!==undefined){
-                        lookDirection.set(this.game.player.facingLeft?-1:1,0,0)
+                        const lookTarget=target.sprite.position.clone().add(lookDirection.multiplyScalar(50));
+                        this.camera.lookAt(lookTarget);
                     }
-                    const lookTarget=this.game.player.sprite.position.clone().add(lookDirection.multiplyScalar(50));
-                    this.camera.lookAt(lookTarget)
-                }
-            }else{
-                // For orthographic isometric camera
-                this.cameraTarget.copy(this.game.player.sprite.position);
-                this.cameraTarget.y=0;
-                
-                // Offset the target in isometric coordinates to show player lower on screen
-                if(this.currentCameraPreset === 'followPlayer') {
-                    // In isometric view, to move player down on screen we need to move target forward
-                    this.cameraTarget.x += -5;  // Move target forward (player appears lower)
-                    this.cameraTarget.z += -5;  // Move target forward (player appears lower)
+                }else{
+                    this.cameraTarget.copy(target.sprite.position);
+                    this.cameraTarget.y=0;
+                    if(this.currentCameraPreset==='followPlayer'){
+                        this.cameraTarget.x+=-5;
+                        this.cameraTarget.z+=-5;
+                    }
                 }
             }
         }
     }
 }
+
+                    // remember to change on calculateCameraTarget also
+                 
 // In camera.js - Add this method to set follow target:
 setFollowTarget(target) {
     this.followTarget = target;

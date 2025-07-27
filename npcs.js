@@ -1,18 +1,80 @@
 
 const NPC_DATA = {
     'trader_jack': {
-        spriteRow: 2,
-        position: {x: 3, z: 8},
-        spawnDelay: 1500,
-        patrolType: 'line',
-        idleFrame: 0,
-        name: 'Juan Pescador',
-        conversations: [
-            {message: "Antes tenía una caña de pescar... Alguien me la pidió prestada y nunca volvió.",requiresConfirmation: false, action: {type: 'camera', preset: 'followPlayer'}},
-            {message: "I know of a hidden cache nearby. Care to make a deal?", action: {type: 'move', target: {x: 2, z: 5}, speed: 0.05}},
-            {message: "Here's your share. May fortune favor your travels!", action: {type: 'disappear', delay: 2000}}
-        ]
-    },
+    spriteRow: 2,
+    position: {x: 3, z: 8},
+    spawnDelay: 1500,
+    patrolType: 'line',
+    idleFrame: 0,
+    name: 'Juan Pescador',
+    conversations: [
+        {
+            message: "Antes tenía una caña de pescar... Alguien me la pidió prestada y nunca volvió.",
+            requiresConfirmation: true,
+            confirmationMessage: "Vamos a buscar algo útil.",
+            confirmationAlternative: "Esperemos un poco más.",
+            action: {
+                type: 'choice',
+                onSuccess: {type: 'move', target: {x: 7, z: 5}, speed: 0.045},
+                onFailure: {
+                    type: 'setConversations',
+                    newConversations: [
+                        {
+                            message: "Supongo que seguiré esperando...",
+                            action: {type: 'patrol', patrolType: 'none'}
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            message: "Y qué buscas exactamente?",
+            requiresConfirmation: true,
+            confirmationMessage: "No lo sé. Pero algo aparecerá si camino con los ojos abiertos.",
+            confirmationAlternative: "Quiero encontrar la caña perfecta.",
+            action: {
+                type: 'choice',
+                onSuccess: {type: 'followAndMove', target: {x: 4, z: 12}, speed: 0.04, smooth: true},
+                onFailure: {
+                    type: 'setConversations',
+                    newConversations: [
+                        {
+                            message: "Quizá tenías razón... pero no encontraremos lo perfecto.",
+                            action: {type: 'move', target: {x: 3, z: 8}, speed: 0.05}
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            message: "Mira, una cuerda vieja colgando de ese árbol...",
+            requiresConfirmation: true,
+            confirmationMessage: "Claro, si lo juntas con ese palo, puede ser una caña.",
+            confirmationAlternative: "No parece gran cosa.",
+            action: {
+                type: 'choice',
+                onSuccess: {
+                    type: 'setConversations',
+                    newConversations: [
+                        {
+                            message: "No sabía que podía hacerlo... gracias por no esperar conmigo.",
+                            action: {type: 'camera', preset: 'followPlayer', smooth: true}
+                        }
+                    ]
+                },
+                onFailure: {
+                    type: 'setConversations',
+                    newConversations: [
+                        {
+                            message: "Tal vez nada es suficiente después de todo...",
+                            action: {type: 'disappear', delay: 3000}
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+},
     'elder_marcus': {
         spriteRow: 0,
         position: {x: 5, z: 5},
@@ -238,23 +300,39 @@ class NPC extends Player {
         const currentConversation = this.conversations[this.conversationIndex];
 
         if (currentConversation.requiresConfirmation) {
-            const mockInteractable = {
-                type: 'npc_confirmation',
-                message: currentConversation.confirmationMessage || "Are you sure you want to continue?",
-                npcRef: this
-            };
+             const mockInteractable = {
+            type: 'npc_choice',
+            message: currentConversation.confirmationMessage || "Are you sure you want to continue?",
+            confirmationMessage: currentConversation.confirmationMessage,
+            confirmationAlternative: currentConversation.confirmationAlternative,
+            npcRef: this
+        };
 
-            this.game.showConfirmationDialog(mockInteractable, (confirmed) => {
-                if (confirmed) {
-                    if (currentConversation.action && !this.isExecutingAction) {
-                        this.executeAction(currentConversation.action);
+             this.game.showConfirmationDialog(mockInteractable, (choiceA) => {
+            if (currentConversation.action && currentConversation.action.type === 'choice') {
+                if (choiceA && currentConversation.action.onSuccess) {
+                    // Ejecuta acción de éxito
+                    this.executeAction(currentConversation.action.onSuccess);
+                    // Solo avanza si la acción no cambió las conversaciones
+                    if (currentConversation.action.onSuccess.type !== 'setConversations') {
+                        this.advanceToNextConversation();
                     }
+                } else if (!choiceA && currentConversation.action.onFailure) {
+                    // Ejecuta acción de fallo
+                    this.executeAction(currentConversation.action.onFailure);
+                    // No avanza conversación si se cambiaron las conversaciones
+                }
+            } else {
+                // Comportamiento normal para confirmaciones simples
+                if (choiceA && currentConversation.action) {
+                    this.executeAction(currentConversation.action);
                     this.advanceToNextConversation();
                 }
-            });
+            }
+        });
 
-            return this.message;
-        }
+        return this.message;
+    }
 
         if (currentConversation.action && !this.isExecutingAction) {
             this.executeAction(currentConversation.action);
@@ -291,7 +369,20 @@ class NPC extends Player {
                     };
                 });
                 break;
-
+case 'choice':
+            // No hace nada aquí, la lógica está en interact()
+            this.isExecutingAction = false;
+            break;
+             case 'setConversations':
+            // Cambia dinámicamente las conversaciones disponibles
+            if (action.newConversations && action.newConversations.length > 0) {
+                this.conversations = action.newConversations;
+                this.conversationIndex = 0;
+                this.message = this.conversations[0].message;
+                console.log(`Updated conversations for ${this.name}:`, this.conversations);
+            }
+            this.isExecutingAction = false;
+            break;
             case 'moveAndCamera':
                 console.log(`Changing camera then moving`);
                 this.game.setCameraPreset(action.cameraPreset, action.smooth !== false, () => {

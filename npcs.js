@@ -11,20 +11,12 @@ const NPC_DATA = {
             {
                 message: "Greetings, young traveler. Let me show you a better view of our lands...",
                 requiresConfirmation: false,
-                action: {type: 'move', target: {x: 12, z: 8}, speed: 0.05}
+                action: {type: 'followAndMove', target: {x: 12, z: 8}, speed: 0.05,smooth: true}
             },
-            {
-                message: "The ancient temple holds secrets... but first, prove your worth.",
-                action: { type: 'followAndMove',
-        target: { x: 7, z: 0 },
-        speed: 0.05,
-        smooth: true},
-                requiresConfirmation: true,
-                confirmationMessage: "Do you wish to follow me to the ancient temple? The path may be dangerous."
-            },
+            {message:"The ancient temple holds secrets... but first, prove your worth.",action:{type:'followAndMove',target:{x:7,z:0},speed:0.05,smooth:!0,usePerspective:true},requiresConfirmation:!0,confirmationMessage:"Do you wish to follow me to the ancient temple? The path may be dangerous."},
             {
                 message: "You followed me here. Good. The real treasure lies beneath the old oak.",
-                action: {type: 'camera', preset: 'overview', requiresConfirmation: false, smooth: true}
+                action: {type: 'camera', preset: 'followPlayer', requiresConfirmation: false, smooth: true}
             }
         ]
     },
@@ -344,29 +336,31 @@ class NPC extends Player {
                 }
                 this.isExecutingAction = false;
                 break;
-             case 'followAndMove':
-            console.log(`Setting camera to follow NPC and moving`);
-            // Set this NPC as the follow target
-            this.game.cameraSystem.setFollowTarget(this);
-            this.game.setCameraPreset('followPlayer', action.smooth !== false, () => {
-                console.log(`Camera now following NPC, starting movement`);
-                this.isPatrolling = false;
-                this.speed = action.speed || this.speed;
-                this.findPath(this.pos, action.target, (path) => {
-                    this.path = path;
-                    this.progress = 0;
-                    this.onReachTarget = () => {
-                        console.log(`NPC reached target, restoring to initial camera state`);
-                        // Restore camera to the exact initial state
-                        this.game.cameraSystem.clearFollowTarget();
-                        this.game.cameraSystem.restoreToInitialState(true, () => {
-                            this.isExecutingAction = false;
-                            this.onReachTarget = null;
-                        });
-                    };
+              case 'followAndMove':
+    console.log(`Setting camera to follow NPC and moving`);
+    // Save the current camera state before switching
+    this.game.cameraSystem.saveInitialCameraState();
+    // Set the NPC as the follow target
+    this.game.cameraSystem.setFollowTarget(this);
+    // Switch to follow camera mode
+    this.game.setCameraPreset('followAndMove',action.smooth!==!1,()=>{
+        console.log(`Camera now following NPC, starting movement`);
+        this.isPatrolling=!1;
+        this.speed=action.speed||this.speed;
+        this.findPath(this.pos,action.target,(path)=>{
+            this.path=path;
+            this.progress=0;
+            this.onReachTarget=()=>{
+                console.log(`NPC reached target, restoring to initial camera state`);
+                this.game.cameraSystem.clearFollowTarget();
+                this.game.cameraSystem.restoreToInitialState(!0,()=>{
+                    this.isExecutingAction=!1;
+                    this.onReachTarget=null;
                 });
-            });
-            break;
+            };
+        });
+    });
+    break;
                 
             case 'drop':
                 console.log(`Dropping in ${action.delay || 0}ms`);

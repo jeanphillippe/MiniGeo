@@ -1,5 +1,18 @@
-// NPC conversation and position data (keeping original structure for stability)
+
 const NPC_DATA = {
+    'trader_jack': {
+        spriteRow: 2,
+        position: {x: 3, z: 8},
+        spawnDelay: 1500,
+        patrolType: 'line',
+        idleFrame: 0,
+        name: 'Juan Pescador',
+        conversations: [
+            {message: "Antes tenía una caña de pescar... Alguien me la pidió prestada y nunca volvió.",requiresConfirmation: false, action: {type: 'camera', preset: 'followPlayer'}},
+            {message: "I know of a hidden cache nearby. Care to make a deal?", action: {type: 'move', target: {x: 2, z: 5}, speed: 0.05}},
+            {message: "Here's your share. May fortune favor your travels!", action: {type: 'disappear', delay: 2000}}
+        ]
+    },
     'elder_marcus': {
         spriteRow: 0,
         position: {x: 5, z: 5},
@@ -96,19 +109,6 @@ const NPC_DATA = {
             {message: "Halt! State your business in these lands.", action: null},
             {message: "Very well. But I must escort you to the checkpoint for verification.", action: {type: 'move', target: {x: 13, z: 13}, speed: 0.055}},
             {message: "You check out. But remember - I'll be watching.", action: {type: 'patrol', patrolType: 'square'}}
-        ]
-    },
-    'trader_jack': {
-        spriteRow: 2,
-        position: {x: 3, z: 8},
-        spawnDelay: 1500,
-        patrolType: 'line',
-        idleFrame: 0,
-        name: 'Trader Jack',
-        conversations: [
-            {message: "Ah, a fellow traveler! I deal in rare goods and information.", action: null},
-            {message: "I know of a hidden cache nearby. Care to make a deal?", action: {type: 'move', target: {x: 2, z: 5}, speed: 0.05}},
-            {message: "Here's your share. May fortune favor your travels!", action: {type: 'disappear', delay: 2000}}
         ]
     },
     'trader_jill': {

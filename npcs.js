@@ -21,7 +21,7 @@ const NPC_DATA = {
                     newConversations: [
                         {
                             message: "Supongo que seguiré esperando...",
-                            action: {type: 'patrol', patrolType: 'random'}
+                            action: {type: 'patrol', patrolType: 'random', speed: 0.02}
                         }
                     ]
                 }
@@ -30,7 +30,7 @@ const NPC_DATA = {
         {
             message: "¿Qué buscamos exactamente?",
             requiresConfirmation: true,
-            confirmationMessage: "No lo sé. Pero algo aparecerá si caminamos con los ojos abiertos.",
+            confirmationMessage: "No lo sé. Seguro algo aparecerá si caminamos con los ojos abiertos.",
             confirmationAlternative: "Quiero la caña perfecta.",
             action: {
                 type: 'choice',
@@ -49,7 +49,7 @@ const NPC_DATA = {
         {
                 message: "Mira, una cuerda vieja colgando de ese árbol...",
                 requiresConfirmation: true,
-                confirmationMessage: "Hey si lo juntas con ese palo, puede ser una caña!",
+                confirmationMessage: "Hey, si lo juntas con ese palo, puede ser una caña!",
                 confirmationAlternative: "No parece gran cosa. No creo que sirva",
                 action: {
                     type: 'choice',

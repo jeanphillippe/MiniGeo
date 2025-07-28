@@ -52,36 +52,45 @@ const NPC_DATA = {
                 confirmationMessage: "Hey, si lo juntas con ese palo, puede ser una caña!",
                 confirmationAlternative: "No parece gran cosa. No creo que sirva",
                 action: {
-                    type: 'choice',
-                    onSuccess: {
-                        type: 'giveObject', // ¡Nueva acción!
+                      type: 'choice',
+                      onSuccess: {
+                        type: 'giveObject',
                         template: 'boat1',
-                        position: {x: 7, z: 8},
+                        position: {
+                          x: 7,
+                          z: 8
+                        },
                         message: "Gracias por creen en mí. No sabía que podía hacerlo.",
+                        nextAction: {
+                          type: 'followAndMove',
+                          delay: 3000,
+                            message: "Me voy al mar!",
+                          target: {
+                            x: 12,
+                            z: 12
+                          },
+                          speed: 0.05,
                           nextAction: {
-                type: 'followAndMove',
-                target: {x: 12, z: 12},
-                speed: 0.05,
-                
-                nextAction: {
-            type: 'disappear',
-            delay: 3000,
-            message: "Time for me to go!"
-        }
-            },
+                            type: 'disappear',
+                            delay: 3000,
+                            message: "Time for me to go!"
+                          }
+                        },
                         mirrored: false
-                    },
-                    onFailure: {
+                      },
+                      onFailure: {
                         type: 'setConversations',
-                        newConversations: [{
+                        newConversations: [
+                          {
                             message: "Tal vez nada es suficiente después de todo...",
                             action: {
-                                type: 'disappear',
-                                delay: 3000
+                              type: 'disappear',
+                              delay: 3000
                             }
-                        }]
+                          }
+                        ]
+                      }
                     }
-                }
             },
             {message: "Here's your share. May fortune favor your travels!", action: {
     type: 'removeObject',
@@ -369,7 +378,16 @@ class NPC extends Player {
     const executeNextAction = () => {
         if (action.nextAction) {
             console.log('Executing chained action:', action.nextAction);
-            this.executeAction(action.nextAction);
+            // Support delay for any nextAction
+            const delay = action.nextAction.delay || 0;
+            if (delay > 0) {
+                console.log(`Delaying next action by ${delay}ms`);
+                setTimeout(() => {
+                    this.executeAction(action.nextAction);
+                }, delay);
+            } else {
+                this.executeAction(action.nextAction);
+            }
         } else {
             this.isExecutingAction = false;
         }

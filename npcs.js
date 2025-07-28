@@ -241,7 +241,7 @@ const STATIC_OBJECT_INSTANCES = [
     {template: 'singlepine', position: {x: 10, z: 5}},
     {template: 'singlepine', position: {x: 2, z: 13}},
     {template: 'singlepine', position: {x: 14, z: 2}},
-    {template: 'finishline', position: {x: 2, z: 11}, mirrored: true},
+    {template: 'finishline', position: {x: 14, z: 12}, mirrored: true},
     {template: 'forest_round', position: {x: 4, z: 10}},
     {template: 'forest_round', position: {x: 4, z: 1}},
     {template: 'forest_round', position: {x: 3, z: 1}},

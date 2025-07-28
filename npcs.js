@@ -11,36 +11,30 @@ const NPC_DATA = {
         {
             message: "Antes tenía una caña de pescar... Alguien me la pidió prestada y nunca volvió.",
             requiresConfirmation: true,
-            confirmationMessage: "¿Y si buscamos con qué hacer otra?",
+            confirmationMessage: "¿Y si intentamos hacer otra?",
             confirmationAlternative: "Esperemos un poco más.",
             action: {
                 type: 'choice',
-                onSuccess: {type: 'followAndMove', target: {x: 10, z: 10}, speed: 0.05},
+                onSuccess: {
+                               type: 'choice',
+                                    message: "¿Qué buscamos exactamente?",
+                        
+                    nextAction: {
+                        type: 'followAndMove', target: {x: 10, z: 10}, speed: 0.05,delay: 2500,
+                                    message: "No lo sé.",
+                                    nextAction: {
+                                        type: 'followAndMove',
+                                        delay: 500,target: {x: 5, z: 10}, speed: 0.05,
+                                        message: "Seguro algo aparecerá si caminamos con los ojos abiertos."
+                                    }
+                                }
+                      },
                 onFailure: {
                     type: 'setConversations',
                     newConversations: [
                         {
                             message: "Supongo que seguiré esperando...",
                             action: {type: 'patrol', patrolType: 'random', speed: 0.02}
-                        }
-                    ]
-                }
-            }
-        },
-        {
-            message: "¿Qué buscamos exactamente?",
-            requiresConfirmation: true,
-            confirmationMessage: "No lo sé. Seguro algo aparecerá si caminamos con los ojos abiertos.",
-            confirmationAlternative: "Quiero la caña perfecta.",
-            action: {
-                type: 'choice',
-                onSuccess: {type: 'followAndMove', target: {x: 5, z: 10}, speed: 0.05, smooth: true},
-                onFailure: {
-                    type: 'setConversations',
-                    newConversations: [
-                        {
-                            message: "Quizá tengas razón... pero nunca no encontraremos lo perfecto.",
-                            action: {type: 'move', target: {x: 9, z: 5}, speed: 0.05}
                         }
                     ]
                 }

@@ -66,14 +66,14 @@ const NPC_DATA = {
                           delay: 3000,
                             message: "Me voy al mar!",
                           target: {
-                            x: 12,
-                            z: 12
+                            x: 7,
+                            z: 8
                           },
                           speed: 0.05,
                           nextAction: {
                             type: 'disappear',
-                            delay: 3000,
-                            message: "Time for me to go!"
+                            delay: 500,
+                            message: "Nos vemos!"
                           }
                         },
                         mirrored: false
@@ -174,7 +174,7 @@ const NPC_DATA = {
     },
     'healer_rose': {
         spriteRow: 7,
-        position: {x: 7, z: 11},
+        position: {x: 5, z: 14},
         spawnDelay: 3000,
         patrolType: 'circle',
         idleFrame: 0,
@@ -187,7 +187,7 @@ const NPC_DATA = {
     },
     'guard_tom': {
         spriteRow: 1,
-        position: {x: 10, z: 10},
+        position: {x: 4, z: 14},
         spawnDelay: 1000,
         patrolType: 'square',
         idleFrame: 0,

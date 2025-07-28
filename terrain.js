@@ -22,7 +22,7 @@ class TerrainSystem {
         // Sprite terrain setup
         if (this.useSprites) {
             const loader = new THREE.TextureLoader();
-            this.terrainTexture = loader.load('https://i.imgur.com/NUCD5KN.png');
+            this.terrainTexture = loader.load('https://i.imgur.com/qBGomXL.png');
             this.terrainTexture.magFilter = THREE.NearestFilter;
             this.terrainTexture.minFilter = THREE.NearestFilter;
             this.spriteSize = 96;

@@ -71,7 +71,13 @@ const NPC_DATA = {
                         }]
                     }
                 }
-            },{message: "Here's your share. May fortune favor your travels!", action: {type: 'disappear', delay: 2000}}
+            },
+            {message: "Here's your share. May fortune favor your travels!", action: {
+    type: 'removeObject',
+    position: {x: 6, z: 12},
+    message: "El bote se desvanece misteriosamente..."
+}},
+            {message: "Chau!", action: {type: 'disappear', delay: 100}}
     ]
 },
     'elder_marcus': {
@@ -440,6 +446,48 @@ case 'choice':
             // Mostrar mensaje si se especifica
             if (action.message) {
                 this.game.showMessage(action.message);
+            }
+            
+            this.isExecutingAction = false;
+            break;
+
+        case 'removeObject':
+            console.log(`Removing object at (${action.position.x}, ${action.position.z})`);
+            
+            if (this.game.staticObjects) {
+                // Buscar objeto en la posición especificada
+                const objectIndex = this.game.staticObjects.findIndex(obj => 
+                    obj.pos.x === action.position.x && obj.pos.z === action.position.z
+                );
+                
+                if (objectIndex !== -1) {
+                    const removedObject = this.game.staticObjects[objectIndex];
+                    
+                    // Remover del escena 3D
+                    if (removedObject.sprite) {
+                        this.game.scene.remove(removedObject.sprite);
+                        
+                        // Limpiar recursos
+                        if (removedObject.sprite.material) {
+                            removedObject.sprite.material.dispose();
+                        }
+                        if (removedObject.sprite.geometry) {
+                            removedObject.sprite.geometry.dispose();
+                        }
+                    }
+                    
+                    // Remover de la lista
+                    this.game.staticObjects.splice(objectIndex, 1);
+                    
+                    console.log(`Removed object: ${removedObject.name} from (${action.position.x}, ${action.position.z})`);
+                    
+                    // Mostrar mensaje si se especifica
+                    if (action.message) {
+                        this.game.showMessage(action.message);
+                    }
+                } else {
+                    console.log(`No object found at (${action.position.x}, ${action.position.z})`);
+                }
             }
             
             this.isExecutingAction = false;

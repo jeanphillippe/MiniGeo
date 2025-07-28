@@ -21,7 +21,7 @@ const NPC_DATA = {
                     newConversations: [
                         {
                             message: "Supongo que seguiré esperando...",
-                            action: {type: 'patrol', patrolType: 'none'}
+                            action: {type: 'patrol', patrolType: 'random'}
                         }
                     ]
                 }
@@ -47,32 +47,31 @@ const NPC_DATA = {
             }
         },
         {
-            message: "Mira, una cuerda vieja colgando de ese árbol...",
-            requiresConfirmation: true,
-            confirmationMessage: "Claro, si lo juntas con ese palo, puede ser una caña.",
-            confirmationAlternative: "No parece gran cosa.",
-            action: {
-                type: 'choice',
-                onSuccess: {
-                    type: 'setConversations',
-                    newConversations: [
-                        {
-                            message: "No sabía que podía hacerlo... gracias por no esperar conmigo.",
-                            action: {type: 'camera', preset: 'followPlayer', smooth: true}
-                        }
-                    ]
-                },
-                onFailure: {
-                    type: 'setConversations',
-                    newConversations: [
-                        {
+                message: "Mira, una cuerda vieja colgando de ese árbol...",
+                requiresConfirmation: true,
+                confirmationMessage: "Claro, si lo juntas con ese palo, puede ser una caña.",
+                confirmationAlternative: "No parece gran cosa.",
+                action: {
+                    type: 'choice',
+                    onSuccess: {
+                        type: 'giveObject', // ¡Nueva acción!
+                        template: 'boat1',
+                        position: {x: 6, z: 12},
+                        message: "¡Aquí tienes! No es una caña, pero este bote te será útil.",
+                        mirrored: false
+                    },
+                    onFailure: {
+                        type: 'setConversations',
+                        newConversations: [{
                             message: "Tal vez nada es suficiente después de todo...",
-                            action: {type: 'disappear', delay: 3000}
-                        }
-                    ]
+                            action: {
+                                type: 'disappear',
+                                delay: 3000
+                            }
+                        }]
+                    }
                 }
-            }
-        }
+            },{message: "Here's your share. May fortune favor your travels!", action: {type: 'disappear', delay: 2000}}
     ]
 },
     'elder_marcus': {
@@ -296,51 +295,43 @@ class NPC extends Player {
         }
     }
 
-    interact() {
-        const currentConversation = this.conversations[this.conversationIndex];
-
-        if (currentConversation.requiresConfirmation) {
-             const mockInteractable = {
-            type: 'npc_choice',
-            message: currentConversation.confirmationMessage || "Are you sure you want to continue?",
-            confirmationMessage: currentConversation.confirmationMessage,
-            confirmationAlternative: currentConversation.confirmationAlternative,
-            npcRef: this
+    interact(){
+    const currentConversation=this.conversations[this.conversationIndex];
+    if(currentConversation.requiresConfirmation){
+        const mockInteractable={
+            type:'npc_choice',
+            message: currentConversation.message, // Usar el mensaje de la conversación como título
+            confirmationMessage:currentConversation.confirmationMessage,
+            confirmationAlternative:currentConversation.confirmationAlternative,
+            npcRef:this
         };
-
-             this.game.showConfirmationDialog(mockInteractable, (choiceA) => {
-            if (currentConversation.action && currentConversation.action.type === 'choice') {
-                if (choiceA && currentConversation.action.onSuccess) {
-                    // Ejecuta acción de éxito
+        this.game.showConfirmationDialog(mockInteractable,(choiceA)=>{
+            if(currentConversation.action&&currentConversation.action.type==='choice'){
+                if(choiceA&&currentConversation.action.onSuccess){
                     this.executeAction(currentConversation.action.onSuccess);
-                    // Solo avanza si la acción no cambió las conversaciones
-                    if (currentConversation.action.onSuccess.type !== 'setConversations') {
-                        this.advanceToNextConversation();
+                    if(currentConversation.action.onSuccess.type!=='setConversations'){
+                        this.advanceToNextConversation()
                     }
-                } else if (!choiceA && currentConversation.action.onFailure) {
-                    // Ejecuta acción de fallo
-                    this.executeAction(currentConversation.action.onFailure);
-                    // No avanza conversación si se cambiaron las conversaciones
+                }else if(!choiceA&&currentConversation.action.onFailure){
+                    this.executeAction(currentConversation.action.onFailure)
                 }
-            } else {
-                // Comportamiento normal para confirmaciones simples
-                if (choiceA && currentConversation.action) {
+            }else{
+                if(choiceA&&currentConversation.action){
                     this.executeAction(currentConversation.action);
-                    this.advanceToNextConversation();
+                    this.advanceToNextConversation()
                 }
             }
         });
-
-        return this.message;
+        return null; // Cambiar de this.message a null para no mostrar el toast
     }
-
-        if (currentConversation.action && !this.isExecutingAction) {
-            this.executeAction(currentConversation.action);
-        }
-
-        this.advanceToNextConversation();
-        return currentConversation.message;
+    
+    if(currentConversation.action&&!this.isExecutingAction){
+        this.executeAction(currentConversation.action)
     }
+    
+    this.advanceToNextConversation();
+    return currentConversation.message
+}
 
     advanceToNextConversation() {
         if (this.conversationIndex < this.conversations.length - 1) {
@@ -427,6 +418,32 @@ case 'choice':
                 }
                 this.isExecutingAction = false;
                 break;
+                 case 'giveObject':
+            console.log(`Giving object: ${action.template} at (${action.position.x}, ${action.position.z})`);
+            
+            // Crear el objeto estático
+            const objectId = this.game.staticObjects ? this.game.staticObjects.length : 0;
+            const newObject = new StaticObject(
+                this.game, 
+                action.template, 
+                action.position, 
+                objectId,
+                action.mirrored || false
+            );
+            
+            // Agregarlo a la lista de objetos estáticos
+            if (!this.game.staticObjects) {
+                this.game.staticObjects = [];
+            }
+            this.game.staticObjects.push(newObject);
+            
+            // Mostrar mensaje si se especifica
+            if (action.message) {
+                this.game.showMessage(action.message);
+            }
+            
+            this.isExecutingAction = false;
+            break;
               case 'followAndMove':
     console.log(`Setting camera to follow NPC and moving`);
     // Save the current camera state before switching

@@ -1047,7 +1047,7 @@ setupIntro() {
 getConfirmationMessage(interactable) {
     switch (interactable.type) {
         case 'npc_choice':
-            return '¿Qué eliges?'; // What do you choose?
+            return ''; // What do you choose?
         case 'npc':
             return 'Do you want to talk to this NPC? They might have useful information or quests.';
         case 'npc_confirmation':

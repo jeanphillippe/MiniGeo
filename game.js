@@ -920,6 +920,7 @@ showInteractionMessage(message){
         position: absolute;
         top: 50%;
         left: 50%;
+        font-family:monospace!important;
         transform: translate(-50%, -50%);
         background: rgba(0, 0, 0, 0.95);
         color: white;
@@ -944,7 +945,8 @@ showInteractionMessage(message){
         buttonSection = `
             <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 16px;">
                 <button id="choiceA" style="
-                    background: #43aa8b;
+                    background: rgb(134 134 134);
+                    font-family:monospace;
                     color: white;
                     border: none;
                     padding: 12px 16px;
@@ -956,8 +958,8 @@ showInteractionMessage(message){
                     line-height: 1.3;
                 ">${interactable.confirmationMessage}</button>
                 <button id="choiceB" style="
-                    background: #f3722c;
-                    color: white;
+                    background: rgb(134 134 134);
+                    color: white;font-family:monospace;
                     border: none;
                     padding: 12px 16px;
                     border-radius: 6px;
@@ -999,7 +1001,7 @@ showInteractionMessage(message){
 
     dialog.innerHTML = `
         <div style="font-size: 16px; margin-bottom: 16px; line-height: 1.4;">
-            <strong>${interactable.message || interactable.name || 'NPC'}</strong>
+            <strong style="max-width: 420px;width: 90%;display: block;margin: auto;">${interactable.message || interactable.name || 'NPC'}</strong>
             <div style="margin-top: 8px; font-size: 14px; opacity: 0.9;">
                 ${message}
             </div>

@@ -122,7 +122,15 @@ const NPC_DATA = {
         idleFrame: 0,
         name: 'Merchant Sara',
         conversations: [
-            {message: "Welcome to my shop! I have the finest wares in the land.", action: null},
+            {message: "Welcome to my shop! I have the finest wares in the land.", action: {
+            type: 'patrolnpc',
+            npcId: 'scout_mike',
+            message: 'I called Scout Mike',
+            delay:2700,
+            patrolType: 'circle',
+            centerX: 4,  // merchant_sara's position
+            centerZ: 13
+        } },
             {message: "Hmm, you look like someone who appreciates quality. Follow me to my secret stash.", action: {type: 'move', target: {x: 12, z: 8}, speed: 0.05}},
             {message: "Here are my rarest items. Choose wisely, traveler.", action: {type: 'camera', preset: 'overview', requiresConfirmation: false, smooth: true}}
         ]
@@ -409,7 +417,41 @@ class NPC extends Player {
                 };
             });
             break;
+case 'movenpc':
+    console.log(`Moving NPC ${action.npcId} to (${action.target.x}, ${action.target.z})`);
+    const targetNPC = this.game.npcs.find(npc => npc.npcId === action.npcId);
+    if (targetNPC) {
+        targetNPC.isPatrolling = false;
+        targetNPC.speed = action.speed || targetNPC.speed;
+        targetNPC.findPath(targetNPC.pos, action.target, (path) => {
+            targetNPC.path = path;
+            targetNPC.progress = 0;
+        });
+        console.log(`Successfully moved ${action.npcId} to target position`);
+    } else {
+        console.log(`NPC ${action.npcId} not found`);
+    }
+    executeNextAction();
+    break;
 
+case 'patrolnpc':
+    console.log(`Setting NPC ${action.npcId} to patrol ${action.patrolType} at (${action.centerX}, ${action.centerZ})`);
+    const patrolNPC = this.game.npcs.find(npc => npc.npcId === action.npcId);
+    if (patrolNPC) {
+        patrolNPC.patrolType = action.patrolType;
+        patrolNPC.patrolPath = action.patrolType !== 'none' ? 
+            patrolNPC.generatePatrolPath(action.patrolType, action.centerX, action.centerZ) : [];
+        patrolNPC.isPatrolling = action.patrolType !== 'none';
+        patrolNPC.patrolIndex = 0;
+        if (patrolNPC.isPatrolling) {
+            patrolNPC.startPatrol();
+        }
+        console.log(`Successfully set ${action.npcId} to patrol ${action.patrolType}`);
+    } else {
+        console.log(`NPC ${action.npcId} not found`);
+    }
+    executeNextAction();
+    break;
         case 'choice':
             executeNextAction(); // Immediately proceed to next action for choice type
             break;

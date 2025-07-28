@@ -2,9 +2,9 @@
 const NPC_DATA = {
     'trader_jack': {
     spriteRow: 2,
-    position: {x: 3, z: 8},
+    position: {x: 9, z: 5},
     spawnDelay: 1500,
-    patrolType: 'line',
+    patrolType: 'none',
     idleFrame: 0,
     name: 'Juan Pescador',
     conversations: [
@@ -15,7 +15,7 @@ const NPC_DATA = {
             confirmationAlternative: "Esperemos un poco más.",
             action: {
                 type: 'choice',
-                onSuccess: {type: 'followAndMove', target: {x: 7, z: 5}, speed: 0.05},
+                onSuccess: {type: 'followAndMove', target: {x: 10, z: 10}, speed: 0.05},
                 onFailure: {
                     type: 'setConversations',
                     newConversations: [
@@ -34,13 +34,13 @@ const NPC_DATA = {
             confirmationAlternative: "Quiero la caña perfecta.",
             action: {
                 type: 'choice',
-                onSuccess: {type: 'followAndMove', target: {x: 4, z: 12}, speed: 0.05, smooth: true},
+                onSuccess: {type: 'followAndMove', target: {x: 5, z: 10}, speed: 0.05, smooth: true},
                 onFailure: {
                     type: 'setConversations',
                     newConversations: [
                         {
-                            message: "Quizá tengas razón... pero no encontraremos lo perfecto.",
-                            action: {type: 'move', target: {x: 3, z: 8}, speed: 0.05}
+                            message: "Quizá tengas razón... pero nunca no encontraremos lo perfecto.",
+                            action: {type: 'move', target: {x: 9, z: 5}, speed: 0.05}
                         }
                     ]
                 }
@@ -56,8 +56,19 @@ const NPC_DATA = {
                     onSuccess: {
                         type: 'giveObject', // ¡Nueva acción!
                         template: 'boat1',
-                        position: {x: 6, z: 12},
+                        position: {x: 7, z: 8},
                         message: "Gracias por creen en mí. No sabía que podía hacerlo.",
+                          nextAction: {
+                type: 'followAndMove',
+                target: {x: 12, z: 12},
+                speed: 0.05,
+                
+                nextAction: {
+            type: 'disappear',
+            delay: 3000,
+            message: "Time for me to go!"
+        }
+            },
                         mirrored: false
                     },
                     onFailure: {
@@ -102,7 +113,7 @@ const NPC_DATA = {
     },
     'merchant_sara': {
         spriteRow: 6,
-        position: {x: 9, z: 5},
+        position: {x: 4, z: 13},
         spawnDelay: 2000,
         patrolType: 'none',
         idleFrame: 0,
@@ -115,7 +126,7 @@ const NPC_DATA = {
     },
     'merchant_mara': {
         spriteRow: 7,
-        position: {x: 1, z: 5},
+        position: {x: 4, z: 12},
         spawnDelay: 2000,
         patrolType: 'none',
         idleFrame: 0,
@@ -128,7 +139,7 @@ const NPC_DATA = {
     },
     'wise_elena': {
         spriteRow: 5,
-        position: {x: 5, z: 5},
+        position: {x: 5, z: 12},
         spawnDelay: 2000,
         patrolType: 'none',
         idleFrame: 0,
@@ -243,8 +254,8 @@ const STATIC_OBJECT_INSTANCES = [
     {template: 'mountain', position: {x: 13, z: 1}},
     {template: 'crate', position: {x: 12, z: 11}},
     {template: 'campfire', position: {x: 11, z: 6}, belowPlayer: true},
-    {template: 'boat1', position: {x: 7, z: 8}},
-    {template: 'boat2', position: {x: 7, z: 7}},
+    //{template: 'boat1', position: {x: 7, z: 8}},
+    //{template: 'boat2', position: {x: 7, z: 7}},
     {template: 'table', position: {x: 7, z: 6}, belowPlayer: true},
     {template: 'bush', position: {x: 7, z: 2}},
     {template: 'darkbush', position: {x: 5, z: 10}},
@@ -351,127 +362,120 @@ class NPC extends Player {
     }
 
     executeAction(action) {
-        console.log(`Executing action: ${action.type}`, action);
-        this.isExecutingAction = true;
-
-        switch (action.type) {
-            case 'move':
-                console.log(`Moving from (${this.pos.x}, ${this.pos.z}) to (${action.target.x}, ${action.target.z})`);
-                this.isPatrolling = false;
-                this.speed = action.speed || this.speed;
-                this.findPath(this.pos, action.target, (path) => {
-                    console.log(`Path found with ${path.length} steps:`, path);
-                    this.path = path;
-                    this.progress = 0;
-                    this.onReachTarget = () => {
-                        console.log(`Reached target at (${this.pos.x}, ${this.pos.z})`);
-                        this.isExecutingAction = false;
-                        this.onReachTarget = null;
-                    };
-                });
-                break;
-case 'choice':
-            // No hace nada aquí, la lógica está en interact()
+    console.log(`Executing action: ${action.type}`, action);
+    this.isExecutingAction = true;
+    
+    // Helper function to execute the next action in chain
+    const executeNextAction = () => {
+        if (action.nextAction) {
+            console.log('Executing chained action:', action.nextAction);
+            this.executeAction(action.nextAction);
+        } else {
             this.isExecutingAction = false;
+        }
+    };
+
+    // Show message for this action if it has one
+    if (action.message) {
+        this.game.showMessage(action.message);
+    }
+
+    switch (action.type) {
+        case 'move':
+            console.log(`Moving from (${this.pos.x}, ${this.pos.z}) to (${action.target.x}, ${action.target.z})`);
+            this.isPatrolling = false;
+            this.speed = action.speed || this.speed;
+            this.findPath(this.pos, action.target, (path) => {
+                console.log(`Path found with ${path.length} steps:`, path);
+                this.path = path;
+                this.progress = 0;
+                this.onReachTarget = () => {
+                    console.log(`Reached target at (${this.pos.x}, ${this.pos.z})`);
+                    this.onReachTarget = null;
+                    executeNextAction(); // Execute next action after reaching target
+                };
+            });
             break;
-             case 'setConversations':
-            // Cambia dinámicamente las conversaciones disponibles
+
+        case 'choice':
+            executeNextAction(); // Immediately proceed to next action for choice type
+            break;
+
+        case 'setConversations':
             if (action.newConversations && action.newConversations.length > 0) {
                 this.conversations = action.newConversations;
                 this.conversationIndex = 0;
                 this.message = this.conversations[0].message;
                 console.log(`Updated conversations for ${this.name}:`, this.conversations);
             }
-            this.isExecutingAction = false;
+            executeNextAction();
             break;
-            case 'moveAndCamera':
-                console.log(`Changing camera then moving`);
-                this.game.setCameraPreset(action.cameraPreset, action.smooth !== false, () => {
-                    console.log(`Camera changed, now moving`);
-                    this.isPatrolling = false;
-                    this.speed = action.speed || this.speed;
-                    this.findPath(this.pos, action.target, (path) => {
-                        this.path = path;
-                        this.progress = 0;
-                        this.onReachTarget = () => {
-                            console.log(`Reached target after camera change`);
-                            this.isExecutingAction = false;
-                            this.onReachTarget = null;
-                        };
-                    });
+
+        case 'moveAndCamera':
+            console.log(`Changing camera then moving`);
+            this.game.setCameraPreset(action.cameraPreset, action.smooth !== false, () => {
+                console.log(`Camera changed, now moving`);
+                this.isPatrolling = false;
+                this.speed = action.speed || this.speed;
+                this.findPath(this.pos, action.target, (path) => {
+                    this.path = path;
+                    this.progress = 0;
+                    this.onReachTarget = () => {
+                        console.log(`Reached target after camera change`);
+                        this.onReachTarget = null;
+                        executeNextAction();
+                    };
                 });
-                break;
+            });
+            break;
 
-            case 'camera':
-                console.log(`Changing camera to: ${action.preset}`);
-                const existingDialog = document.getElementById('confirmationDialog');
-                if (existingDialog) existingDialog.remove();
-                const npcDialog = document.getElementById('npcQuestionDialog');
-                if (npcDialog) npcDialog.remove();
+        case 'camera':
+            console.log(`Changing camera to: ${action.preset}`);
+            const existingDialog = document.getElementById('confirmationDialog');
+            if (existingDialog) existingDialog.remove();
+            const npcDialog = document.getElementById('npcQuestionDialog');
+            if (npcDialog) npcDialog.remove();
+            setTimeout(() => {
+                this.game.setCameraPreset(action.preset, action.smooth !== false, () => {
+                    console.log(`Camera preset '${action.preset}' applied`);
+                    executeNextAction();
+                });
+            }, 100);
+            break;
 
-                setTimeout(() => {
-                    this.game.setCameraPreset(action.preset, action.smooth !== false, () => {
-                        console.log(`Camera preset '${action.preset}' applied`);
-                        this.isExecutingAction = false;
-                    });
-                }, 100);
-                break;
+        case 'patrol':
+            console.log(`Changing patrol type to: ${action.patrolType}`);
+            this.patrolType = action.patrolType;
+            this.patrolPath = action.patrolType !== 'none' ? 
+                this.generatePatrolPath(action.patrolType, this.pos.x, this.pos.z) : [];
+            this.isPatrolling = action.patrolType !== 'none';
+            this.patrolIndex = 0;
+            if (this.isPatrolling) {
+                this.startPatrol();
+            }
+            executeNextAction();
+            break;
 
-            case 'patrol':
-                console.log(`Changing patrol type to: ${action.patrolType}`);
-                this.patrolType = action.patrolType;
-                this.patrolPath = action.patrolType !== 'none' ? this.generatePatrolPath(action.patrolType, this.pos.x, this.pos.z) : [];
-                this.isPatrolling = action.patrolType !== 'none';
-                this.patrolIndex = 0;
-                if (this.isPatrolling) {
-                    this.startPatrol();
-                }
-                this.isExecutingAction = false;
-                break;
-                 case 'giveObject':
+        case 'giveObject':
             console.log(`Giving object: ${action.template} at (${action.position.x}, ${action.position.z})`);
-            
-            // Crear el objeto estático
             const objectId = this.game.staticObjects ? this.game.staticObjects.length : 0;
-            const newObject = new StaticObject(
-                this.game, 
-                action.template, 
-                action.position, 
-                objectId,
-                action.mirrored || false
-            );
-            
-            // Agregarlo a la lista de objetos estáticos
+            const newObject = new StaticObject(this.game, action.template, action.position, objectId, action.mirrored || false);
             if (!this.game.staticObjects) {
                 this.game.staticObjects = [];
             }
             this.game.staticObjects.push(newObject);
-            
-            // Mostrar mensaje si se especifica
-            if (action.message) {
-                this.game.showMessage(action.message);
-            }
-            
-            this.isExecutingAction = false;
+            executeNextAction();
             break;
 
         case 'removeObject':
             console.log(`Removing object at (${action.position.x}, ${action.position.z})`);
-            
             if (this.game.staticObjects) {
-                // Buscar objeto en la posición especificada
                 const objectIndex = this.game.staticObjects.findIndex(obj => 
-                    obj.pos.x === action.position.x && obj.pos.z === action.position.z
-                );
-                
+                    obj.pos.x === action.position.x && obj.pos.z === action.position.z);
                 if (objectIndex !== -1) {
                     const removedObject = this.game.staticObjects[objectIndex];
-                    
-                    // Remover del escena 3D
                     if (removedObject.sprite) {
                         this.game.scene.remove(removedObject.sprite);
-                        
-                        // Limpiar recursos
                         if (removedObject.sprite.material) {
                             removedObject.sprite.material.dispose();
                         }
@@ -479,118 +483,104 @@ case 'choice':
                             removedObject.sprite.geometry.dispose();
                         }
                     }
-                    
-                    // Remover de la lista
                     this.game.staticObjects.splice(objectIndex, 1);
-                    
                     console.log(`Removed object: ${removedObject.name} from (${action.position.x}, ${action.position.z})`);
-                    
-                    // Mostrar mensaje si se especifica
-                    if (action.message) {
-                        this.game.showMessage(action.message);
-                    }
                 } else {
                     console.log(`No object found at (${action.position.x}, ${action.position.z})`);
                 }
             }
-            
-            this.isExecutingAction = false;
+            executeNextAction();
             break;
-              case 'followAndMove':
-    console.log(`Setting camera to follow NPC and moving`);
-    // Save the current camera state before switching
-    this.game.cameraSystem.saveInitialCameraState();
-    // Set the NPC as the follow target
-    this.game.cameraSystem.setFollowTarget(this);
-    // Switch to follow camera mode
-    this.game.setCameraPreset('followAndMove',action.smooth!==!1,()=>{
-        console.log(`Camera now following NPC, starting movement`);
-        this.isPatrolling=!1;
-        this.speed=action.speed||this.speed;
-        this.findPath(this.pos,action.target,(path)=>{
-            this.path=path;
-            this.progress=0;
-            this.onReachTarget=()=>{
-                console.log(`NPC reached target, restoring to initial camera state`);
-                this.game.cameraSystem.clearFollowTarget();
-                this.game.cameraSystem.restoreToInitialState(!0,()=>{
-                    this.isExecutingAction=!1;
-                    this.onReachTarget=null;
+
+        case 'followAndMove':
+            console.log(`Setting camera to follow NPC and moving`);
+            this.game.cameraSystem.saveInitialCameraState();
+            this.game.cameraSystem.setFollowTarget(this);
+            this.game.setCameraPreset('followAndMove', action.smooth !== false, () => {
+                console.log(`Camera now following NPC, starting movement`);
+                this.isPatrolling = false;
+                this.speed = action.speed || this.speed;
+                this.findPath(this.pos, action.target, (path) => {
+                    this.path = path;
+                    this.progress = 0;
+                    this.onReachTarget = () => {
+                        console.log(`NPC reached target, restoring to initial camera state`);
+                        this.game.cameraSystem.clearFollowTarget();
+                        this.game.cameraSystem.restoreToInitialState(true, () => {
+                            this.onReachTarget = null;
+                            executeNextAction();
+                        });
+                    };
                 });
-            };
-        });
-    });
-    break;
-                
-            case 'drop':
-                console.log(`Dropping in ${action.delay || 0}ms`);
-                setTimeout(() => {
-                    this.isInteractable = false;
-                    this.isPatrolling = false;
-                    if (this.sprite) {
-                        let velocity = 0;
-                        const gravity = 0.01;
-                        const rotationSpeed = 0.01;
-                        const startY = this.sprite.position.y;
+            });
+            break;
 
-                        const dropAnimation = () => {
-                            if (!this.sprite.material) return;
-                            velocity += gravity;
-                            this.sprite.position.y -= velocity;
-                            this.sprite.rotation.z += rotationSpeed;
+        case 'drop':
+            console.log(`Dropping in ${action.delay || 0}ms`);
+            setTimeout(() => {
+                this.isInteractable = false;
+                this.isPatrolling = false;
+                if (this.sprite) {
+                    let velocity = 0;
+                    const gravity = 0.01;
+                    const rotationSpeed = 0.01;
+                    const startY = this.sprite.position.y;
+                    const dropAnimation = () => {
+                        if (!this.sprite.material) return;
+                        velocity += gravity;
+                        this.sprite.position.y -= velocity;
+                        this.sprite.rotation.z += rotationSpeed;
+                        if (this.sprite.position.y < startY - 3) {
+                            this.sprite.material.opacity = Math.max(0, this.sprite.material.opacity - 0.02);
+                        }
+                        if (this.sprite.position.y < startY - 8 || this.sprite.material.opacity <= 0) {
+                            this.game.scene.remove(this.sprite);
+                            this.game.interactables = this.game.interactables.filter(interactable => interactable.npcRef !== this);
+                            executeNextAction();
+                            console.log('NPC dropped out of sight');
+                        } else {
+                            requestAnimationFrame(dropAnimation);
+                        }
+                    };
+                    this.sprite.material.transparent = true;
+                    dropAnimation();
+                } else {
+                    executeNextAction();
+                    console.log('NPC dropped (no sprite)');
+                }
+            }, action.delay || 0);
+            break;
 
-                            if (this.sprite.position.y < startY - 3) {
-                                this.sprite.material.opacity = Math.max(0, this.sprite.material.opacity - 0.02);
-                            }
+        case 'disappear':
+            console.log(`Disappearing in ${action.delay || 0}ms`);
+            setTimeout(() => {
+                this.isInteractable = false;
+                this.isPatrolling = false;
+                if (this.sprite) {
+                    const fadeOut = () => {
+                        if (!this.sprite.material) return;
+                        this.sprite.material.opacity -= 0.05;
+                        if (this.sprite.material.opacity <= 0) {
+                            this.game.scene.remove(this.sprite);
+                            this.game.interactables = this.game.interactables.filter(interactable => interactable.npcRef !== this);
+                            executeNextAction();
+                            console.log('NPC disappeared');
+                        } else {
+                            requestAnimationFrame(fadeOut);
+                        }
+                    };
+                    this.sprite.material.transparent = true;
+                    fadeOut();
+                } else {
+                    executeNextAction();
+                    console.log('NPC disappeared (no sprite)');
+                }
+            }, action.delay || 0);
+            break;
 
-                            if (this.sprite.position.y < startY - 8 || this.sprite.material.opacity <= 0) {
-                                this.game.scene.remove(this.sprite);
-                                this.game.interactables = this.game.interactables.filter(interactable => interactable.npcRef !== this);
-                                this.isExecutingAction = false;
-                                console.log('NPC dropped out of sight');
-                            } else {
-                                requestAnimationFrame(dropAnimation);
-                            }
-                        };
-
-                        this.sprite.material.transparent = true;
-                        dropAnimation();
-                    } else {
-                        this.isExecutingAction = false;
-                        console.log('NPC dropped (no sprite)');
-                    }
-                }, action.delay || 0);
-                break;
-
-            case 'disappear':
-                console.log(`Disappearing in ${action.delay || 0}ms`);
-                setTimeout(() => {
-                    this.isInteractable = false;
-                    this.isPatrolling = false;
-                    if (this.sprite) {
-                        const fadeOut = () => {
-                            if (!this.sprite.material) return;
-                            this.sprite.material.opacity -= 0.05;
-                            if (this.sprite.material.opacity <= 0) {
-                                this.game.scene.remove(this.sprite);
-                                this.game.interactables = this.game.interactables.filter(interactable => interactable.npcRef !== this);
-                                this.isExecutingAction = false;
-                                console.log('NPC disappeared');
-                            } else {
-                                requestAnimationFrame(fadeOut);
-                            }
-                        };
-
-                        this.sprite.material.transparent = true;
-                        fadeOut();
-                    } else {
-                        this.isExecutingAction = false;
-                        console.log('NPC disappeared (no sprite)');
-                    }
-                }, action.delay || 0);
-                break;
-        }
     }
+}
+
 
     update() {
         if (!this.isPatrolling && !this.isExecutingAction) return;

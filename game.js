@@ -859,39 +859,52 @@ setupIntro() {
         }
     }
 
-    showInteractionMessage(message) {
-        const overlay = document.createElement('div');
-        overlay.style.cssText = `
-            position: absolute;
-            top: 20%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.9);
-            color: white;
-            padding: 16px 24px;
-            border-radius: 8px;
-            font-size: 14px;
-            z-index: 200;
-            animation: fadeInOut 3s ease forwards;
-        `;
-        overlay.textContent = message;
-        
-        if (!document.getElementById('interactionStyles')) {
-            const style = document.createElement('style');
-            style.id = 'interactionStyles';
-            style.textContent = `
-                @keyframes fadeInOut {
-                    0% { opacity: 0; transform: translate(-50%, -50%) translateY(20px); }
-                    20%, 80% { opacity: 1; transform: translate(-50%, -50%) translateY(0); }
-                    100% { opacity: 0; transform: translate(-50%, -50%) translateY(-20px); }
-                }
-            `;
-            document.head.appendChild(style);
-        }
-        
-        document.body.appendChild(overlay);
-        setTimeout(() => overlay.remove(), 3000);
+    
+showInteractionMessage(message){
+    // Ocultar tooltips mientras se muestra el toast
+    const tooltipContainer = document.getElementById('tooltipContainer');
+    if (tooltipContainer) {
+        tooltipContainer.style.display = 'none';
     }
+    
+    const overlay=document.createElement('div');
+    overlay.style.cssText=`
+        position: absolute;
+        top: 20%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.9);
+        color: white;
+        padding: 16px 24px;
+        border-radius: 8px;
+        font-size: 14px;
+        z-index: 200;
+        animation: fadeInOut 3s ease forwards;
+    `;
+    overlay.textContent=message;
+    
+    if(!document.getElementById('interactionStyles')){
+        const style=document.createElement('style');
+        style.id='interactionStyles';
+        style.textContent=`
+            @keyframes fadeInOut {
+                0% { opacity: 0; transform: translate(-50%, -50%) translateY(20px); }
+                20%, 80% { opacity: 1; transform: translate(-50%, -50%) translateY(0); }
+                100% { opacity: 0; transform: translate(-50%, -50%) translateY(-20px); }
+            }
+        `;
+        document.head.appendChild(style)
+    }
+    
+    document.body.appendChild(overlay);
+    setTimeout(() => {
+        overlay.remove();
+        // Restaurar tooltips después del toast
+        if (tooltipContainer) {
+            tooltipContainer.style.display = '';
+        }
+    }, 3000)
+}
 
     showMessage(text) {
         this.showInteractionMessage(text);

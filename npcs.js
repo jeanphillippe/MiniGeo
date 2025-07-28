@@ -11,11 +11,11 @@ const NPC_DATA = {
         {
             message: "Antes tenía una caña de pescar... Alguien me la pidió prestada y nunca volvió.",
             requiresConfirmation: true,
-            confirmationMessage: "Vamos a buscar algo útil.",
+            confirmationMessage: "¿Y si buscamos con qué hacer otra?",
             confirmationAlternative: "Esperemos un poco más.",
             action: {
                 type: 'choice',
-                onSuccess: {type: 'move', target: {x: 7, z: 5}, speed: 0.045},
+                onSuccess: {type: 'followAndMove', target: {x: 7, z: 5}, speed: 0.05},
                 onFailure: {
                     type: 'setConversations',
                     newConversations: [
@@ -28,18 +28,18 @@ const NPC_DATA = {
             }
         },
         {
-            message: "Y qué buscas exactamente?",
+            message: "¿Qué buscamos exactamente?",
             requiresConfirmation: true,
-            confirmationMessage: "No lo sé. Pero algo aparecerá si camino con los ojos abiertos.",
-            confirmationAlternative: "Quiero encontrar la caña perfecta.",
+            confirmationMessage: "No lo sé. Pero algo aparecerá si caminamos con los ojos abiertos.",
+            confirmationAlternative: "Quiero la caña perfecta.",
             action: {
                 type: 'choice',
-                onSuccess: {type: 'followAndMove', target: {x: 4, z: 12}, speed: 0.04, smooth: true},
+                onSuccess: {type: 'followAndMove', target: {x: 4, z: 12}, speed: 0.05, smooth: true},
                 onFailure: {
                     type: 'setConversations',
                     newConversations: [
                         {
-                            message: "Quizá tenías razón... pero no encontraremos lo perfecto.",
+                            message: "Quizá tengas razón... pero no encontraremos lo perfecto.",
                             action: {type: 'move', target: {x: 3, z: 8}, speed: 0.05}
                         }
                     ]
@@ -49,15 +49,15 @@ const NPC_DATA = {
         {
                 message: "Mira, una cuerda vieja colgando de ese árbol...",
                 requiresConfirmation: true,
-                confirmationMessage: "Claro, si lo juntas con ese palo, puede ser una caña.",
-                confirmationAlternative: "No parece gran cosa.",
+                confirmationMessage: "Hey si lo juntas con ese palo, puede ser una caña!",
+                confirmationAlternative: "No parece gran cosa. No creo que sirva",
                 action: {
                     type: 'choice',
                     onSuccess: {
                         type: 'giveObject', // ¡Nueva acción!
                         template: 'boat1',
                         position: {x: 6, z: 12},
-                        message: "¡Aquí tienes! No es una caña, pero este bote te será útil.",
+                        message: "Gracias por creen en mí. No sabía que podía hacerlo.",
                         mirrored: false
                     },
                     onFailure: {

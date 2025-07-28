@@ -161,19 +161,143 @@ const NPC_DATA = {
             {message: "This place holds ancient magic. Use it wisely.", action: {type: 'patrol', patrolType: 'circle'}}
         ]
     },
-    'scout_mike': {
-        spriteRow: 4,
-        position: {x: 14, z: 2},
-        spawnDelay: 0,
-        patrolType: 'random',
-        idleFrame: 0,
-        name: 'Scout Mike',
-        conversations: [
-            {message: "I've been watching the perimeter. Strange movements in the eastern woods.", action: null},
-            {message: "Come, I'll show you the patrol route. Stay close and stay quiet.", action: {type: 'move', target: {x: 10, z: 6}, speed: 0.05}},
-            {message: "From here you can see the entire valley. Remember this vantage point.", action: {type: 'patrol', patrolType: 'random'}}
-        ]
-    },
+
+'scout_mike': {
+    spriteRow: 4,
+    position: {x: 14, z: 2},
+    spawnDelay: 0,
+    patrolType: 'none',
+    idleFrame: 0,
+    name: 'Donatello',
+    conversations: [
+        {
+            message: "Hola, viajero. Veo a Veloz allá. Debería ir a hablar con él sobre el camino hacia la bandera...",
+            action: {
+                type: 'move',
+                target: {x: 8, z: 5},
+                speed: 0.04
+            }
+        },
+        {
+            message: "Veloz, ¿también vas hacia la bandera? Veo que tienes prisa como siempre... No compito contigo. Yo solo quiero llegar y disfrutar el camino.",
+            requiresConfirmation: true,
+            confirmationMessage: "Seguir a Donatello (el constante)",
+            confirmationAlternative: "Seguir a Veloz (el rápido)",
+            action: {
+                type: 'choice',
+                onSuccess: {
+                    type: 'followAndMove',
+                    target: {x: 10, z: 8},
+                    speed: 0.03,
+                    delay: 2000,
+                    message: "Llevo agua, comida... No corro, me preparo. Cuando Veloz se canse, yo seguiré.",
+                    nextAction: {
+                        type: 'followAndMove',
+                        target: {x: 8, z: 12},
+                        speed: 0.03,
+                        delay: 3000,
+                        message: "Mira, Veloz ya está descansando bajo el árbol. Yo continúo...",
+                        nextAction: {
+                            type: 'followAndMove',
+                            target: {x: 14, z: 12},
+                            speed: 0.03,
+                            delay: 2000,
+                            message: "Llegué primero. No porque sea rápido, sino porque nunca me detuve."
+                        }
+                    }
+                },
+                onFailure: {
+                    type: 'setConversations',
+                    newConversations: [
+                        {
+                            message: "Está bien, ve con Veloz. Verás que la velocidad sin constancia no sirve.",
+                            action: {
+                                type: 'move',
+                                target: {x: 14, z: 12},
+                                speed: 0.03
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+},
+
+'guard_tom': {
+    spriteRow: 1,
+    position: {x: 8, z: 5},
+    spawnDelay: 1000,
+    patrolType: 'none',
+    idleFrame: 0,
+    name: 'Veloz',
+    conversations: [
+        {
+            message: "Hola viajero. Veo a Donatello allá lejos con su mochila pesada. Espera, voy a llamarlo para hablar sobre la carrera...",
+            action: {
+                type: 'patrolnpc',
+
+            npcId: 'scout_mike',
+            message: 'I called Scout Mike',
+            delay:700,
+            patrolType: null,
+            centerX: 7, 
+            centerZ: 5,
+                speed: 0.04,
+                delay: 3000  // Wait 3 seconds for Donatello to arrive
+            }
+        },
+        {
+            message: "¡Donatello! ¿También vas hacia la bandera? Con esas piernitas y esa mochila no vas a llegar antes de mañana. La bandera al final del camino. ¿Quién llega primero? Esto será rápido... para mí.",
+            requiresConfirmation: true,
+            confirmationMessage: "Seguir a Veloz (el rápido)",
+            confirmationAlternative: "Seguir a Donatello (el constante)",
+            action: {
+                type: 'choice',
+                onSuccess: {
+                    type: 'followAndMove',
+                    target: {x: 6, z: 8},
+                    speed: 0.08,
+                    delay: 1000,
+                    message: "¡Fácil! Me sobran piernas. ¡Mírame correr hacia el árbol!",
+                    nextAction: {
+                        type: 'followAndMove',
+                        target: {x: 8, z: 12},
+                        speed: 0.08,
+                        delay: 1500,
+                        message: "Voy tan adelantado... que puedo darme el lujo de descansar aquí.",
+                        nextAction: {
+                            type: 'patrol',
+                            patrolType: 'none',
+                            delay: 8000,
+                            message: "¡No puede ser...! ¿Cómo me ganó Donatello? ¡Él nunca se detuvo!",
+                            nextAction: {
+                                type: 'move',
+                                target: {x: 14, z: 12},
+                                speed: 0.06,
+                                delay: 1000,
+                                message: "He aprendido que la velocidad sin constancia no sirve de nada..."
+                            }
+                        }
+                    }
+                },
+                onFailure: {
+                    type: 'setConversations',
+                    newConversations: [
+                        {
+                            message: "Está bien, sigue a la tortuga. Pero yo llegaré primero de todas formas.",
+                            action: {
+                                type: 'move',
+                                target: {x: 14, z: 12},
+                                speed: 0.07
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+},
     'healer_rose': {
         spriteRow: 7,
         position: {x: 5, z: 14},
@@ -187,19 +311,7 @@ const NPC_DATA = {
             {message: "These plants will serve you well on your journey. May they keep you safe.", action: {type: 'patrol', patrolType: 'line'}}
         ]
     },
-    'guard_tom': {
-        spriteRow: 1,
-        position: {x: 4, z: 14},
-        spawnDelay: 1000,
-        patrolType: 'square',
-        idleFrame: 0,
-        name: 'Guard Tom',
-        conversations: [
-            {message: "Halt! State your business in these lands.", action: null},
-            {message: "Very well. But I must escort you to the checkpoint for verification.", action: {type: 'move', target: {x: 13, z: 13}, speed: 0.055}},
-            {message: "You check out. But remember - I'll be watching.", action: {type: 'patrol', patrolType: 'square'}}
-        ]
-    },
+   
     'trader_jill': {
         spriteRow: 3,
         position: {x: 13, z: 8},
@@ -685,6 +797,7 @@ case 'patrolnpc':
     // Unified patrol path generation
     generatePatrolPath(type, centerX, centerZ) {
         const generators = {
+             null: () => [{x: centerX, z: centerZ}],
             circle: () => [
                 {x: centerX + 1, z: centerZ - 1}, {x: centerX + 1, z: centerZ}, {x: centerX + 1, z: centerZ + 1},
                 {x: centerX, z: centerZ + 1}, {x: centerX - 1, z: centerZ + 1}, {x: centerX - 1, z: centerZ},

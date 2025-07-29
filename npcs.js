@@ -162,62 +162,97 @@ const NPC_DATA = {
         ]
     },
 
-'scout_mike': {
+    'scout_mike': {
     spriteRow: 4,
-    position: {x: 14, z: 2},
+    position: {x: 12, z: 1},
     spawnDelay: 0,
     patrolType: 'none',
     idleFrame: 0,
     name: 'Donatello',
     conversations: [
         {
-            message: "Hola, viajero. Veo a Veloz allá. Debería ir a hablar con él sobre el camino hacia la bandera...",
+            message: "Hola, viajero. Veo a Veloz allá. Deberíamos hablar sobre quién llega primero a la bandera...",
             action: {
-                type: 'move',
-                target: {x: 8, z: 5},
+                type: 'patrolnpc',
+                npcId: 'guard_tom',
+                message: 'Donatello llama a Veloz',
+                delay: 500,
+                patrolType: null,
+                centerX: 14,
+                centerZ: 4,
                 speed: 0.04
             }
         },
         {
-            message: "Veloz, ¿también vas hacia la bandera? Veo que tienes prisa como siempre... No compito contigo. Yo solo quiero llegar y disfrutar el camino.",
+            message: "Veloz, ¿también vas hacia la bandera? No tengo prisa, pero siempre llego. ¿Quieres hacer una carrera?",
             requiresConfirmation: true,
-            confirmationMessage: "Seguir a Donatello (el constante)",
-            confirmationAlternative: "Seguir a Veloz (el rápido)",
+            confirmationMessage: "Ver la carrera siguiendo a Donatello",
+            confirmationAlternative: "Ver la carrera siguiendo a Veloz",
             action: {
                 type: 'choice',
                 onSuccess: {
-                    type: 'followAndMove',
-                    target: {x: 10, z: 8},
+                    type: 'move',
+                    target: {x: 14, z: 7},
                     speed: 0.03,
-                    delay: 2000,
-                    message: "Llevo agua, comida... No corro, me preparo. Cuando Veloz se canse, yo seguiré.",
+                    delay: 800,
+                    message: "Voy paso a paso, pero nunca me detengo.",
                     nextAction: {
-                        type: 'followAndMove',
-                        target: {x: 8, z: 12},
-                        speed: 0.03,
-                        delay: 3000,
-                        message: "Mira, Veloz ya está descansando bajo el árbol. Yo continúo...",
+                        type: 'patrolnpc',
+                        npcId: 'guard_tom',
+                        message: 'Veloz corre adelante',
+                        delay: 300,
+                        patrolType: null,
+                        centerX: 12,
+                        centerZ: 8,
+                        speed: 0.08,
                         nextAction: {
-                            type: 'followAndMove',
-                            target: {x: 14, z: 12},
+                            type: 'move',
+                            target: {x: 13, z: 9},
                             speed: 0.03,
-                            delay: 2000,
-                            message: "Llegué primero. No porque sea rápido, sino porque nunca me detuve."
+                            delay: 2500,
+                            message: "Mira, Veloz ya se adelantó mucho... pero sigo mi ritmo.",
+                            nextAction: {
+                                type: 'patrolnpc',
+                                npcId: 'guard_tom',
+                                message: 'Veloz se detiene a descansar',
+                                delay: 800,
+                                patrolType: 'none',
+                                centerX: 12,
+                                centerZ: 8,
+                                speed: 0,
+                                nextAction: {
+                                    type: 'move',
+                                    target: {x: 14, z: 12},
+                                    speed: 0.03,
+                                    delay: 4000,
+                                    message: "Llegué primero. La constancia siempre gana.",
+                                    nextAction: {
+                                        type: 'patrolnpc',
+                                        npcId: 'guard_tom',
+                                        message: 'Veloz reacciona tarde',
+                                        delay: 1200,
+                                        patrolType: null,
+                                        centerX: 14,
+                                        centerZ: 12,
+                                        speed: 0.06
+                                    }
+                                }
+                            }
                         }
                     }
                 },
                 onFailure: {
-                    type: 'setConversations',
-                    newConversations: [
-                        {
-                            message: "Está bien, ve con Veloz. Verás que la velocidad sin constancia no sirve.",
-                            action: {
-                                type: 'move',
-                                target: {x: 14, z: 12},
-                                speed: 0.03
-                            }
-                        }
-                    ]
+                    type: 'move',
+                    target: {x: 14, z: 12},
+                    speed: 0.03,
+                    delay: 5000,
+                    message: "Está bien, sigue a Veloz. Yo continuaré a mi ritmo.",
+                    nextAction: {
+                        type: 'move',
+                        target: {x: 14, z: 12},
+                        speed: 0.03,
+                        message: "Al final, llegué igual. Paso a paso se llega lejos."
+                    }
                 }
             }
         }
@@ -226,73 +261,118 @@ const NPC_DATA = {
 
 'guard_tom': {
     spriteRow: 1,
-    position: {x: 8, z: 5},
+    position: {x: 14, z: 5},
     spawnDelay: 1000,
     patrolType: 'none',
     idleFrame: 0,
     name: 'Veloz',
     conversations: [
         {
-            message: "Hola viajero. Veo a Donatello allá lejos con su mochila pesada. Espera, voy a llamarlo para hablar sobre la carrera...",
+            message: "¡Hola viajero! Veo a Donatello allá con su paso lento. Voy a retarlo a una carrera.",
             action: {
                 type: 'patrolnpc',
-
-            npcId: 'scout_mike',
-            message: 'I called Scout Mike',
-            delay:700,
-            patrolType: null,
-            centerX: 7, 
-            centerZ: 5,
-                speed: 0.04,
-                delay: 3000  // Wait 3 seconds for Donatello to arrive
+                npcId: 'scout_mike',
+                message: 'Veloz llama a Donatello',
+                delay: 10,
+                patrolType: null,
+                centerX: 13,
+                centerZ: 5,
+                speed: 0.05
             }
         },
         {
-            message: "¡Donatello! ¿También vas hacia la bandera? Con esas piernitas y esa mochila no vas a llegar antes de mañana. La bandera al final del camino. ¿Quién llega primero? Esto será rápido... para mí.",
+            message: "¡Donatello! Con esas piernas cortas no vas a llegar nunca. ¿Hacemos una carrera a la bandera? Será fácil para mí.",
             requiresConfirmation: true,
-            confirmationMessage: "Seguir a Veloz (el rápido)",
-            confirmationAlternative: "Seguir a Donatello (el constante)",
+            confirmationMessage: "Ver la carrera siguiendo a Veloz",
+            confirmationAlternative: "Ver la carrera siguiendo a Donatello",
             action: {
                 type: 'choice',
                 onSuccess: {
-                    type: 'followAndMove',
-                    target: {x: 6, z: 8},
+                    type: 'move',
+                    target: {x: 13, z: 9},
                     speed: 0.08,
-                    delay: 1000,
-                    message: "¡Fácil! Me sobran piernas. ¡Mírame correr hacia el árbol!",
+                    delay: 50,
+                    message: "¡Mírame! ¡Soy rapidísimo!",
                     nextAction: {
-                        type: 'followAndMove',
-                        target: {x: 8, z: 12},
-                        speed: 0.08,
-                        delay: 1500,
-                        message: "Voy tan adelantado... que puedo darme el lujo de descansar aquí.",
+                        type: 'patrolnpc',
+                        npcId: 'scout_mike',
+                        message: 'Donatello sigue su ritmo',
+                        delay: 50,
+                        patrolType: null,
+                        centerX: 13,
+                        centerZ: 6,
+                        speed: 0.001,
                         nextAction: {
-                            type: 'patrol',
-                            patrolType: 'none',
-                            delay: 8000,
-                            message: "¡No puede ser...! ¿Cómo me ganó Donatello? ¡Él nunca se detuvo!",
+                            type: 'move',
+                            target: {x: 12, z: 8},
+                            speed: 0.03,
+                            delay: 20,
+                            message: "Voy tan adelantado que puedo descansar un rato...",
                             nextAction: {
-                                type: 'move',
-                                target: {x: 14, z: 12},
-                                speed: 0.06,
+                                type: 'patrolnpc',
+                                npcId: 'scout_mike',
+                                message: 'Donatello avanza a su tiempo',
+                                delay: 3000,
+                                patrolType: null,
+                                centerX: 13,
+                                centerZ: 7,
+                                speed: 0.03,
+                                nextAction: {
+                                type: 'patrolnpc',
+                                npcId: 'scout_mike',
+                                message: null,
                                 delay: 1000,
-                                message: "He aprendido que la velocidad sin constancia no sirve de nada..."
+                                patrolType: null,
+                                centerX: 13,
+                                centerZ: 10,
+                                speed: 0.03,
+                                nextAction: {
+                                    type: 'patrolnpc',
+                                npcId: 'scout_mike',
+                                message: 'Donatello pasa de largo',
+                                delay: 4000,
+                                patrolType: null,
+                                centerX: 14,
+                                centerZ: 12,
+                                speed: 0.03,
+                                nextAction: {
+                                    type: 'patrol',
+                                    patrolType: null,
+                                    delay: 2000,
+                                    message: "Zzz... un descanso merecido...",
+                                    nextAction: {
+                                        type: 'move',
+                                        target: {x: 14, z: 12},
+                                        speed: 0.06,
+                                        delay: 800,
+                                        message: "¡No puede ser! ¡Me ganó! La velocidad sin constancia no sirve..."
+                                    }
+                                    }
+                                    }
+                                }
                             }
                         }
                     }
                 },
                 onFailure: {
-                    type: 'setConversations',
-                    newConversations: [
-                        {
-                            message: "Está bien, sigue a la tortuga. Pero yo llegaré primero de todas formas.",
-                            action: {
-                                type: 'move',
-                                target: {x: 14, z: 12},
-                                speed: 0.07
-                            }
+                    type: 'move',
+                                            target: {x: 12, z: 8},
+                    speed: 0.08,
+                    delay: 800,
+                    message: "Está bien, sigue al lento. Yo llegaré primero de todas formas.",
+                    nextAction: {
+                        type: 'move',
+                        target: {x: 12, z: 8},
+                        speed: 0.08,
+                        delay: 1200,
+                        message: "Descanso aquí... tengo tiempo de sobra.",
+                        nextAction: {
+                            type: 'patrol',
+                            patrolType: 'none',
+                            delay: 7000,
+                            message: "Ups... creo que me quedé dormido demasiado tiempo."
                         }
-                    ]
+                    }
                 }
             }
         }
@@ -360,6 +440,7 @@ const STATIC_OBJECT_INSTANCES = [
     {template: 'house', position: {x: 11, z: 4}},
     {template: 'singlepine', position: {x: 10, z: 5}},
     {template: 'singlepine', position: {x: 2, z: 13}},
+    {template: 'singlepine', position: {x: 11, z: 8}},
     {template: 'singlepine', position: {x: 14, z: 2}},
     {template: 'finishline', position: {x: 14, z: 12}, mirrored: true},
     {template: 'forest_round', position: {x: 4, z: 10}},
@@ -549,15 +630,18 @@ case 'movenpc':
 case 'patrolnpc':
     console.log(`Setting NPC ${action.npcId} to patrol ${action.patrolType} at (${action.centerX}, ${action.centerZ})`);
     const patrolNPC = this.game.npcs.find(npc => npc.npcId === action.npcId);
-    if (patrolNPC) {
+    if(patrolNPC) {
+        patrolNPC.isExecutingAction = true; // This will prevent player proximity interruption
         patrolNPC.patrolType = action.patrolType;
         patrolNPC.patrolPath = action.patrolType !== 'none' ? 
             patrolNPC.generatePatrolPath(action.patrolType, action.centerX, action.centerZ) : [];
         patrolNPC.isPatrolling = action.patrolType !== 'none';
         patrolNPC.patrolIndex = 0;
-        if (patrolNPC.isPatrolling) {
+        
+        if(patrolNPC.isPatrolling) {
             patrolNPC.startPatrol();
         }
+        
         console.log(`Successfully set ${action.npcId} to patrol ${action.patrolType}`);
     } else {
         console.log(`NPC ${action.npcId} not found`);

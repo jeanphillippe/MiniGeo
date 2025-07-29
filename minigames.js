@@ -430,6 +430,8 @@ class TerrainWaveCross extends BaseMinigame {
             border-radius: 8px;
             font-family: monospace;
             z-index: 1000;
+            max-height: 50px;
+            overflow-y:scroll;
             min-width: 250px;
         `, `
             <h3>🌊 Terrain Wave Cross</h3>

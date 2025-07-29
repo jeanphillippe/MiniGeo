@@ -1,6 +1,6 @@
 
 const NPC_DATA = {
-    'trader_jack': {
+ 'trader_jack': {
     spriteRow: 2,
     position: {x: 9, z: 5},
     spawnDelay: 1500,
@@ -16,82 +16,96 @@ const NPC_DATA = {
             action: {
                 type: 'choice',
                 onSuccess: {
-                               type: 'choice',
-                                    message: "¿Qué buscamos exactamente?",
-                        
+                    type: 'followAndMove',
+                    target: {x: 10, z: 10},
+                    speed: 0.05,
+                    delay: 800,
+                    message: "Tienes razón, vamos a buscar materiales...",
                     nextAction: {
-                        type: 'followAndMove', target: {x: 10, z: 10}, speed: 0.05,delay: 2500,
-                                    message: "No lo sé.",
-                                    nextAction: {
-                                        type: 'followAndMove',
-                                        delay: 500,target: {x: 5, z: 10}, speed: 0.05,
-                                        message: "Seguro algo aparecerá si caminamos con los ojos abiertos."
-                                    }
-                                }
-                      },
+                        type: 'followAndMove',
+                        target: {x: 5, z: 10},
+                        speed: 0.05,
+                        delay: 2000,
+                        message: "¿Qué buscamos exactamente? No lo sé... pero algo aparecerá si caminamos con los ojos abiertos."
+                    }
+                },
                 onFailure: {
                     type: 'setConversations',
                     newConversations: [
                         {
                             message: "Supongo que seguiré esperando...",
-                            action: {type: 'patrol', patrolType: 'random', speed: 0.02}
+                            action: {
+                                type: 'patrol',
+                                patrolType: 'random',
+                                speed: 0.02
+                            }
                         }
                     ]
                 }
             }
         },
         {
-                message: "Mira, una cuerda vieja colgando de ese árbol...",
-                requiresConfirmation: true,
-                confirmationMessage: "Hey, si lo juntas con ese palo, puede ser una caña!",
-                confirmationAlternative: "No parece gran cosa. No creo que sirva",
-                action: {
-                      type: 'choice',
-                      onSuccess: {
-                        type: 'giveObject',
-                        template: 'boat1',
-                        position: {
-                          x: 7,
-                          z: 8
-                        },
-                        message: "Gracias por creen en mí. No sabía que podía hacerlo.",
+            message: "Mira, una cuerda vieja colgando de ese árbol...",
+            requiresConfirmation: true,
+            confirmationMessage: "Hey, si lo juntas con ese palo, puede ser una caña!",
+            confirmationAlternative: "No parece gran cosa. No creo que sirva",
+            action: {
+                type: 'choice',
+                onSuccess: {
+                    type: 'message',
+                    message: "¡Tienes razón! Gracias por creer en mí. No sabía que podía hacerlo.",
+                    delay: 1500,
+                    nextAction: {
+                        type: 'followAndMove',
+                        target: {x: 1, z: 1},
+                        speed: 0.05,
+                        delay: 2000,
+                        message: "Mira, ¿qué es eso? Una estatua de pez... debe ser una señal.",
                         nextAction: {
-                          type: 'followAndMove',
-                          delay: 3000,
+                            type: 'followAndMove',
+                            target: {x: 7, z: 8},
+                            speed: 0.05,
+                            delay: 1500,
                             message: "Me voy al mar!",
-                          target: {
-                            x: 7,
-                            z: 8
-                          },
-                          speed: 0.05,
-                          nextAction: {
-                            type: 'disappear',
-                            delay: 500,
-                            message: "Nos vemos!"
-                          }
-                        },
-                        mirrored: false
-                      },
-                      onFailure: {
-                        type: 'setConversations',
-                        newConversations: [
-                          {
+                            nextAction: {
+                                type: 'giveObject',
+                                template: 'boat1',
+                                position: {x: 7, z: 8},
+                                message: "Aquí pondré mi bote.",
+                                mirrored: false
+                            }
+                        }
+                    }
+                },
+                onFailure: {
+                    type: 'setConversations',
+                    newConversations: [
+                        {
                             message: "Tal vez nada es suficiente después de todo...",
                             action: {
-                              type: 'disappear',
-                              delay: 3000
+                                type: 'disappear',
+                                delay: 3000
                             }
-                          }
-                        ]
-                      }
-                    }
-            },
-            {message: "Here's your share. May fortune favor your travels!", action: {
-    type: 'removeObject',
-    position: {x: 6, z: 12},
-    message: "El bote se desvanece misteriosamente..."
-}},
-            {message: "Chau!", action: {type: 'disappear', delay: 100}}
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            message: "Gracias por ayudarme a encontrar mi camino de vuelta al mar.",
+            action: {
+                type: 'removeObject',
+                position: {x: 7, z: 8},
+                message: "El bote se desvanece misteriosamente..."
+            }
+        },
+        {
+            message: "¡Nos vemos, amigo!",
+            action: {
+                type: 'disappear',
+                delay: 1000
+            }
+        }
     ]
 },
     'elder_marcus': {

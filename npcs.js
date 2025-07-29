@@ -409,7 +409,26 @@ const NPC_DATA = {
         idleFrame: 0,
         name: 'Trader Jull',
         conversations: [
-            {message: "Ah, a fellow traveler! I deal in rare goods and information.", action: null},
+            {message: "Ah, a fellow traveler! I deal in rare goods and information.", action: [
+            {
+                type: 'giveObject',
+                template: 'boat1',
+                position: { x: 7, z: 8 },
+                message: "¡Un bote para ti!"
+            },
+            {
+                type: 'removeObject',
+                position: { x: 6, z: 12 },
+                message: "El viejo objeto desaparece..."
+            },
+            {
+                type: 'patrolnpc',
+                npcId: 'guard_tom',
+                patrolType: null,
+                centerX: 5,
+                centerZ: 5
+            }
+        ]},
             {message: "I know of a hidden cache nearby. Care to make a deal?", action: {type: 'move', target: {x: 1, z: 5}, speed: 0.05}},
             {message: "Here's your share. May fortune favor your travels!", action: {type: 'disappear', delay: 2000}}
         ]
@@ -575,21 +594,17 @@ class NPC extends Player {
         }
     }
 
-    executeAction(action) {
-    console.log(`Executing action: ${action.type}`, action);
+ executeAction(action) {
+    console.log(`Executing action: ${action.type || 'multiple'}`, action);
     this.isExecutingAction = true;
     
-    // Helper function to execute the next action in chain
     const executeNextAction = () => {
         if (action.nextAction) {
             console.log('Executing chained action:', action.nextAction);
-            // Support delay for any nextAction
             const delay = action.nextAction.delay || 0;
             if (delay > 0) {
                 console.log(`Delaying next action by ${delay}ms`);
-                setTimeout(() => {
-                    this.executeAction(action.nextAction);
-                }, delay);
+                setTimeout(() => this.executeAction(action.nextAction), delay);
             } else {
                 this.executeAction(action.nextAction);
             }
@@ -598,216 +613,215 @@ class NPC extends Player {
         }
     };
 
-    // Show message for this action if it has one
-    if (action.message) {
-        this.game.showMessage(action.message);
+    // Manejo de múltiples acciones simultáneas
+    if (Array.isArray(action)) {
+        console.log(`Executing ${action.length} simultaneous actions`);
+        let completed = 0;
+        const total = action.length;
+        const nextAction = action.find(a => a.nextAction)?.nextAction;
+        
+        const onComplete = () => {
+            if (++completed === total) {
+                console.log('All simultaneous actions completed');
+                if (nextAction) {
+                    setTimeout(() => this.executeAction(nextAction), nextAction.delay || 0);
+                } else {
+                    this.isExecutingAction = false;
+                }
+            }
+        };
+        
+        action.forEach((act, i) => {
+            console.log(`Executing parallel action ${i + 1}/${total}:`, act.type);
+            this.executeSingleAction({ ...act, nextAction: undefined }, onComplete);
+        });
+        return;
     }
+    
+    // Acción individual
+    this.executeSingleAction(action, executeNextAction);
+}
 
+executeSingleAction(action, onComplete) {
+    if (action.message) this.game.showMessage(action.message);
+    
     switch (action.type) {
         case 'move':
             console.log(`Moving from (${this.pos.x}, ${this.pos.z}) to (${action.target.x}, ${action.target.z})`);
             this.isPatrolling = false;
             this.speed = action.speed || this.speed;
             this.findPath(this.pos, action.target, (path) => {
-                console.log(`Path found with ${path.length} steps:`, path);
                 this.path = path;
                 this.progress = 0;
                 this.onReachTarget = () => {
-                    console.log(`Reached target at (${this.pos.x}, ${this.pos.z})`);
                     this.onReachTarget = null;
-                    executeNextAction(); // Execute next action after reaching target
+                    onComplete();
                 };
             });
             break;
-case 'movenpc':
-    console.log(`Moving NPC ${action.npcId} to (${action.target.x}, ${action.target.z})`);
-    const targetNPC = this.game.npcs.find(npc => npc.npcId === action.npcId);
-    if (targetNPC) {
-        targetNPC.isPatrolling = false;
-        targetNPC.speed = action.speed || targetNPC.speed;
-        targetNPC.findPath(targetNPC.pos, action.target, (path) => {
-            targetNPC.path = path;
-            targetNPC.progress = 0;
-        });
-        console.log(`Successfully moved ${action.npcId} to target position`);
-    } else {
-        console.log(`NPC ${action.npcId} not found`);
-    }
-    executeNextAction();
-    break;
-
-case 'patrolnpc':
-    console.log(`Setting NPC ${action.npcId} to patrol ${action.patrolType} at (${action.centerX}, ${action.centerZ})`);
-    const patrolNPC = this.game.npcs.find(npc => npc.npcId === action.npcId);
-    if(patrolNPC) {
-        patrolNPC.isExecutingAction = true; // This will prevent player proximity interruption
-        patrolNPC.patrolType = action.patrolType;
-        patrolNPC.patrolPath = action.patrolType !== 'none' ? 
-            patrolNPC.generatePatrolPath(action.patrolType, action.centerX, action.centerZ) : [];
-        patrolNPC.isPatrolling = action.patrolType !== 'none';
-        patrolNPC.patrolIndex = 0;
-        
-        if(patrolNPC.isPatrolling) {
-            patrolNPC.startPatrol();
-        }
-        
-        console.log(`Successfully set ${action.npcId} to patrol ${action.patrolType}`);
-    } else {
-        console.log(`NPC ${action.npcId} not found`);
-    }
-    executeNextAction();
-    break;
-        case 'choice':
-            executeNextAction(); // Immediately proceed to next action for choice type
+            
+        case 'movenpc':
+            const moveNPC = this.game.npcs.find(npc => npc.npcId === action.npcId);
+            if (moveNPC) {
+                moveNPC.isPatrolling = false;
+                moveNPC.speed = action.speed || moveNPC.speed;
+                moveNPC.findPath(moveNPC.pos, action.target, (path) => {
+                    moveNPC.path = path;
+                    moveNPC.progress = 0;
+                });
+            }
+            onComplete();
             break;
-
+            
+        case 'patrolnpc':
+    const patrolNPC = this.game.npcs.find(npc => npc.npcId === action.npcId);
+    if (patrolNPC) {
+        patrolNPC.path = [];
+        patrolNPC.onReachTarget = null;
+        
+        if (action.patrolType === null) {
+            // Movimiento directo para null
+            patrolNPC.isPatrolling = false;
+            patrolNPC.isExecutingAction = true; // <-- CLAVE: Mantener ejecutando para que se actualice
+            patrolNPC.speed = action.speed || 0.05;
+            console.log(`Moving ${action.npcId} directly to (${action.centerX}, ${action.centerZ})`);
+            patrolNPC.findPath(patrolNPC.pos, {x: action.centerX, z: action.centerZ}, (path) => {
+                console.log(`Path found for ${action.npcId}:`, path);
+                patrolNPC.path = path;
+                patrolNPC.progress = 0;
+                patrolNPC.onReachTarget = () => {
+                    patrolNPC.isExecutingAction = false; // <-- Detener cuando llegue
+                    patrolNPC.onReachTarget = null;
+                };
+            });
+        } else {
+            // Patrullaje normal
+            patrolNPC.isExecutingAction = true;
+            patrolNPC.patrolType = action.patrolType;
+            patrolNPC.patrolPath = action.patrolType !== 'none' ? 
+                patrolNPC.generatePatrolPath(action.patrolType, action.centerX, action.centerZ) : [];
+            patrolNPC.isPatrolling = action.patrolType !== 'none';
+            patrolNPC.patrolIndex = 0;
+            if (patrolNPC.isPatrolling) patrolNPC.startPatrol();
+        }
+    }
+    onComplete();
+    break;
+            
+        case 'choice':
+            onComplete();
+            break;
+            
         case 'setConversations':
-            if (action.newConversations && action.newConversations.length > 0) {
+            if (action.newConversations?.length > 0) {
                 this.conversations = action.newConversations;
                 this.conversationIndex = 0;
                 this.message = this.conversations[0].message;
-                console.log(`Updated conversations for ${this.name}:`, this.conversations);
             }
-            executeNextAction();
+            onComplete();
             break;
-
+            
         case 'moveAndCamera':
-            console.log(`Changing camera then moving`);
             this.game.setCameraPreset(action.cameraPreset, action.smooth !== false, () => {
-                console.log(`Camera changed, now moving`);
                 this.isPatrolling = false;
                 this.speed = action.speed || this.speed;
                 this.findPath(this.pos, action.target, (path) => {
                     this.path = path;
                     this.progress = 0;
                     this.onReachTarget = () => {
-                        console.log(`Reached target after camera change`);
                         this.onReachTarget = null;
-                        executeNextAction();
+                        onComplete();
                     };
                 });
             });
             break;
-
+            
         case 'camera':
-            console.log(`Changing camera to: ${action.preset}`);
             const existingDialog = document.getElementById('confirmationDialog');
             if (existingDialog) existingDialog.remove();
             const npcDialog = document.getElementById('npcQuestionDialog');
             if (npcDialog) npcDialog.remove();
             setTimeout(() => {
-                this.game.setCameraPreset(action.preset, action.smooth !== false, () => {
-                    console.log(`Camera preset '${action.preset}' applied`);
-                    executeNextAction();
-                });
+                this.game.setCameraPreset(action.preset, action.smooth !== false, onComplete);
             }, 100);
             break;
-
+            
         case 'patrol':
-            console.log(`Changing patrol type to: ${action.patrolType}`);
             this.patrolType = action.patrolType;
             this.patrolPath = action.patrolType !== 'none' ? 
                 this.generatePatrolPath(action.patrolType, this.pos.x, this.pos.z) : [];
             this.isPatrolling = action.patrolType !== 'none';
             this.patrolIndex = 0;
-            if (this.isPatrolling) {
-                this.startPatrol();
-            }
-            executeNextAction();
+            if (this.isPatrolling) this.startPatrol();
+            onComplete();
             break;
-
+            
         case 'giveObject':
-            console.log(`Giving object: ${action.template} at (${action.position.x}, ${action.position.z})`);
-            const objectId = this.game.staticObjects ? this.game.staticObjects.length : 0;
+            const objectId = this.game.staticObjects?.length || 0;
             const newObject = new StaticObject(this.game, action.template, action.position, objectId, action.mirrored || false);
-            if (!this.game.staticObjects) {
-                this.game.staticObjects = [];
-            }
+            if (!this.game.staticObjects) this.game.staticObjects = [];
             this.game.staticObjects.push(newObject);
-            executeNextAction();
+            onComplete();
             break;
-
+            
         case 'removeObject':
-            console.log(`Removing object at (${action.position.x}, ${action.position.z})`);
             if (this.game.staticObjects) {
-                const objectIndex = this.game.staticObjects.findIndex(obj => 
+                const idx = this.game.staticObjects.findIndex(obj => 
                     obj.pos.x === action.position.x && obj.pos.z === action.position.z);
-                if (objectIndex !== -1) {
-                    const removedObject = this.game.staticObjects[objectIndex];
-                    if (removedObject.sprite) {
-                        this.game.scene.remove(removedObject.sprite);
-                        if (removedObject.sprite.material) {
-                            removedObject.sprite.material.dispose();
-                        }
-                        if (removedObject.sprite.geometry) {
-                            removedObject.sprite.geometry.dispose();
-                        }
+                if (idx !== -1) {
+                    const obj = this.game.staticObjects[idx];
+                    if (obj.sprite) {
+                        this.game.scene.remove(obj.sprite);
+                        obj.sprite.material?.dispose();
+                        obj.sprite.geometry?.dispose();
                     }
-                    this.game.staticObjects.splice(objectIndex, 1);
-                    console.log(`Removed object: ${removedObject.name} from (${action.position.x}, ${action.position.z})`);
-                } else {
-                    console.log(`No object found at (${action.position.x}, ${action.position.z})`);
+                    this.game.staticObjects.splice(idx, 1);
                 }
             }
-            executeNextAction();
+            onComplete();
             break;
-
-        
-case 'followAndMove':
-    console.log(`Setting camera to follow NPC and moving`);
-    this.game.cameraSystem.saveInitialCameraState();
-    this.game.cameraSystem.setFollowTarget(this);
-    this.game.setCameraPreset('followAndMove', action.smooth !== false, () => {
-        console.log(`Camera now following NPC, starting movement`);
-        this.isPatrolling = false;
-        this.speed = action.speed || this.speed;
-        this.findPath(this.pos, action.target, (path) => {
-            this.path = path;
-            this.progress = 0;
-            this.onReachTarget = () => {
-                console.log(`NPC reached target, checking for nextAction`);
-                
-                // Only restore camera if there's no nextAction
-                if (!action.nextAction) {
-                    this.game.cameraSystem.clearFollowTarget();
-                    this.game.cameraSystem.restoreToInitialState(true, () => {
-                        this.onReachTarget = null;
-                        executeNextAction();
-                    });
-                } else {
-                    // Continue following, just execute next action
-                    this.onReachTarget = null;
-                    executeNextAction();
-                }
-            };
-        });
-    });
-    break;
-
-// Add a new action type for explicitly changing camera at the end of chains:
-case 'endCamera':
-    console.log(`Ending chain with camera preset: ${action.preset}`);
-    this.game.cameraSystem.clearFollowTarget();
-    if (action.preset === 'restore') {
-        this.game.cameraSystem.restoreToInitialState(action.smooth !== false, () => {
-            executeNextAction();
-        });
-    } else {
-        this.game.setCameraPreset(action.preset, action.smooth !== false, () => {
-            executeNextAction();
-        });
-    }
-    break;
+            
+        case 'followAndMove':
+            this.game.cameraSystem.saveInitialCameraState();
+            this.game.cameraSystem.setFollowTarget(this);
+            this.game.setCameraPreset('followAndMove', action.smooth !== false, () => {
+                this.isPatrolling = false;
+                this.speed = action.speed || this.speed;
+                this.findPath(this.pos, action.target, (path) => {
+                    this.path = path;
+                    this.progress = 0;
+                    this.onReachTarget = () => {
+                        if (!action.nextAction) {
+                            this.game.cameraSystem.clearFollowTarget();
+                            this.game.cameraSystem.restoreToInitialState(true, () => {
+                                this.onReachTarget = null;
+                                onComplete();
+                            });
+                        } else {
+                            this.onReachTarget = null;
+                            onComplete();
+                        }
+                    };
+                });
+            });
+            break;
+            
+        case 'endCamera':
+            this.game.cameraSystem.clearFollowTarget();
+            if (action.preset === 'restore') {
+                this.game.cameraSystem.restoreToInitialState(action.smooth !== false, onComplete);
+            } else {
+                this.game.setCameraPreset(action.preset, action.smooth !== false, onComplete);
+            }
+            break;
+            
         case 'drop':
-            console.log(`Dropping in ${action.delay || 0}ms`);
             setTimeout(() => {
                 this.isInteractable = false;
                 this.isPatrolling = false;
                 if (this.sprite) {
                     let velocity = 0;
-                    const gravity = 0.01;
-                    const rotationSpeed = 0.01;
-                    const startY = this.sprite.position.y;
+                    const gravity = 0.01, rotationSpeed = 0.01, startY = this.sprite.position.y;
                     const dropAnimation = () => {
                         if (!this.sprite.material) return;
                         velocity += gravity;
@@ -818,9 +832,8 @@ case 'endCamera':
                         }
                         if (this.sprite.position.y < startY - 8 || this.sprite.material.opacity <= 0) {
                             this.game.scene.remove(this.sprite);
-                            this.game.interactables = this.game.interactables.filter(interactable => interactable.npcRef !== this);
-                            executeNextAction();
-                            console.log('NPC dropped out of sight');
+                            this.game.interactables = this.game.interactables.filter(i => i.npcRef !== this);
+                            onComplete();
                         } else {
                             requestAnimationFrame(dropAnimation);
                         }
@@ -828,14 +841,12 @@ case 'endCamera':
                     this.sprite.material.transparent = true;
                     dropAnimation();
                 } else {
-                    executeNextAction();
-                    console.log('NPC dropped (no sprite)');
+                    onComplete();
                 }
             }, action.delay || 0);
             break;
-
+            
         case 'disappear':
-            console.log(`Disappearing in ${action.delay || 0}ms`);
             setTimeout(() => {
                 this.isInteractable = false;
                 this.isPatrolling = false;
@@ -845,9 +856,8 @@ case 'endCamera':
                         this.sprite.material.opacity -= 0.05;
                         if (this.sprite.material.opacity <= 0) {
                             this.game.scene.remove(this.sprite);
-                            this.game.interactables = this.game.interactables.filter(interactable => interactable.npcRef !== this);
-                            executeNextAction();
-                            console.log('NPC disappeared');
+                            this.game.interactables = this.game.interactables.filter(i => i.npcRef !== this);
+                            onComplete();
                         } else {
                             requestAnimationFrame(fadeOut);
                         }
@@ -855,12 +865,14 @@ case 'endCamera':
                     this.sprite.material.transparent = true;
                     fadeOut();
                 } else {
-                    executeNextAction();
-                    console.log('NPC disappeared (no sprite)');
+                    onComplete();
                 }
             }, action.delay || 0);
             break;
-
+            
+        default:
+            onComplete();
+            break;
     }
 }
 

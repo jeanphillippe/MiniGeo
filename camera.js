@@ -22,14 +22,14 @@ class CameraSystem {
             followPlayer: {
                 type: 'orthographic',
                 offset: new THREE.Vector3(6, 9, 10),
-                zoom: 0.753,
+                zoom: 0.90,
                 followPlayer: true,
                 lookAtTarget: true
             },
             overview: {
                 type: 'orthographic',
                 offset: new THREE.Vector3(20, 25, 20),
-                zoom: 2.5,
+                zoom: 2,
                 followPlayer: false,
                 lookAtTarget: true,
                 centerTarget: true
@@ -37,7 +37,7 @@ class CameraSystem {
             thirdPerson: {
                 type: 'perspective',
                 offset: new THREE.Vector3(3, 10, 3),
-                fov: 22,
+                fov: 47,
                 followPlayer: true,
                 lookAtPlayer: true
             },
@@ -78,6 +78,7 @@ class CameraSystem {
     }
 
     setCameraPreset(presetName, smooth = true, callback = null) {
+        smooth = true;
         console.log(`CameraSystem: Setting camera preset to ${presetName}`);
         
         // Clean up any existing dialogs - moved here to ensure it happens
@@ -432,8 +433,33 @@ saveInitialCameraState() {
         console.log('Initial camera state saved:', this.initialCameraState);
     }
 }
+
 restoreToInitialState(smooth = true, callback = null) {
     console.log('Restoring to initial camera state');
+    
+    // Check if we should restore to initial state or follow player instead
+    let shouldFollowPlayer = false;
+    
+    // If we were following a target and that target has moved significantly from initial position
+    if (this.followTarget && this.followTarget.sprite) {
+        const currentPos = this.followTarget.sprite.position;
+        const distanceFromInitial = currentPos.distanceTo(this.initialCameraState.position);
+        
+        // If the followed target moved far from where camera was initially
+        if (distanceFromInitial > 5) {
+            shouldFollowPlayer = true;
+        }
+    }
+    
+    // If initial preset was following something, default to follow player
+    if (this.initialCameraState.preset === 'followPlayer' || 
+        this.initialCameraState.preset === 'followAndMove' ||
+        shouldFollowPlayer) {
+        
+        console.log('Restoring to follow player instead of exact initial state');
+        this.setCameraPreset('followPlayer', smooth, callback);
+        return;
+    }
     
     if (smooth && this.camera) {
         this.cameraTransition.active = true;
@@ -442,15 +468,11 @@ restoreToInitialState(smooth = true, callback = null) {
         this.cameraTransition.fromPosition.copy(this.camera.position);
         this.cameraTransition.fromTarget.copy(this.cameraTarget);
         this.cameraTransition.fromZoom = this.zoomLevel;
-        
         this.cameraTransition.toPosition.copy(this.initialCameraState.position);
         this.cameraTransition.toTarget.copy(this.initialCameraState.target);
         this.cameraTransition.toZoom = this.initialCameraState.zoom;
-        
-        // Set the preset without applying it immediately (transition handles it)
         this.currentCameraPreset = this.initialCameraState.preset;
     } else {
-        // Immediate restore
         this.camera.position.copy(this.initialCameraState.position);
         this.cameraTarget.copy(this.initialCameraState.target);
         this.zoomLevel = this.initialCameraState.zoom;

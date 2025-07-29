@@ -8,6 +8,7 @@ class Player {
         this._vA = new THREE.Vector3();
         this._vB = new THREE.Vector3();
         this.pos = { x: 10, z: 9 };
+        this.pathLine = null;
         this.pathLines = [];
 this.pathAnimationTime = 0;
         this.animationState = 'idle'; // 'idle', 'walking'
@@ -358,9 +359,8 @@ updateAnimation() {
         });
     }
 
-    update() {
+ update() {
     if (!this.path.length || !this.sprite) {
-        // Player is idle
         if (this.animationState !== 'idle') {
             this.animationState = 'idle';
             this.animationFrame = 0;
@@ -369,14 +369,13 @@ updateAnimation() {
         this.updateAnimation();
         return;
     }
-
-    // Player is moving - set walking animation
+    
     if (this.animationState !== 'walking') {
         this.animationState = 'walking';
         this.animationFrame = 0;
         this.animationTime = 0;
     }
-        
+    
     const next = this.path[0];
     const currentTile = this.game.terrain.getTile(this.pos.x, this.pos.z);
     const nextTile = this.game.terrain.getTile(next.x, next.z);
@@ -385,50 +384,51 @@ updateAnimation() {
         this.path = [];
         return;
     }
-
-    // NEW: Determine movement direction and flip sprite if needed
+    
     if (this.progress === 0) {
-    const deltaX = next.x - this.pos.x;
-    const deltaZ = next.z - this.pos.z;
-    
-    // Calculate screen-space movement direction
-    // In your isometric view, moving left on screen = negative X + positive Z
-    // Moving right on screen = positive X + negative Z
-    const screenDeltaX = deltaX - deltaZ;
-    
-    if (screenDeltaX !== 0) {
-        const shouldFaceLeft = screenDeltaX < 0;
+        const deltaX = next.x - this.pos.x;
+        const deltaZ = next.z - this.pos.z;
+        const screenDeltaX = deltaX - deltaZ;
         
-        if (shouldFaceLeft !== this.facingLeft) {
-            this.facingLeft = shouldFaceLeft;
-            // Use scale.x directly for sprite flipping
-            this.sprite.scale.x = Math.abs(this.sprite.scale.x) * (this.facingLeft ? -1 : 1);
+        if (screenDeltaX !== 0) {
+            const shouldFaceLeft = screenDeltaX < 0;
+            if (shouldFaceLeft !== this.facingLeft) {
+                this.facingLeft = shouldFaceLeft;
+                this.sprite.scale.x = Math.abs(this.sprite.scale.x) * (this.facingLeft ? -1 : 1);
+            }
         }
+        
+        const a = currentTile.mesh.position, b = nextTile.mesh.position;
+        this._vA.set(a.x, this.game.terrain.heightScales[currentTile.height] + 1.0, a.z);
+        this._vB.set(b.x, this.game.terrain.heightScales[nextTile.height] + 1.0, b.z);
     }
     
-    const a = currentTile.mesh.position, b = nextTile.mesh.position;
-    this._vA.set(a.x, this.game.terrain.heightScales[currentTile.height] + 1.0, a.z);
-    this._vB.set(b.x, this.game.terrain.heightScales[nextTile.height] + 1.0, b.z);
-}
-
-    this.progress += this.speed;
+    // Use deltaTime-normalized speed for consistent movement
+    const normalizedSpeed = this.speed * (this.game.deltaTime / 16.67); // Normalize to 60fps
+    this.progress += normalizedSpeed;
+    
     if (this.progress >= 1) {
         this.setPosition(next.x, next.z);
         this.path.shift();
-        if (this.pathLines.length > 0 && this.path.length === 0) {
-    this.pathLines.forEach(line => {
-        this.game.scene.remove(line);
-        line.geometry.dispose();
-        line.material.dispose();
-    });
-    this.pathLines = [];
-}
         this.progress = 0;
+        
+        // Clean up path line when movement is complete
+        if (this.pathLine && this.path.length === 0) {
+            this.game.scene.remove(this.pathLine);
+            this.pathLine.geometry.dispose();
+            this.pathLine.material.dispose();
+            this.pathLine = null;
+        }
+        
+        // Call onReachTarget if it exists (for NPCs extending Player)
+        if (this.onReachTarget && this.path.length === 0) {
+            this.onReachTarget();
+        }
     } else {
         this.sprite.position.lerpVectors(this._vA, this._vB, this.progress);
         this.sprite.position.y += Math.sin(this.progress * Math.PI) * 0.5;
     }
-this.updatePathLine();
+    
     this.updateAnimation();
 }
 

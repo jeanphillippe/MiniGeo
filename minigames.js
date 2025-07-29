@@ -73,6 +73,27 @@ class MinigameManager {
                 speed: this.game.player.speed
             };
         }
+
+        // Save and hide static objects
+        this.originalStaticObjects = [];
+        if (this.game.staticObjects) {
+            this.game.staticObjects.forEach(obj => {
+                if (obj.sprite) {
+                    this.originalStaticObjects.push({
+                        object: obj,
+                        visible: obj.sprite.visible
+                    });
+                    obj.sprite.visible = false;
+                }
+            });
+        }
+
+        // Save and hide interactables (remove tooltips)
+        this.originalInteractables = [...this.game.interactables];
+        this.game.interactables = [];
+        if (this.game.activeTooltip) {
+            this.game.hideTooltip();
+        }
     }
 
     restoreGameState() {
@@ -99,6 +120,22 @@ class MinigameManager {
             this.game.player.setPosition(this.originalPlayerState.pos.x, this.originalPlayerState.pos.z);
             this.game.player.path = [];
             this.game.player.speed = this.originalPlayerState.speed;
+        }
+
+        // Restore static objects visibility
+        if (this.originalStaticObjects) {
+            this.originalStaticObjects.forEach(({ object, visible }) => {
+                if (object.sprite) {
+                    object.sprite.visible = visible;
+                }
+            });
+            this.originalStaticObjects = null;
+        }
+
+        // Restore interactables
+        if (this.originalInteractables) {
+            this.game.interactables = this.originalInteractables;
+            this.originalInteractables = null;
         }
     }
 
@@ -258,7 +295,7 @@ class TerrainWaveCross extends BaseMinigame {
                 
                 npc.setPosition(startLine, npcZ);
                 npc.isPatrolling = false;
-                npc.isInteractable = false;
+                npc.isInteractable = false; // Disable interaction
                 npc.path = [];
                 npc.speed = 0.25 + Math.random() * 0.15; // Competitive but fair speeds
                 
@@ -268,12 +305,71 @@ class TerrainWaveCross extends BaseMinigame {
                     startPos: { x: startLine, z: npcZ },
                     isAlive: true,
                     aiTimer: Math.random() * 500,
-                    aiState: 'waiting',
+                    aiState: 'racing', // Set to racing mode
                     progress: 0,
                     stuckTimer: 0
                 });
             }
         });
+
+        // Start the race immediately after positioning
+        setTimeout(() => {
+            this.startRace();
+        }, 1000);
+    }
+
+    startRace() {
+        this.game.showMessage("🏁 ¡LA CARRERA COMENZÓ! ¡Llega al lado derecho antes que los NPCs!");
+        
+        // Make all NPCs start racing toward the goal
+        this.participants.forEach(participant => {
+            if (participant.type === 'npc') {
+                const npc = participant.entity;
+                participant.aiState = 'racing';
+                
+                // Give NPCs an initial boost toward the goal
+                this.moveNPCTowardGoal(participant);
+            }
+        });
+    }
+
+    moveNPCTowardGoal(participant) {
+        const npc = participant.entity;
+        const goalX = this.config.mapSize - 1;
+        
+        // Find a safe tile to move forward
+        const targetX = Math.min(npc.pos.x + 1 + Math.floor(Math.random() * 2), goalX);
+        const searchRadius = 3;
+        const safeTiles = [];
+        
+        for (let dx = 0; dx <= searchRadius; dx++) {
+            for (let dz = -searchRadius; dz <= searchRadius; dz++) {
+                const checkX = targetX + dx;
+                const checkZ = npc.pos.z + dz;
+                
+                if (checkX >= 0 && checkX < this.config.mapSize && 
+                    checkZ >= 0 && checkZ < this.config.mapSize &&
+                    checkX > npc.pos.x) { // Must move forward
+                    
+                    const tile = this.game.terrain.getTile(checkX, checkZ);
+                    if (tile && tile.height > 1) {
+                        // Prioritize tiles closer to goal
+                        const priority = checkX * 10 + Math.random() * 5;
+                        safeTiles.push({ x: checkX, z: checkZ, priority });
+                    }
+                }
+            }
+        }
+        
+        if (safeTiles.length > 0) {
+            safeTiles.sort((a, b) => b.priority - a.priority);
+            const target = safeTiles[0];
+            
+            npc.findPath(npc.pos, target, (path) => {
+                npc.path = path;
+                npc.progress = 0;
+            });
+        }
     }
 
     spawnScoreObjects() {
@@ -462,50 +558,23 @@ class TerrainWaveCross extends BaseMinigame {
                 participant.stuckTimer = 0;
             }
             
-            // AI decision making every 600-1000ms or if stuck
-            if (participant.aiTimer >= 600 + Math.random() * 400 || participant.stuckTimer > 2000) {
+            // Aggressive AI: Make decisions more frequently in racing mode
+            const decisionInterval = participant.aiState === 'racing' ? 300 + Math.random() * 300 : 600 + Math.random() * 400;
+            
+            if (participant.aiTimer >= decisionInterval || participant.stuckTimer > 1500) {
                 participant.aiTimer = 0;
                 participant.stuckTimer = 0;
                 
-                if (npc.path.length === 0) {
-                    // Smart AI: Look for safe paths forward
-                    const currentX = npc.pos.x;
-                    const currentZ = npc.pos.z;
-                    const targetX = Math.min(currentX + 1 + Math.floor(Math.random() * 3), this.config.mapSize - 1);
-                    
-                    // Find safe tiles to move to
-                    const safeTiles = [];
-                    const searchRadius = 2;
-                    
-                    for (let dx = -searchRadius; dx <= searchRadius; dx++) {
-                        for (let dz = -searchRadius; dz <= searchRadius; dz++) {
-                            const checkX = targetX + dx;
-                            const checkZ = currentZ + dz;
-                            
-                            if (checkX >= 0 && checkX < this.config.mapSize && 
-                                checkZ >= 0 && checkZ < this.config.mapSize &&
-                                checkX > currentX) { // Must move forward
-                                
-                                const tile = this.game.terrain.getTile(checkX, checkZ);
-                                if (tile && tile.height > 1) {
-                                    // Prefer tiles closer to the goal (right side)
-                                    const priority = checkX + Math.random() * 2;
-                                    safeTiles.push({ x: checkX, z: checkZ, priority });
-                                }
-                            }
-                        }
-                    }
-                    
-                    if (safeTiles.length > 0) {
-                        // Choose best safe tile (furthest forward with some randomness)
-                        safeTiles.sort((a, b) => b.priority - a.priority);
-                        const target = safeTiles[0];
-                        
-                        npc.findPath(npc.pos, target, (path) => {
-                            npc.path = path;
-                            npc.progress = 0;
-                        });
-                    }
+                if (npc.path.length === 0 || participant.stuckTimer > 1000) {
+                    this.moveNPCTowardGoal(participant);
+                }
+            }
+            
+            // Racing behavior: constantly try to move forward when not pathing
+            if (participant.aiState === 'racing' && npc.path.length === 0) {
+                // Quick forward movement attempts
+                if (Math.random() < 0.3) { // 30% chance per frame when not moving
+                    this.moveNPCTowardGoal(participant);
                 }
             }
         });

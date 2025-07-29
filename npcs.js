@@ -105,7 +105,7 @@ const NPC_DATA = {
             {
                 message: "Greetings, young traveler. Let me show you a better view of our lands...",
                 requiresConfirmation: false,
-                action: {type: 'followAndMove', target: {x: 2, z: 3}, speed: 0.05,smooth: true}
+                action: {type: 'followAndMove', target: {x: 12, z: 3}, speed: 0.05,smooth: true}
             },
             {message:"The ancient temple holds secrets... but first, prove your worth.",action:{type:'followAndMove',target:{x:7,z:0},speed:0.05,smooth:!0,usePerspective:true},requiresConfirmation:!0,confirmationMessage:"Do you wish to follow me to the ancient temple? The path may be dangerous."},
             {
@@ -188,52 +188,50 @@ const NPC_DATA = {
                         centerX: 14,
                         centerZ: 5,
                         speed: 0.04,
-                        delay: 1000,
+                        delay: 100,
                         nextAction: {
                             type: 'move',
-                            target: {x: 14, z: 8},
+                            target: {x: 13, z: 6},
                             speed: 0.03,
-                            delay: 1500,
+                            delay: 1200,
                             message: "¡Empezamos! Voy paso a paso, pero nunca me detengo.",
                             nextAction: {
-                                type: 'patrolnpc',
-                                npcId: 'guard_tom',
-                                message: 'Veloz arranca rapidísimo',
+                                type: 'message',
+                                message: 'Sigo mi ritmo...',
                                 delay: 500,
-                                patrolType: null,
-                                centerX: 12,
-                                centerZ: 10,
-                                speed: 0.08,
                                 nextAction: {
-                                    type: 'move',
-                                    target: {x: 13, z: 10},
-                                    speed: 0.03,
-                                    delay: 1500,
-                                    message: "Mira, Veloz ya se adelantó mucho... pero sigo mi ritmo.",
+                                    type: 'patrolnpc',
+                                    npcId: 'guard_tom',
+                                    message: 'Veloz arranca rapidísimo',
+                                    delay: 500,
+                                    patrolType: null,
+                                    centerX: 13,
+                                    centerZ: 9,
+                                    speed: 0.08,
                                     nextAction: {
-                                        type: 'patrolnpc',
-                                        npcId: 'guard_tom',
+                                        type: 'message',
                                         message: 'Veloz se detiene a descansar',
-                                        delay: 1000,
-                                        patrolType: 'none',
-                                        centerX: 12,
-                                        centerZ: 10,
-                                        speed: 0,
+                                        delay: 1500,
                                         nextAction: {
-                                            type: 'move',
-                                            target: {x: 14, z: 12},
-                                            speed: 0.03,
-                                            delay: 2000,
-                                            message: "Llegué primero. La constancia siempre gana.",
+                                            type: 'message',
+                                            message: 'Mientras Veloz descansa, yo sigo avanzando...',
+                                            delay: 1500,
                                             nextAction: {
-                                                type: 'patrolnpc',
-                                                npcId: 'guard_tom',
-                                                message: 'Veloz despierta y corre desesperado',
+                                                type: 'move',
+                                                target: {x: 14, z: 12},
+                                                speed: 0.03,
                                                 delay: 1000,
-                                                patrolType: null,
-                                                centerX: 14,
-                                                centerZ: 12,
-                                                speed: 0.08
+                                                message: "La constancia siempre gana.",
+                                                nextAction: {
+                                                    type: 'patrolnpc',
+                                                    npcId: 'guard_tom',
+                                                    message: 'Veloz despierta y corre desesperado',
+                                                    delay: 1400,
+                                                    patrolType: null,
+                                                    centerX: 14,
+                                                    centerZ: 12,
+                                                    speed: 0.08
+                                                }
                                             }
                                         }
                                     }
@@ -256,44 +254,54 @@ const NPC_DATA = {
                         speed: 0.04,
                         delay: 1000,
                         nextAction: {
-                            type: 'patrolnpc',
-                            npcId: 'guard_tom',
-                            message: 'Veloz arranca rapidísimo',
+                            type: 'move',
+                            target: {x: 13, z: 8},
+                            speed: 0.03,
                             delay: 1500,
-                            patrolType: null,
-                            centerX: 12,
-                            centerZ: 10,
-                            speed: 0.08,
+                            message: "Está bien, yo mantendré mi ritmo constante.",
                             nextAction: {
-                                type: 'move',
-                                target: {x: 13, z: 8},
-                                speed: 0.03,
-                                delay: 1000,
-                                message: "Sigo a mi ritmo constante.",
+                                type: 'message',
+                                message: 'Avanzo paso a paso mientras Veloz corre...',
+                                delay: 500,
                                 nextAction: {
                                     type: 'patrolnpc',
                                     npcId: 'guard_tom',
-                                    message: 'Veloz se detiene confiado',
-                                    delay: 1500,
-                                    patrolType: 'none',
-                                    centerX: 12,
-                                    centerZ: 10,
-                                    speed: 0,
+                                    message: 'Veloz corre rapidísimo y se adelanta',
+                                    delay: 500,
+                                    patrolType: null,
+                                    centerX: 13,
+                                    centerZ: 8,
+                                    speed: 0.08,
                                     nextAction: {
-                                        type: 'move',
-                                        target: {x: 14, z: 12},
-                                        speed: 0.03,
-                                        delay: 2000,
-                                        message: "Al final, llegué igual. Paso a paso se llega lejos.",
+                                        type: 'patrolnpc',
+                                        npcId: 'guard_tom',
+                                        message: 'Veloz se detiene confiado a descansar',
+                                        delay: 1500,
+                                        patrolType: 'none',
+                                        centerX: 13,
+                                        centerZ: 8,
+                                        speed: 0,
                                         nextAction: {
-                                            type: 'patrolnpc',
-                                            npcId: 'guard_tom',
-                                            message: 'Veloz despierta demasiado tarde',
-                                            delay: 1000,
-                                            patrolType: null,
-                                            centerX: 14,
-                                            centerZ: 12,
-                                            speed: 0.06
+                                            type: 'message',
+                                            message: 'Sigo avanzando mientras él descansa...',
+                                            delay: 1500,
+                                            nextAction: {
+                                                type: 'move',
+                                                target: {x: 14, z: 12},
+                                                speed: 0.03,
+                                                delay: 1000,
+                                                message: "Al final, llegué primero. Paso a paso se llega lejos.",
+                                                nextAction: {
+                                                    type: 'patrolnpc',
+                                                    npcId: 'guard_tom',
+                                                    message: 'Veloz despierta demasiado tarde',
+                                                    delay: 1000,
+                                                    patrolType: null,
+                                                    centerX: 14,
+                                                    centerZ: 12,
+                                                    speed: 0.06
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -336,10 +344,14 @@ const NPC_DATA = {
                         delay: 1000,
                         nextAction: {
                             type: 'move',
-                            target: {x: 12, z: 10},
+                            target: {x: 13, z: 9},
                             speed: 0.08,
                             delay: 1500,
                             message: "¡Mírame! ¡Soy rapidísimo!",
+                            nextAction: {
+                                            type: 'message',
+                                            message: 'Voy tan adelantado que puedo descansar... Zzz...',
+                                            delay: 500,
                             nextAction: {
                                 type: 'patrolnpc',
                                 npcId: 'scout_mike',
@@ -349,29 +361,19 @@ const NPC_DATA = {
                                 centerX: 13,
                                 centerZ: 8,
                                 speed: 0.03,
-                                nextAction: {
-                                    type: 'patrol',
-                                    patrolType: 'none',
-                                    delay: 1500,
-                                    message: "Voy tan adelantado que puedo descansar... Zzz...",
                                     nextAction: {
                                         type: 'patrolnpc',
                                         npcId: 'scout_mike',
                                         message: 'Donatello sigue avanzando constante',
                                         delay: 1500,
                                         patrolType: null,
-                                        centerX: 13,
-                                        centerZ: 11,
+                                        centerX: 14,
+                                        centerZ: 12,
                                         speed: 0.03,
                                         nextAction: {
-                                            type: 'patrolnpc',
-                                            npcId: 'scout_mike',
+                                            type: 'message',
                                             message: 'Donatello llega a la meta',
                                             delay: 1500,
-                                            patrolType: null,
-                                            centerX: 14,
-                                            centerZ: 12,
-                                            speed: 0.03,
                                             nextAction: {
                                                 type: 'move',
                                                 target: {x: 14, z: 12},
@@ -387,60 +389,64 @@ const NPC_DATA = {
                     }
                 },
                 onFailure: {
-                    type: 'move',
-                    target: {x: 14, z: 5},
-                    speed: 0.04,
-                    message: "Nos preparamos, pero seguirás a Donatello...",
+    type: 'move',
+    target: {x: 14, z: 5},
+    speed: 0.04,
+    message: "Nos preparamos, pero seguirás a Donatello...",
+    nextAction: {
+        type: 'patrolnpc',
+        npcId: 'scout_mike',
+        patrolType: null,
+        centerX: 13,
+        centerZ: 5,
+        speed: 0.04,
+        delay: 1000,
+        nextAction: {
+            type: 'move',
+            target: {x: 13, z: 8},
+            speed: 0.08,
+            delay: 1500,
+            message: "Está bien, sigue al lento. Yo llegaré primero de todas formas.",
+            nextAction: {
+                type: 'message',
+                message: 'Descanso aquí... tengo tiempo de sobra... Zzz...',
+                delay: 500,
+                nextAction: {
+                    type: 'patrolnpc',
+                    npcId: 'scout_mike',
+                    message: 'Donatello avanza lento pero constante',
+                    delay: 500,
+                    patrolType: null,
+                    centerX: 13,
+                    centerZ: 8,
+                    speed: 0.03,
                     nextAction: {
                         type: 'patrolnpc',
                         npcId: 'scout_mike',
+                        message: 'Donatello pasa y llega a la meta',
+                        delay: 1500,
                         patrolType: null,
-                        centerX: 13,
-                        centerZ: 5,
-                        speed: 0.04,
-                        delay: 1000,
+                        centerX: 14,
+                        centerZ: 12,
+                        speed: 0.03,
                         nextAction: {
-                            type: 'move',
-                            target: {x: 12, z: 10},
-                            speed: 0.08,
+                            type: 'message',
+                            message: 'Donatello gana la carrera',
                             delay: 1500,
-                            message: "Está bien, sigue al lento. Yo llegaré primero de todas formas.",
                             nextAction: {
-                                type: 'patrolnpc',
-                                npcId: 'scout_mike',
-                                message: 'Donatello avanza lento pero constante',
-                                delay: 500,
-                                patrolType: null,
-                                centerX: 13,
-                                centerZ: 8,
-                                speed: 0.03,
-                                nextAction: {
-                                    type: 'patrol',
-                                    patrolType: 'none',
-                                    delay: 2000,
-                                    message: "Descanso aquí... tengo tiempo de sobra...",
-                                    nextAction: {
-                                        type: 'patrolnpc',
-                                        npcId: 'scout_mike',
-                                        message: 'Donatello pasa y llega a la meta',
-                                        delay: 2000,
-                                        patrolType: null,
-                                        centerX: 14,
-                                        centerZ: 12,
-                                        speed: 0.03,
-                                        nextAction: {
-                                            type: 'move',
-                                            target: {x: 14, z: 12},
-                                            speed: 0.06,
-                                            delay: 1000,
-                                            message: "Ups... creo que me quedé dormido demasiado tiempo."
-                                        }
-                                    }
-                                }
+                                type: 'move',
+                                target: {x: 14, z: 12},
+                                speed: 0.06,
+                                delay: 1000,
+                                message: "Ups... creo que me quedé dormido demasiado tiempo."
                             }
                         }
                     }
                 }
+            }
+        }
+    }
+}
             }
         }
     ]
@@ -526,7 +532,7 @@ const STATIC_OBJECT_INSTANCES = [
     {template: 'house', position: {x: 11, z: 4}},
     {template: 'singlepine', position: {x: 10, z: 5}},
     {template: 'singlepine', position: {x: 2, z: 13}},
-    {template: 'singlepine', position: {x: 12, z: 8}},
+    {template: 'singlepine', position: {x: 12, z: 9}},
     {template: 'singlepine', position: {x: 14, z: 2}},
     {template: 'finishline', position: {x: 14, z: 12}, mirrored: true},
     {template: 'forest_round', position: {x: 4, z: 10}},

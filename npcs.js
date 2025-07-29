@@ -170,9 +170,7 @@ const NPC_DATA = {
         idleFrame: 0,
         name: 'Wise Elena',
         conversations: [
-            {message: "The spirits whisper of your arrival...", action: null},
-            {message: "They tell me you seek knowledge. Come, let me show you the sacred grove.", action: {type: 'move', target: {x: 2, z: 2}, speed: 0.05}},
-            {message: "This place holds ancient magic. Use it wisely.", action: {type: 'patrol', patrolType: 'circle'}}
+            {message: "The spirits whisper of your arrival...", action: null}
         ]
     },
 'scout_mike': {
@@ -507,8 +505,8 @@ const NPC_DATA = {
                 centerZ: 5
             }
         ]},
-            {message: "I know of a hidden cache nearby. Care to make a deal?", action: {type: 'move', target: {x: 1, z: 5}, speed: 0.05}},
-            {message: "Here's your share. May fortune favor your travels!", action: {type: 'disappear', delay: 2000}}
+            {message: "I know of a hidden cache nearby. Care to make a deal?", action: {type: 'move', target: {x: 1, z: 5}, speed: 0.05}}
+            
         ]
     }
 };

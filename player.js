@@ -301,19 +301,17 @@ updatePathLine() {
             this.sprite.material.map.repeat.set(w / texW, h / texH);
         }
     }}
-updateAnimation(deltaTime) {
+updateAnimation() {
     if (!this.sprite || !this.sprite.material.map) return;
     
     const currentAnim = this.animations[this.animationState];
     if (!currentAnim) return;
     
-    // Update animation timer
-    this.animationTime += deltaTime || 0.016; // Default to ~60fps
+    // Use deltaTime for consistent timing across devices
+    this.animationTime += this.game.deltaTime * 0.001; // Convert to seconds
     
-    // Check if we should advance to next frame
     if (this.animationTime >= this.animationSpeed) {
         this.animationTime = 0;
-        
         if (currentAnim.frameCount > 1) {
             this.animationFrame++;
             if (this.animationFrame >= currentAnim.frameCount) {
@@ -322,18 +320,8 @@ updateAnimation(deltaTime) {
         }
     }
     
-    // Apply the current frame
     const frame = currentAnim.frames[this.animationFrame];
-
- this.setFrameUV(
-   frame.x,         // column X
-   frame.y,         // row Y (spriteRow * 64 for NPCs)
-   64, 64,
-   this.texW,       // full sheet width
-  this.texH        // full sheet height
-);
-
-
+    this.setFrameUV(frame.x, frame.y, 64, 64, this.texW, this.texH);
 }
 
 

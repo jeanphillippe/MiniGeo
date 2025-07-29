@@ -3,6 +3,12 @@ const USE_SPRITE_TERRAIN = true;
 
 class GameEngine {
     constructor() {
+
+this.lastFrameTime = performance.now();
+this.deltaTime = 0;
+this.targetFPS = 60;
+this.frameInterval = 1000 / this.targetFPS;
+
         this.gridSize = 16;
         this.tileSize = 2;
         this.heightLevels = 8;
@@ -34,13 +40,37 @@ class GameEngine {
         
         this.init();
     }
-
+setupMobileOptimizations() {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+        // Reduce shadow quality on mobile
+        this.renderer.shadowMap.type = THREE.BasicShadowMap;
+        this.directionalLight.shadow.mapSize.setScalar(1024); // Reduce from 2048
+        
+        // Reduce cloud count
+        this.cloudSprites = this.cloudSprites.slice(0, 3);
+        
+        // Optimize materials
+        this.scene.traverse((object) => {
+            if (object.isMesh && object.material) {
+                object.material.precision = 'lowp';
+            }
+        });
+        
+        console.log('Mobile optimizations applied');
+    }
+}
     init() {
         this.setupRenderer();
         this.cameraSystem.setupCamera();
         this.camera = this.cameraSystem.camera; // Alias for backward compatibility
         this.setupScene();
         this.setupLighting();
+        
+
+// Call this in init() method after setupClouds()
+this.setupMobileOptimizations();
         this.setupClouds();
         this.setupTerrain();
         this.setupInput();
@@ -222,24 +252,29 @@ setupIntro() {
     }
 
     handleTileClick(e) {
-        const rect = this.canvas.getBoundingClientRect();
-        this.mouse.set(
-            ((e.clientX - rect.left) / rect.width) * 2 - 1,
-            -((e.clientY - rect.top) / rect.height) * 2 + 1
-        );
-        
-        this.raycaster.setFromCamera(this.mouse, this.camera);
-        const intersects = this.raycaster.intersectObjects(this.terrainSystem.terrainGroup.children, true);
-        
-        if (intersects.length) {
-            const tile = intersects[0].object.userData;
-            this.selectTile(tile.x, tile.z);
-            
-            if (e.shiftKey) this.modifyTileHeight(tile.x, tile.z, -1);
-            else if (e.ctrlKey || e.metaKey) this.setTileHeight(tile.x, tile.z, 0);
-            else this.modifyTileHeight(tile.x, tile.z, 1);
-        }
+    const rect = this.canvas.getBoundingClientRect();
+    this.mouse.set(
+        ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        -((e.clientY - rect.top) / rect.height) * 2 + 1
+    );
+    
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    
+    // Optimize: Only raycast against visible tiles
+    const visibleTiles = this.terrainSystem.terrainGroup.children.filter(child => {
+        return child.position.distanceTo(this.camera.position) < 50;
+    });
+    
+    const intersects = this.raycaster.intersectObjects(visibleTiles, true);
+    
+    if (intersects.length) {
+        const tile = intersects[0].object.userData;
+        this.selectTile(tile.x, tile.z);
+        if (e.shiftKey) this.modifyTileHeight(tile.x, tile.z, -1);
+        else if (e.ctrlKey || e.metaKey) this.setTileHeight(tile.x, tile.z, 0);
+        else this.modifyTileHeight(tile.x, tile.z, 1);
     }
+}
 
     // Edit system methods (kept as-is since they're specific to the game)
     selectTile(x, z) {
@@ -452,13 +487,20 @@ setupIntro() {
     }
 
     animate() {
-        requestAnimationFrame(() => this.animate());
-        this.update();
-        this.render();
-        if (this.debugSystem) {
-            this.debugSystem.updatePerformanceStats();
-        }
+    requestAnimationFrame(() => this.animate());
+    
+    const currentTime = performance.now();
+    this.deltaTime = Math.min(currentTime - this.lastFrameTime, 33.33); // Cap at 30fps minimum
+    this.lastFrameTime = currentTime;
+    
+    this.update();
+    this.render();
+    
+    if (this.debugSystem) {
+        this.debugSystem.updatePerformanceStats();
     }
+}
+
 
     update() {
         this.handleKeyboardInput();
@@ -467,11 +509,15 @@ setupIntro() {
         this.cameraSystem.update();
         
         // Update cloud movement
-        this.cloudSprites.forEach(c => {
-            c.position.x += c.userData.speed;
-            if (c.position.x > this.gridSize * this.tileSize) 
-                c.position.x = -this.gridSize * this.tileSize;
-        });
+        this.cloudSprites.forEach((c, i) => {
+    // Update only every 4th frame for clouds
+    if (i % 4 === (Date.now() / 100) % 4 | 0) {
+        c.position.x += c.userData.speed * (this.deltaTime / 16.67); // Normalize to 60fps
+        if (c.position.x > this.gridSize * this.tileSize) {
+            c.position.x = -this.gridSize * this.tileSize;
+        }
+    }
+});
         
         // Update tile highlight
         if (this.selectedTile && this.tileHighlight) {
@@ -632,38 +678,46 @@ setupIntro() {
     }
 
     addGlowEffect(mesh) {
-        if (!mesh.userData) mesh.userData = {};
-        if (mesh.userData.glowAdded) return;
-        
-        const addGlowTo = (m) => {
-            if (!m.userData) m.userData = {};
-            if (m.material && m.material.emissive) {
-                const originalEmissive = m.material.emissive.clone();
-                m.userData.originalEmissive = originalEmissive;
-                m.userData.glowAdded = true;
+    if (!mesh.userData) mesh.userData = {};
+    if (mesh.userData.glowAdded) return;
+    
+    const addGlowTo = (m) => {
+        if (!m.userData) m.userData = {};
+        if (m.material && m.material.emissive) {
+            const originalEmissive = m.material.emissive.clone();
+            m.userData.originalEmissive = originalEmissive;
+            m.userData.glowAdded = true;
+            
+            // Reduce glow frequency for mobile performance
+            let lastUpdate = 0;
+            const animate = (currentTime) => {
+                if (!m.userData.glowAdded) return;
                 
-                const animate = () => {
-                    if (!m.userData.glowAdded) return;
-                    const intensity = (Math.sin(Date.now() * 0.003) + 1) * 0.1;
+                // Update only every 100ms instead of every frame
+                if (currentTime - lastUpdate > 100) {
+                    const intensity = (Math.sin(currentTime * 0.003) + 1) * 0.1;
                     m.material.emissive.setRGB(
                         originalEmissive.r + intensity,
                         originalEmissive.g + intensity,
                         originalEmissive.b + intensity
                     );
-                    requestAnimationFrame(animate);
-                };
-                animate();
-            }
-        };
-        
-        if (mesh.isGroup) {
-            mesh.children.forEach(addGlowTo);
-        } else {
-            addGlowTo(mesh);
+                    lastUpdate = currentTime;
+                }
+                requestAnimationFrame(animate);
+            };
+            animate(performance.now());
         }
-        
-        mesh.userData.glowAdded = true;
+    };
+    
+    if (mesh.isGroup) {
+        mesh.children.forEach(addGlowTo);
+    } else {
+        addGlowTo(mesh);
     }
+    
+    mesh.userData.glowAdded = true;
+}
+
 
     removeGlowEffect(mesh) {
         if (!mesh.userData) mesh.userData = {};

@@ -564,7 +564,8 @@ class NPC extends Player {
         super(game);
         const data = NPC_DATA[npcId];
         if (!data) throw new Error(`NPC data not found for ID: ${npcId}`);
-
+this.actionTimer = 0;
+this.actionDelay = 0;
         this.npcId = npcId;
         this.spriteRow = data.spriteRow;
         this.isNPC = true;
@@ -706,8 +707,30 @@ class NPC extends Player {
     this.executeSingleAction(action, executeNextAction);
 }
 
+// Complete executeSingleAction method for NPC class
+// Replace the entire executeSingleAction method with this:
+
 executeSingleAction(action, onComplete) {
     if (action.message) this.game.showMessage(action.message);
+    
+    // Helper function for deltaTime-based delays
+    const delayedComplete = (delay) => {
+        if (delay) {
+            this.actionDelay = delay;
+            this.actionTimer = 0;
+            const checkDelay = () => {
+                this.actionTimer += this.game.deltaTime || 16.67;
+                if (this.actionTimer >= this.actionDelay) {
+                    onComplete();
+                } else {
+                    requestAnimationFrame(checkDelay);
+                }
+            };
+            checkDelay();
+        } else {
+            onComplete();
+        }
+    };
     
     switch (action.type) {
         case 'move':
@@ -738,39 +761,37 @@ executeSingleAction(action, onComplete) {
             break;
             
         case 'patrolnpc':
-    const patrolNPC = this.game.npcs.find(npc => npc.npcId === action.npcId);
-    if (patrolNPC) {
-        patrolNPC.path = [];
-        patrolNPC.onReachTarget = null;
-        
-        if (action.patrolType === null) {
-            // Movimiento directo para null
-            patrolNPC.isPatrolling = false;
-            patrolNPC.isExecutingAction = true; // <-- CLAVE: Mantener ejecutando para que se actualice
-            patrolNPC.speed = action.speed || 0.05;
-            console.log(`Moving ${action.npcId} directly to (${action.centerX}, ${action.centerZ})`);
-            patrolNPC.findPath(patrolNPC.pos, {x: action.centerX, z: action.centerZ}, (path) => {
-                console.log(`Path found for ${action.npcId}:`, path);
-                patrolNPC.path = path;
-                patrolNPC.progress = 0;
-                patrolNPC.onReachTarget = () => {
-                    patrolNPC.isExecutingAction = false; // <-- Detener cuando llegue
-                    patrolNPC.onReachTarget = null;
-                };
-            });
-        } else {
-            // Patrullaje normal
-            patrolNPC.isExecutingAction = true;
-            patrolNPC.patrolType = action.patrolType;
-            patrolNPC.patrolPath = action.patrolType !== 'none' ? 
-                patrolNPC.generatePatrolPath(action.patrolType, action.centerX, action.centerZ) : [];
-            patrolNPC.isPatrolling = action.patrolType !== 'none';
-            patrolNPC.patrolIndex = 0;
-            if (patrolNPC.isPatrolling) patrolNPC.startPatrol();
-        }
-    }
-    onComplete();
-    break;
+            const patrolNPC = this.game.npcs.find(npc => npc.npcId === action.npcId);
+            if (patrolNPC) {
+                patrolNPC.path = [];
+                patrolNPC.onReachTarget = null;
+                
+                if (action.patrolType === null) {
+                    patrolNPC.isPatrolling = false;
+                    patrolNPC.isExecutingAction = true;
+                    patrolNPC.speed = action.speed || 0.05;
+                    console.log(`Moving ${action.npcId} directly to (${action.centerX}, ${action.centerZ})`);
+                    patrolNPC.findPath(patrolNPC.pos, {x: action.centerX, z: action.centerZ}, (path) => {
+                        console.log(`Path found for ${action.npcId}:`, path);
+                        patrolNPC.path = path;
+                        patrolNPC.progress = 0;
+                        patrolNPC.onReachTarget = () => {
+                            patrolNPC.isExecutingAction = false;
+                            patrolNPC.onReachTarget = null;
+                        };
+                    });
+                } else {
+                    patrolNPC.isExecutingAction = true;
+                    patrolNPC.patrolType = action.patrolType;
+                    patrolNPC.patrolPath = action.patrolType !== 'none' ? 
+                        patrolNPC.generatePatrolPath(action.patrolType, action.centerX, action.centerZ) : [];
+                    patrolNPC.isPatrolling = action.patrolType !== 'none';
+                    patrolNPC.patrolIndex = 0;
+                    if (patrolNPC.isPatrolling) patrolNPC.startPatrol();
+                }
+            }
+            delayedComplete(action.delay);
+            break;
             
         case 'choice':
             onComplete();
@@ -805,9 +826,11 @@ executeSingleAction(action, onComplete) {
             if (existingDialog) existingDialog.remove();
             const npcDialog = document.getElementById('npcQuestionDialog');
             if (npcDialog) npcDialog.remove();
-            setTimeout(() => {
-                this.game.setCameraPreset(action.preset, action.smooth !== false, onComplete);
-            }, 100);
+            
+            delayedComplete(100); // Small delay before camera change
+            this.game.setCameraPreset(action.preset, action.smooth !== false, () => {
+                // Camera change completed
+            });
             break;
             
         case 'patrol':
@@ -831,7 +854,8 @@ executeSingleAction(action, onComplete) {
         case 'removeObject':
             if (this.game.staticObjects) {
                 const idx = this.game.staticObjects.findIndex(obj => 
-                    obj.pos.x === action.position.x && obj.pos.z === action.position.z);
+                    obj.pos.x === action.position.x && obj.pos.z === action.position.z
+                );
                 if (idx !== -1) {
                     const obj = this.game.staticObjects[idx];
                     if (obj.sprite) {
@@ -879,59 +903,57 @@ executeSingleAction(action, onComplete) {
             }
             break;
             
+        case 'message':
+            delayedComplete(action.delay);
+            break;
+            
         case 'drop':
-            setTimeout(() => {
-                this.isInteractable = false;
-                this.isPatrolling = false;
-                if (this.sprite) {
-                    let velocity = 0;
-                    const gravity = 0.01, rotationSpeed = 0.01, startY = this.sprite.position.y;
-                    const dropAnimation = () => {
-                        if (!this.sprite.material) return;
-                        velocity += gravity;
-                        this.sprite.position.y -= velocity;
-                        this.sprite.rotation.z += rotationSpeed;
-                        if (this.sprite.position.y < startY - 3) {
-                            this.sprite.material.opacity = Math.max(0, this.sprite.material.opacity - 0.02);
-                        }
-                        if (this.sprite.position.y < startY - 8 || this.sprite.material.opacity <= 0) {
-                            this.game.scene.remove(this.sprite);
-                            this.game.interactables = this.game.interactables.filter(i => i.npcRef !== this);
-                            onComplete();
-                        } else {
-                            requestAnimationFrame(dropAnimation);
-                        }
-                    };
-                    this.sprite.material.transparent = true;
-                    dropAnimation();
-                } else {
-                    onComplete();
-                }
-            }, action.delay || 0);
+            delayedComplete(action.delay || 0);
+            this.isInteractable = false;
+            this.isPatrolling = false;
+            if (this.sprite) {
+                let velocity = 0;
+                const gravity = 0.01, rotationSpeed = 0.01, startY = this.sprite.position.y;
+                const dropAnimation = () => {
+                    if (!this.sprite.material) return;
+                    velocity += gravity;
+                    this.sprite.position.y -= velocity;
+                    this.sprite.rotation.z += rotationSpeed;
+                    if (this.sprite.position.y < startY - 3) {
+                        this.sprite.material.opacity = Math.max(0, this.sprite.material.opacity - 0.02);
+                    }
+                    if (this.sprite.position.y < startY - 8 || this.sprite.material.opacity <= 0) {
+                        this.game.scene.remove(this.sprite);
+                        this.game.interactables = this.game.interactables.filter(i => i.npcRef !== this);
+                        // onComplete is called via delayedComplete above
+                    } else {
+                        requestAnimationFrame(dropAnimation);
+                    }
+                };
+                this.sprite.material.transparent = true;
+                dropAnimation();
+            }
             break;
             
         case 'disappear':
-            setTimeout(() => {
-                this.isInteractable = false;
-                this.isPatrolling = false;
-                if (this.sprite) {
-                    const fadeOut = () => {
-                        if (!this.sprite.material) return;
-                        this.sprite.material.opacity -= 0.05;
-                        if (this.sprite.material.opacity <= 0) {
-                            this.game.scene.remove(this.sprite);
-                            this.game.interactables = this.game.interactables.filter(i => i.npcRef !== this);
-                            onComplete();
-                        } else {
-                            requestAnimationFrame(fadeOut);
-                        }
-                    };
-                    this.sprite.material.transparent = true;
-                    fadeOut();
-                } else {
-                    onComplete();
-                }
-            }, action.delay || 0);
+            delayedComplete(action.delay || 0);
+            this.isInteractable = false;
+            this.isPatrolling = false;
+            if (this.sprite) {
+                const fadeOut = () => {
+                    if (!this.sprite.material) return;
+                    this.sprite.material.opacity -= 0.05;
+                    if (this.sprite.material.opacity <= 0) {
+                        this.game.scene.remove(this.sprite);
+                        this.game.interactables = this.game.interactables.filter(i => i.npcRef !== this);
+                        // onComplete is called via delayedComplete above
+                    } else {
+                        requestAnimationFrame(fadeOut);
+                    }
+                };
+                this.sprite.material.transparent = true;
+                fadeOut();
+            }
             break;
             
         default:
@@ -1112,8 +1134,52 @@ class StaticObject extends NPC {
     }
 
     update() {
+    // Skip update on some frames for performance (every 3rd frame for background NPCs)
+    if (!this.isPlayerNearby() && Math.random() > 0.33) return;
+    
+    if (!this.isPatrolling && !this.isExecutingAction) return;
+    
+    if (this.isExecutingAction) {
+        if (this.path.length > 0) {
+            super.update();
+            if (this.onReachTarget && this.path.length === 0) {
+                this.onReachTarget();
+            }
+        }
         return;
     }
+    
+    if (this.isPlayerNearby() && !this.isExecutingAction) {
+        if (this.animationState !== 'idle') {
+            this.animationState = 'idle';
+            this.animationFrame = 0;
+            this.animationTime = 0;
+        }
+        this.updateAnimation();
+        return;
+    }
+    
+    if (this.path.length > 0) {
+        super.update();
+        return;
+    }
+    
+    if (this.patrolPath.length > 0 && this.isPatrolling) {
+        this.waitTime += this.game.deltaTime || 30;
+        if (this.waitTime >= this.maxWaitTime) {
+            this.patrolIndex = (this.patrolIndex + 1) % this.patrolPath.length;
+            this.maxWaitTime = 1500 + Math.random() * 1000;
+            this.startPatrol();
+        } else {
+            if (this.animationState !== 'idle') {
+                this.animationState = 'idle';
+                this.animationFrame = 0;
+                this.animationTime = 0;
+            }
+            this.updateAnimation();
+        }
+    }
+}
 }
 
 // Initialization function

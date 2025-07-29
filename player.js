@@ -34,7 +34,7 @@ this.animations = {
 
         if (USE_SPRITE_PLAYER) {
             const loader = new THREE.TextureLoader();
-            loader.load('https://i.imgur.com/lWizvUh.png', texture => {
+            loader.load('https://i.imgur.com/4lded4b.png', texture => {
                 texture.magFilter = texture.minFilter = THREE.NearestFilter;
                 this.sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true }));
                 this.sprite.scale.setScalar(2);

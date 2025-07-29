@@ -262,14 +262,18 @@ const NPC_DATA = {
 'guard_tom': {
     spriteRow: 1,
     position: {x: 14, z: 5},
-    spawnDelay: 1000,
-    patrolType: 'none',
+    spawnDelay: 1,
+    patrolType: 'random',
     idleFrame: 0,
     name: 'Veloz',
     conversations: [
         {
             message: "¡Hola viajero! Veo a Donatello allá con su paso lento. Voy a retarlo a una carrera.",
-            action: {
+            type: 'move',
+                        target: {x: 14, z: 5},
+                        delay:10,
+                        speed: 0.03,
+            nextAction: {
                 type: 'patrolnpc',
                 npcId: 'scout_mike',
                 message: 'Veloz llama a Donatello',
@@ -399,7 +403,7 @@ const NPC_DATA = {
    
     'trader_jill': {
         spriteRow: 3,
-        position: {x: 13, z: 8},
+        position: {x: 2, z: 5},
         spawnDelay: 1500,
         patrolType: 'line',
         idleFrame: 0,

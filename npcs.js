@@ -288,7 +288,7 @@ const NPC_DATA = {
             action: {
                 type: 'choice',
                 onSuccess: {
-                    type: 'move',
+                    type: 'followAndMove',
                     target: {x: 13, z: 9},
                     speed: 0.08,
                     delay: 50,
@@ -345,7 +345,12 @@ const NPC_DATA = {
                                         target: {x: 14, z: 12},
                                         speed: 0.06,
                                         delay: 800,
-                                        message: "¡No puede ser! ¡Me ganó! La velocidad sin constancia no sirve..."
+                                        message: "¡No puede ser! ¡Me ganó! La velocidad sin constancia no sirve...",
+                                        nextAction: {
+                                            type: 'endCamera',
+                                            preset: 'default', // or 'overview' or 'restore'
+                                            smooth: true
+                                        }
                                     }
                                     }
                                     }
@@ -743,29 +748,52 @@ case 'patrolnpc':
             executeNextAction();
             break;
 
-        case 'followAndMove':
-            console.log(`Setting camera to follow NPC and moving`);
-            this.game.cameraSystem.saveInitialCameraState();
-            this.game.cameraSystem.setFollowTarget(this);
-            this.game.setCameraPreset('followAndMove', action.smooth !== false, () => {
-                console.log(`Camera now following NPC, starting movement`);
-                this.isPatrolling = false;
-                this.speed = action.speed || this.speed;
-                this.findPath(this.pos, action.target, (path) => {
-                    this.path = path;
-                    this.progress = 0;
-                    this.onReachTarget = () => {
-                        console.log(`NPC reached target, restoring to initial camera state`);
-                        this.game.cameraSystem.clearFollowTarget();
-                        this.game.cameraSystem.restoreToInitialState(true, () => {
-                            this.onReachTarget = null;
-                            executeNextAction();
-                        });
-                    };
-                });
-            });
-            break;
+        
+case 'followAndMove':
+    console.log(`Setting camera to follow NPC and moving`);
+    this.game.cameraSystem.saveInitialCameraState();
+    this.game.cameraSystem.setFollowTarget(this);
+    this.game.setCameraPreset('followAndMove', action.smooth !== false, () => {
+        console.log(`Camera now following NPC, starting movement`);
+        this.isPatrolling = false;
+        this.speed = action.speed || this.speed;
+        this.findPath(this.pos, action.target, (path) => {
+            this.path = path;
+            this.progress = 0;
+            this.onReachTarget = () => {
+                console.log(`NPC reached target, checking for nextAction`);
+                
+                // Only restore camera if there's no nextAction
+                if (!action.nextAction) {
+                    this.game.cameraSystem.clearFollowTarget();
+                    this.game.cameraSystem.restoreToInitialState(true, () => {
+                        this.onReachTarget = null;
+                        executeNextAction();
+                    });
+                } else {
+                    // Continue following, just execute next action
+                    this.onReachTarget = null;
+                    executeNextAction();
+                }
+            };
+        });
+    });
+    break;
 
+// Add a new action type for explicitly changing camera at the end of chains:
+case 'endCamera':
+    console.log(`Ending chain with camera preset: ${action.preset}`);
+    this.game.cameraSystem.clearFollowTarget();
+    if (action.preset === 'restore') {
+        this.game.cameraSystem.restoreToInitialState(action.smooth !== false, () => {
+            executeNextAction();
+        });
+    } else {
+        this.game.setCameraPreset(action.preset, action.smooth !== false, () => {
+            executeNextAction();
+        });
+    }
+    break;
         case 'drop':
             console.log(`Dropping in ${action.delay || 0}ms`);
             setTimeout(() => {

@@ -411,7 +411,7 @@ const NPC_DATA = {
             }
         }
     ]
-}
+},
     'healer_rose': {
         spriteRow: 7,
         position: {x: 5, z: 14},

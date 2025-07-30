@@ -1,7 +1,7 @@
 class Player {
     constructor(game) {
         this.game = game;
-        this.speed = 0.5;
+        this.speed = 0.03;
         this.path = [];
         this.facingLeft = false;
         this.progress = 0;

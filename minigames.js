@@ -258,8 +258,8 @@ class TerrainWaveCross extends BaseMinigame {
     setupFullMapWave() {
         const { mapSize } = this.config;
         
-        // Save and setup entire map as wave terrain
-        for (let x = 0; x < mapSize; x++) {
+        // Save and setup wave terrain (skip first and last rows)
+        for (let x = 1; x < mapSize - 1; x++) { // Skip x=0 (start) and x=15 (goal)
             for (let z = 0; z < mapSize; z++) {
                 this.saveTileState(x, z);
                 // Initialize with varied heights for interesting starting pattern
@@ -269,108 +269,135 @@ class TerrainWaveCross extends BaseMinigame {
         }
     }
 
-    positionParticipants() {
-        const { mapSize } = this.config;
-        const startLine = 0; // Left side of map
-        
-        // Position player at random spot on start line
-        const playerZ = Math.floor(Math.random() * mapSize);
-        this.game.player.setPosition(startLine, playerZ);
-        this.participants.push({
-            entity: this.game.player,
-            type: 'player',
-            startPos: { x: startLine, z: playerZ },
-            isAlive: true,
-            progress: 0
-        });
-
-        // Position NPCs at random spots on start line
-        this.config.participantNPCs.forEach((npcId, index) => {
-            const npc = this.game.npcs.find(n => n.npcId === npcId);
-            if (npc) {
-                let npcZ;
-                do {
-                    npcZ = Math.floor(Math.random() * mapSize);
-                } while (npcZ === playerZ); // Avoid same position as player
-                
-                npc.setPosition(startLine, npcZ);
-                npc.isPatrolling = false;
-                npc.isInteractable = false; // Disable interaction
-                npc.path = [];
-                npc.speed = 0.25 + Math.random() * 0.15; // Competitive but fair speeds
-                
-                this.participants.push({
-                    entity: npc,
-                    type: 'npc',
-                    startPos: { x: startLine, z: npcZ },
-                    isAlive: true,
-                    aiTimer: Math.random() * 500,
-                    aiState: 'racing', // Set to racing mode
-                    progress: 0,
-                    stuckTimer: 0
-                });
-            }
-        });
-
-        // Start the race immediately after positioning
-        setTimeout(() => {
-            this.startRace();
-        }, 1000);
-    }
+    positionParticipants(){
+    const{mapSize}=this.config;
+    const startLine=0;
+    const playerZ=Math.floor(Math.random()*mapSize);
+    this.game.player.setPosition(startLine,playerZ);
+    this.participants.push({entity:this.game.player,type:'player',startPos:{x:startLine,z:playerZ},isAlive:!0,progress:0});
+    
+    this.config.participantNPCs.forEach((npcId,index)=>{
+        const npc=this.game.npcs.find(n=>n.npcId===npcId);
+        if(npc){
+            let npcZ;
+            do{npcZ=Math.floor(Math.random()*mapSize)}while(npcZ===playerZ);
+            npc.setPosition(startLine,npcZ);
+            npc.isPatrolling=!1;
+            npc.isInteractable=!1;
+            npc.path=[];
+            // TWEAK: Make NPCs much slower and more variable
+            npc.speed=0.02+Math.random()*0.015; // Slightly slower than normal 0.03
+            this.participants.push({
+                entity:npc,
+                type:'npc',
+                startPos:{x:startLine,z:npcZ},
+                isAlive:!0,
+                aiTimer:Math.random()*1000, // Increased from 500
+                aiState:'racing',
+                progress:0,
+                stuckTimer:0,
+                // TWEAK: Add confusion and hesitation
+                confusionLevel: 0.3 + Math.random() * 0.4, // 0.3 to 0.7
+                hesitationChance: 0.25 + Math.random() * 0.25 // 0.25 to 0.5
+            })
+        }
+    });
+    setTimeout(()=>{this.startRace()},1000)
+}
 
     startRace() {
         this.game.showMessage("🏁 ¡LA CARRERA COMENZÓ! ¡Llega al lado derecho antes que los NPCs!");
         
-        // Make all NPCs start racing toward the goal
+        // Make all NPCs start racing toward the goal using patrolnpc system
         this.participants.forEach(participant => {
             if (participant.type === 'npc') {
                 const npc = participant.entity;
                 participant.aiState = 'racing';
                 
-                // Give NPCs an initial boost toward the goal
-                this.moveNPCTowardGoal(participant);
+                // Use patrolnpc with null type to move to goal
+                this.executePatrolNPC(npc.npcId, null, this.config.mapSize - 1, npc.pos.z, 0.3);
             }
         });
     }
 
-    moveNPCTowardGoal(participant) {
-        const npc = participant.entity;
-        const goalX = this.config.mapSize - 1;
-        
-        // Find a safe tile to move forward
-        const targetX = Math.min(npc.pos.x + 1 + Math.floor(Math.random() * 2), goalX);
-        const searchRadius = 3;
-        const safeTiles = [];
-        
-        for (let dx = 0; dx <= searchRadius; dx++) {
-            for (let dz = -searchRadius; dz <= searchRadius; dz++) {
-                const checkX = targetX + dx;
-                const checkZ = npc.pos.z + dz;
+    executePatrolNPC(npcId, patrolType, centerX, centerZ, speed) {
+        const npc = this.game.npcs.find(n => n.npcId === npcId);
+        if (npc) {
+            npc.path = [];
+            npc.onReachTarget = null;
+            
+            if (patrolType === null) {
+                npc.isPatrolling = false;
+                npc.isExecutingAction = true;
+                npc.speed = speed || 0.3;
                 
-                if (checkX >= 0 && checkX < this.config.mapSize && 
-                    checkZ >= 0 && checkZ < this.config.mapSize &&
-                    checkX > npc.pos.x) { // Must move forward
-                    
-                    const tile = this.game.terrain.getTile(checkX, checkZ);
-                    if (tile && tile.height > 1) {
-                        // Prioritize tiles closer to goal
-                        const priority = checkX * 10 + Math.random() * 5;
-                        safeTiles.push({ x: checkX, z: checkZ, priority });
-                    }
-                }
+                npc.findPath(npc.pos, { x: centerX, z: centerZ }, (path) => {
+                    npc.path = path;
+                    npc.progress = 0;
+                    npc.onReachTarget = () => {
+                        npc.isExecutingAction = false;
+                        npc.onReachTarget = null;
+                        // Continue racing - find next safe tile forward
+                        this.continueNPCRacing(npc);
+                    };
+                });
             }
         }
-        
-        if (safeTiles.length > 0) {
-            safeTiles.sort((a, b) => b.priority - a.priority);
-            const target = safeTiles[0];
-            
-            npc.findPath(npc.pos, target, (path) => {
-                npc.path = path;
-                npc.progress = 0;
+    }
+
+continueNPCRacing(npc){
+    if(this.gameEnded)return;
+    const goalX=this.config.mapSize-1;
+    if(npc.pos.x>=goalX)return;
+    
+    const participant = this.participants.find(p => p.entity === npc);
+    
+    // TWEAK: Add hesitation - sometimes NPCs just wait
+    if(Math.random() < participant.hesitationChance){
+        setTimeout(()=>this.continueNPCRacing(npc), 800 + Math.random() * 1200);
+        return;
+    }
+    
+    // TWEAK: Reduce forward progress and add randomness
+    const baseProgress = 1;
+    const randomProgress = Math.random() < participant.confusionLevel ? 
+        Math.floor(Math.random() * 2) : // Sometimes move 0-1 tiles
+        Math.floor(Math.random() * 2) + 1; // Sometimes move 1-2 tiles
+    
+    const targetX=Math.min(npc.pos.x + randomProgress, goalX);
+    const safeTiles=[];
+    
+    // TWEAK: Reduce search range and make NPCs pickier about tiles
+    for(let dz=-1;dz<=1;dz++){ // Reduced from -2 to 2
+        const checkZ=Math.max(0,Math.min(this.config.mapSize-1,npc.pos.z+dz));
+        const tile=this.game.terrain.getTile(targetX,checkZ);
+        if(tile && tile.height > 1){
+            // TWEAK: Add some randomness to tile selection priority
+            const randomFactor = Math.random() * participant.confusionLevel;
+            safeTiles.push({
+                x:targetX,
+                z:checkZ,
+                priority: targetX + Math.random() - randomFactor
             });
         }
     }
+    
+    if(safeTiles.length>0){
+        // TWEAK: Sometimes NPCs pick suboptimal tiles
+        if(Math.random() < participant.confusionLevel){
+            // Pick a random safe tile instead of the best one
+            const randomTile = safeTiles[Math.floor(Math.random() * safeTiles.length)];
+            this.executePatrolNPC(npc.npcId,null,randomTile.x,randomTile.z,0.025); // Slower speed
+        } else {
+            safeTiles.sort((a,b)=>b.priority-a.priority);
+            const target=safeTiles[0];
+            this.executePatrolNPC(npc.npcId,null,target.x,target.z,0.03);
+        }
+    }else{
+        // TWEAK: Increase wait time when stuck
+        setTimeout(()=>this.continueNPCRacing(npc), 700 + Math.random() * 800);
+    }
+}
 
     spawnScoreObjects() {
         const { mapSize, scoreObjectChance } = this.config;
@@ -430,8 +457,6 @@ class TerrainWaveCross extends BaseMinigame {
             border-radius: 8px;
             font-family: monospace;
             z-index: 1000;
-            max-height: 50px;
-            overflow-y:scroll;
             min-width: 250px;
         `, `
             <h3>🌊 Terrain Wave Cross</h3>
@@ -458,8 +483,8 @@ class TerrainWaveCross extends BaseMinigame {
             
             const { mapSize, minHeight, maxHeight } = this.config;
             
-            // Create complex wave patterns across entire map
-            for (let x = 0; x < mapSize; x++) {
+            // Create complex wave patterns (skip first and last rows)
+            for (let x = 1; x < mapSize - 1; x++) { // Skip x=0 (start) and x=15 (goal)
                 for (let z = 0; z < mapSize; z++) {
                     // Multiple wave functions for complex terrain
                     const wave1 = Math.sin((x + this.wavePhase) * 0.4) * 0.5;
@@ -486,101 +511,78 @@ class TerrainWaveCross extends BaseMinigame {
         }
     }
 
-    checkCollisions() {
-        if (this.gameEnded) return;
-        
-        this.participants.forEach(participant => {
-            if (!participant.isAlive) return;
-            
-            const entity = participant.entity;
-            const tile = this.game.terrain.getTile(entity.pos.x, entity.pos.z);
-            
-            if (tile) {
-                // Update progress
-                participant.progress = entity.pos.x;
-                
-                // Check death condition (height <= 1)
-                if (tile.height <= 1) {
-                    participant.isAlive = false;
-                    entity.setPosition(participant.startPos.x, participant.startPos.z);
-                    participant.progress = 0;
-                    
-                    if (participant.type === 'player') {
-                        this.game.showMessage("¡Tocaste una altura peligrosa! Vuelves al inicio.");
-                    }
-                    
-                    setTimeout(() => {
-                        participant.isAlive = true;
-                    }, 1500);
-                    return;
+ checkCollisions(){
+    if(this.gameEnded)return;
+    this.participants.forEach(participant=>{
+        if(!participant.isAlive)return;
+        const entity=participant.entity;
+        const tile=this.game.terrain.getTile(entity.pos.x,entity.pos.z);
+        if(tile){
+            participant.progress=entity.pos.x;
+            if(tile.height<=1){
+                participant.isAlive=!1;
+                entity.setPosition(participant.startPos.x,participant.startPos.z);
+                participant.progress=0;
+                if(participant.type==='player'){
+                    this.game.showMessage("¡Tocaste una altura peligrosa! Vuelves al inicio.");
+                } else {
+                    // TWEAK: NPCs get more confused after failing
+                    participant.confusionLevel = Math.min(0.8, participant.confusionLevel + 0.2);
+                    participant.hesitationChance = Math.min(0.6, participant.hesitationChance + 0.15);
                 }
                 
-                // Check score object collection
-                const key = `${entity.pos.x},${entity.pos.z}`;
-                const scoreObj = this.scoreObjects.get(key);
-                if (scoreObj) {
-                    if (participant.type === 'player') {
-                        this.score += scoreObj.value;
-                    }
-                    
-                    this.game.scene.remove(scoreObj.mesh);
-                    scoreObj.mesh.geometry.dispose();
-                    scoreObj.mesh.material.dispose();
-                    this.scoreObjects.delete(key);
-                }
-                
-                // Check win/lose conditions
-                if (entity.pos.x >= this.config.mapSize - 1) {
-                    this.gameEnded = true;
-                    this.winner = participant;
-                    
-                    if (participant.type === 'player') {
-                        this.game.showMessage(`¡🎉 GANASTE! Llegaste primero con ${this.score} puntos!`);
-                    } else {
-                        this.game.showMessage(`💔 PERDISTE! ${participant.entity.name} llegó primero. Tu puntuación: ${this.score}`);
-                    }
-                    
-                    setTimeout(() => this.manager.endMinigame(), 3000);
-                    return;
-                }
+                // TWEAK: NPCs take longer to recover
+                const recoveryTime = participant.type === 'player' ? 1500 : 2000 + Math.random() * 1500;
+                setTimeout(()=>{
+                    participant.isAlive=!0;
+                }, recoveryTime);
+                return;
             }
-        });
-    }
+            
+            const key=`${entity.pos.x},${entity.pos.z}`;
+            const scoreObj=this.scoreObjects.get(key);
+            if(scoreObj){
+                if(participant.type==='player'){
+                    this.score+=scoreObj.value;
+                }
+                this.game.scene.remove(scoreObj.mesh);
+                scoreObj.mesh.geometry.dispose();
+                scoreObj.mesh.material.dispose();
+                this.scoreObjects.delete(key);
+            }
+            
+            if(entity.pos.x>=this.config.mapSize-1){
+                this.gameEnded=!0;
+                this.winner=participant;
+                if(participant.type==='player'){
+                    this.game.showMessage(`¡🎉 GANASTE! Llegaste primero con ${this.score} puntos!`);
+                }else{
+                    this.game.showMessage(`💔 PERDISTE! ${participant.entity.name} llegó primero. Tu puntuación: ${this.score}`);
+                }
+                setTimeout(()=>this.manager.endMinigame(),3000);
+                return;
+            }
+        }
+    });
+}
 
-    updateNPCAI() {
-        this.participants.forEach(participant => {
-            if (participant.type !== 'npc' || !participant.isAlive || this.gameEnded) return;
-            
-            const npc = participant.entity;
-            participant.aiTimer += this.game.deltaTime;
-            
-            if (npc.path.length === 0) {
-                participant.stuckTimer += this.game.deltaTime;
-            } else {
-                participant.stuckTimer = 0;
+    updateNPCAI(){
+    this.participants.forEach(participant=>{
+        if(participant.type!=='npc'||!participant.isAlive||this.gameEnded)return;
+        const npc=participant.entity;
+        
+        // TWEAK: Add thinking time - NPCs don't move immediately
+        participant.aiTimer -= this.game.deltaTime;
+        
+        if(!npc.isExecutingAction && npc.path.length===0 && npc.pos.x<this.config.mapSize-1){
+            if(participant.aiTimer <= 0){
+                // TWEAK: Reset timer with more variation
+                participant.aiTimer = 300 + Math.random() * 700 + (participant.confusionLevel * 500);
+                this.continueNPCRacing(npc);
             }
-            
-            // Aggressive AI: Make decisions more frequently in racing mode
-            const decisionInterval = participant.aiState === 'racing' ? 300 + Math.random() * 300 : 600 + Math.random() * 400;
-            
-            if (participant.aiTimer >= decisionInterval || participant.stuckTimer > 1500) {
-                participant.aiTimer = 0;
-                participant.stuckTimer = 0;
-                
-                if (npc.path.length === 0 || participant.stuckTimer > 1000) {
-                    this.moveNPCTowardGoal(participant);
-                }
-            }
-            
-            // Racing behavior: constantly try to move forward when not pathing
-            if (participant.aiState === 'racing' && npc.path.length === 0) {
-                // Quick forward movement attempts
-                if (Math.random() < 0.3) { // 30% chance per frame when not moving
-                    this.moveNPCTowardGoal(participant);
-                }
-            }
-        });
-    }
+        }
+    });
+}
 
     updateUI() {
         const scoreDisplay = document.getElementById('scoreDisplay');

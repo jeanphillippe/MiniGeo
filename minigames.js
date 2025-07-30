@@ -233,7 +233,7 @@ class TerrainWaveCross extends BaseMinigame {
             mapSize: 16,
             minHeight: 0,
             maxHeight: 4,
-            waveSpeed: 2000,
+            waveSpeed: 1000,
             scoreObjectChance: 0.2,
             participantNPCs: ['scout_mike', 'guard_tom', 'merchant_sara', 'healer_rose']
         };
@@ -269,12 +269,15 @@ class TerrainWaveCross extends BaseMinigame {
         }
     }
 
-    positionParticipants(){
+positionParticipants(){
     const{mapSize}=this.config;
     const startLine=0;
     const playerZ=Math.floor(Math.random()*mapSize);
     this.game.player.setPosition(startLine,playerZ);
     this.participants.push({entity:this.game.player,type:'player',startPos:{x:startLine,z:playerZ},isAlive:!0,progress:0});
+    
+    // TWEAK: Single variable to control all NPC speeds - easily adjustable
+    const NPC_BASE_SPEED = 0.001; // Change this one value to adjust all NPC speeds!
     
     this.config.participantNPCs.forEach((npcId,index)=>{
         const npc=this.game.npcs.find(n=>n.npcId===npcId);
@@ -286,7 +289,7 @@ class TerrainWaveCross extends BaseMinigame {
             npc.isInteractable=!1;
             npc.path=[];
             // TWEAK: Make NPCs much slower and more variable
-            npc.speed=0.02+Math.random()*0.015; // Slightly slower than normal 0.03
+            npc.speed=NPC_BASE_SPEED * (0.7 + Math.random() * 0.4); // Range: 0.7x to 1.1x base speed
             this.participants.push({
                 entity:npc,
                 type:'npc',
@@ -298,7 +301,8 @@ class TerrainWaveCross extends BaseMinigame {
                 stuckTimer:0,
                 // TWEAK: Add confusion and hesitation
                 confusionLevel: 0.3 + Math.random() * 0.4, // 0.3 to 0.7
-                hesitationChance: 0.25 + Math.random() * 0.25 // 0.25 to 0.5
+                hesitationChance: 0.25 + Math.random() * 0.25, // 0.25 to 0.5
+                baseSpeed: NPC_BASE_SPEED // Store base speed for reference
             })
         }
     });
@@ -315,7 +319,7 @@ class TerrainWaveCross extends BaseMinigame {
                 participant.aiState = 'racing';
                 
                 // Use patrolnpc with null type to move to goal
-                this.executePatrolNPC(npc.npcId, null, this.config.mapSize - 1, npc.pos.z, 0.3);
+                this.executePatrolNPC(npc.npcId, null, this.config.mapSize - 1, npc.pos.z, NPC_BASE_SPEED);
             }
         });
     }
@@ -351,6 +355,7 @@ continueNPCRacing(npc){
     if(npc.pos.x>=goalX)return;
     
     const participant = this.participants.find(p => p.entity === npc);
+    const NPC_BASE_SPEED = 0.001; // Same base speed variable
     
     // TWEAK: Add hesitation - sometimes NPCs just wait
     if(Math.random() < participant.hesitationChance){
@@ -387,11 +392,11 @@ continueNPCRacing(npc){
         if(Math.random() < participant.confusionLevel){
             // Pick a random safe tile instead of the best one
             const randomTile = safeTiles[Math.floor(Math.random() * safeTiles.length)];
-            this.executePatrolNPC(npc.npcId,null,randomTile.x,randomTile.z,0.025); // Slower speed
+            this.executePatrolNPC(npc.npcId,null,randomTile.x,randomTile.z,0.02); // Slower speed
         } else {
             safeTiles.sort((a,b)=>b.priority-a.priority);
             const target=safeTiles[0];
-            this.executePatrolNPC(npc.npcId,null,target.x,target.z,0.03);
+            this.executePatrolNPC(npc.npcId,null,target.x,target.z,0.025);
         }
     }else{
         // TWEAK: Increase wait time when stuck
@@ -510,8 +515,7 @@ continueNPCRacing(npc){
             }
         }
     }
-
- checkCollisions(){
+checkCollisions(){
     if(this.gameEnded)return;
     this.participants.forEach(participant=>{
         if(!participant.isAlive)return;
@@ -566,7 +570,7 @@ continueNPCRacing(npc){
     });
 }
 
-    updateNPCAI(){
+ updateNPCAI(){
     this.participants.forEach(participant=>{
         if(participant.type!=='npc'||!participant.isAlive||this.gameEnded)return;
         const npc=participant.entity;

@@ -1,73 +1,1062 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Cosmic Defender</title><style>body{margin:0;padding:0;background:#000;font-family:'Courier New',monospace;overflow:hidden}
-#gameContainer{position:relative;width:100vw;height:100vh}
-canvas{display:block}
-#intro{position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#0a0a2e,#16213e,#0f3460);display:flex;flex-direction:column;justify-content:center;align-items:center;color:#fff;z-index:1000;transition:opacity 0.5s}
-#intro h1{font-size:4rem;margin:0;text-shadow:0 0 20px #4facfe;background:linear-gradient(45deg,#4facfe,#00f2fe);-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:glow 2s infinite alternate}
-#intro p{font-size:1.2rem;margin:20px 0;text-align:center;max-width:600px}
-#startBtn{padding:15px 30px;font-size:1.5rem;background:linear-gradient(45deg,#667eea,#764ba2);border:none;color:white;cursor:pointer;border-radius:50px;transition:all 0.3s;box-shadow:0 4px 15px rgba(0,0,0,0.3)}
-#startBtn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.4)}
-@keyframes glow{0%{text-shadow:0 0 20px #4facfe}
-100%{text-shadow:0 0 30px #4facfe,0 0 40px #00f2fe}}
-#hud{position:absolute;top:20px;left:20px;color:#4facfe;font-size:1.2rem;z-index:100;text-shadow:0 0 10px rgba(79,172,254,0.8)}
-#weaponHud{position:absolute;top:20px;right:20px;color:#4facfe;font-size:1rem;z-index:100;text-shadow:0 0 10px rgba(79,172,254,0.8)}.hidden{opacity:0;pointer-events:none}
-#controls{position:absolute;bottom:20px;right:20px;color:rgba(255,255,255,0.7);font-size:0.9rem;text-align:right;z-index:100}.weapon-active{color:#00f2fe;font-weight:bold}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cosmic Defender</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background: #000;
+        font-family: 'Courier New', monospace;
+        overflow: hidden
+      }
 
-/* Mobile Controls */
-#mobileControls{position:absolute;bottom:20px;left:20px;right:20px;display:none;z-index:200}
-#dpad{position:absolute;bottom:20px;left:20px;width:120px;height:120px}
-#dpadOuter{width:120px;height:120px;border:3px solid rgba(79,172,254,0.6);border-radius:50%;position:absolute;background:rgba(0,0,0,0.3)}
-#dpadInner{width:40px;height:40px;background:rgba(79,172,254,0.8);border-radius:50%;position:absolute;top:40px;left:40px;transition:all 0.1s ease}
-#fireBtn{position:absolute;bottom:40px;right:20px;width:80px;height:80px;border:3px solid rgba(255,75,87,0.6);border-radius:50%;background:rgba(255,75,87,0.3);color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;user-select:none}
-#weaponBtn{position:absolute;bottom:140px;right:20px;width:60px;height:60px;border:3px solid rgba(254,202,87,0.6);border-radius:50%;background:rgba(254,202,87,0.3);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;user-select:none}
+      #gameContainer {
+        position: relative;
+        width: 100vw;
+        height: 100vh
+      }
 
-@media (max-width: 768px) {
-  #mobileControls{display:block}
-  #controls{display:none}
-  #intro h1{font-size:2.5rem}
-  #intro p{font-size:1rem;padding:0 20px}
-}</style></head><body><div id="gameContainer"><div id="intro"><h1>COSMIC DEFENDER</h1><p>Navigate through hostile space territories.Defend against alien sentries orbiting distant worlds.Use WASD or Arrow Keys to move,SPACE to fire.Keys 1-5 to change weapons.Stay alert-enemies will attack when you get too close!</p><button id="startBtn">Launch Mission</button></div><div id="hud"><div>Health:<span id="health">100</span></div><div>Score:<span id="score">0</span></div></div><div id="weaponHud"><div>WEAPONS:</div><div id="weapon1" class="weapon-active">1-Blaster</div><div id="weapon2">2-Scatter</div><div id="weapon3">3-Shotgun</div><div id="weapon4">4-Mines</div><div id="weapon5">5-Laser</div></div><div id="controls"><div>WASD/Arrows-Move</div><div>SPACE-Fire</div><div>1-5-Weapons</div></div><div id="mobileControls"><div id="dpad"><div id="dpadOuter"></div><div id="dpadInner"></div></div><div id="fireBtn">FIRE</div><div id="weaponBtn">W<br>1</div></div></div><script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script><script>const CONFIG={player:{acceleration:0.1,maxSpeed:0.8,friction:0.92,health:1000},stars:{count:1000,rotationSpeed:0.0005,spread:400},planets:{count:3,configs:[{radius:18,color:0xff6b6b,distance:60,enemyCount:3,enemyType:'fighter'},{radius:3,color:0x4ecdc4,distance:80,enemyCount:2,enemyType:'interceptor'},{radius:50,color:0xfeca57,distance:100,enemyCount:4,enemyType:'heavy'}]},enemies:{orbitMargin:8,baseSpeed:0.015,speedVariation:0.005,attackRange:30,health:30,chaseSpeed:0.3,returnSpeed:0.2},bullets:{speed:2,lifetime:80,damage:10},weapons:{laser:{damage:2,width:1,maxDistance:100}}};class SpaceShooter{constructor(){this.scene=new THREE.Scene();const aspect=window.innerWidth/window.innerHeight;const d=60;this.camera=new THREE.OrthographicCamera(-d*aspect,d*aspect,d,-d,1,2000);this.renderer=new THREE.WebGLRenderer({antialias:!0});this.renderer.setSize(window.innerWidth,window.innerHeight);this.renderer.setClearColor(0x000011);document.getElementById('gameContainer').appendChild(this.renderer.domElement);this.gameStarted=!1;this.player={health:CONFIG.player.health,score:0,currentWeapon:1};this.keys={};this.bullets=[];this.mines=[];this.enemies=[];this.planets=[];this.stars=[];this.collisionCooldown=0;this.spacePressed=!1;this.playerShip=null;this.playerVelocity=new THREE.Vector3();this.laserBeam=null;this.touchControls={moveX:0,moveY:0,firing:!1};this.init();this.setupEventListeners();this.animate()}
-init(){this.camera.position.set(0,60,60);this.camera.lookAt(0,0,0);const ambientLight=new THREE.AmbientLight(0x404040,0.3);this.scene.add(ambientLight);const directionalLight=new THREE.DirectionalLight(0xffffff,0.8);directionalLight.position.set(10,10,5);this.scene.add(directionalLight);this.createStarField();this.createPlayer();this.createPlanets();this.createEnemies()}
-createStarField(){const starGeometry=new THREE.BufferGeometry();const positions=new Float32Array(CONFIG.stars.count*3);for(let i=0;i<CONFIG.stars.count*3;i+=3){positions[i]=(Math.random()-0.5)*CONFIG.stars.spread;positions[i+1]=(Math.random()-0.5)*CONFIG.stars.spread;positions[i+2]=(Math.random()-0.5)*CONFIG.stars.spread}
-starGeometry.setAttribute('position',new THREE.BufferAttribute(positions,3));const starMaterial=new THREE.PointsMaterial({color:0xffffff,size:0.5});this.stars=new THREE.Points(starGeometry,starMaterial);this.scene.add(this.stars)}
-createShip(config={}){const shipGroup=new THREE.Group();const scale=config.scale||1;const primaryColor=config.primaryColor||0x4facfe;const secondaryColor=config.secondaryColor||0x667eea;const accentColor=config.accentColor||0x00f2fe;const cockpitColor=config.cockpitColor||0x764ba2;const bodyGeometry=new THREE.BoxGeometry(2*scale,0.3*scale,4*scale);const bodyMaterial=new THREE.MeshLambertMaterial({color:primaryColor});const body=new THREE.Mesh(bodyGeometry,bodyMaterial);shipGroup.add(body);const wingGeometry=new THREE.BoxGeometry(4*scale,0.2*scale,1*scale);const wingMaterial=new THREE.MeshLambertMaterial({color:secondaryColor});const leftWing=new THREE.Mesh(wingGeometry,wingMaterial);leftWing.position.set(0,-0.1*scale,-1*scale);shipGroup.add(leftWing);const engineGeometry=new THREE.SphereGeometry(0.3*scale,8,8);const engineMaterial=new THREE.MeshBasicMaterial({color:accentColor,transparent:!0,opacity:0.8});const leftEngine=new THREE.Mesh(engineGeometry,engineMaterial);leftEngine.position.set(-1.5*scale,0,-2*scale);const rightEngine=leftEngine.clone();rightEngine.position.set(1.5*scale,0,-2*scale);shipGroup.add(leftEngine);shipGroup.add(rightEngine);const cockpitGeometry=new THREE.SphereGeometry(0.4*scale,8,8);const cockpitMaterial=new THREE.MeshLambertMaterial({color:cockpitColor});const cockpit=new THREE.Mesh(cockpitGeometry,cockpitMaterial);cockpit.position.set(0,0.3*scale,0.5*scale);shipGroup.add(cockpit);return shipGroup}
-createPlayer(){this.playerShip=this.createShip();this.playerShip.position.y=5;this.scene.add(this.playerShip)}
-createPlanets(){const angleStep=(Math.PI*2)/CONFIG.planets.count;for(let i=0;i<CONFIG.planets.count;i++){const planetConfig=CONFIG.planets.configs[i%CONFIG.planets.configs.length];const angle=angleStep*i;const planetGeometry=new THREE.SphereGeometry(planetConfig.radius,16,16);const planetMaterial=new THREE.MeshLambertMaterial({color:planetConfig.color});const planet=new THREE.Mesh(planetGeometry,planetMaterial);const x=Math.cos(angle)*planetConfig.distance;const z=Math.sin(angle)*planetConfig.distance;planet.position.set(x,0,z);this.scene.add(planet);const orbitRadius=planetConfig.radius+CONFIG.enemies.orbitMargin;this.planets.push({mesh:planet,radius:orbitRadius,center:planet.position.clone(),config:planetConfig})}}
-createEnemies(){this.planets.forEach((planet,planetIndex)=>{const enemyConfig=this.getEnemyConfig(planet.config.enemyType);for(let i=0;i<planet.config.enemyCount;i++){const enemyShip=this.createShip(enemyConfig.shipConfig);const enemy={mesh:enemyShip,planet:planet,angle:(i*Math.PI*2)/planet.config.enemyCount,originalAngle:(i*Math.PI*2)/planet.config.enemyCount,speed:CONFIG.enemies.baseSpeed+Math.random()*CONFIG.enemies.speedVariation,attackRange:CONFIG.enemies.attackRange,attacking:!1,returning:!1,health:CONFIG.enemies.health,type:planet.config.enemyType,chaseSpeed:enemyConfig.chaseSpeed};this.updateEnemyPosition(enemy);this.enemies.push(enemy);this.scene.add(enemyShip)}})}
-updateEnemyPosition(enemy){const x=enemy.planet.center.x+Math.cos(enemy.angle)*enemy.planet.radius;const z=enemy.planet.center.z+Math.sin(enemy.angle)*enemy.planet.radius;enemy.mesh.position.set(x,2,z)}
-getEnemyConfig(type){const configs={fighter:{shipConfig:{scale:0.8,primaryColor:0xff4757,secondaryColor:0xff3838,accentColor:0xff6b6b,cockpitColor:0x2f3542},chaseSpeed:0.4},interceptor:{shipConfig:{scale:0.9,primaryColor:0x3742fa,secondaryColor:0x2f3542,accentColor:0x70a1ff,cockpitColor:0xff4757},chaseSpeed:0.5},heavy:{shipConfig:{scale:1.2,primaryColor:0x2ed573,secondaryColor:0x1e90ff,accentColor:0x7bed9f,cockpitColor:0xff5252},chaseSpeed:0.3}};return configs[type]||configs.fighter}
-selectWeapon(weaponNum){if(weaponNum>=1&&weaponNum<=5){document.getElementById(`weapon${this.player.currentWeapon}`).classList.remove('weapon-active');this.player.currentWeapon=weaponNum;document.getElementById(`weapon${weaponNum}`).classList.add('weapon-active');document.getElementById('weaponBtn').innerHTML=`W<br>${weaponNum}`;if(this.laserBeam){this.scene.remove(this.laserBeam);this.laserBeam=null}}}
-cycleWeapon(){const nextWeapon=this.player.currentWeapon%5+1;this.selectWeapon(nextWeapon)}
-setupEventListeners(){document.addEventListener('keydown',(e)=>{this.keys[e.code]=!0;if(e.code.startsWith('Digit')){const weaponNum=parseInt(e.code.charAt(5));this.selectWeapon(weaponNum)}});document.addEventListener('keyup',(e)=>{this.keys[e.code]=!1});document.getElementById('startBtn').addEventListener('click',()=>{this.startGame()});this.setupMobileControls();window.addEventListener('resize',()=>{const aspect=window.innerWidth/window.innerHeight;const d=60;this.camera.left=-d*aspect;this.camera.right=d*aspect;this.camera.top=d;this.camera.bottom=-d;this.camera.updateProjectionMatrix();this.renderer.setSize(window.innerWidth,window.innerHeight)})}
-setupMobileControls(){const dpad=document.getElementById('dpad');const dpadInner=document.getElementById('dpadInner');const fireBtn=document.getElementById('fireBtn');const weaponBtn=document.getElementById('weaponBtn');let dpadPressed=!1;const updateDpad=(clientX,clientY)=>{const rect=dpad.getBoundingClientRect();const centerX=rect.left+rect.width/2;const centerY=rect.top+rect.height/2;const deltaX=clientX-centerX;const deltaY=clientY-centerY;const distance=Math.sqrt(deltaX*deltaX+deltaY*deltaY);const maxDistance=40;if(distance<=maxDistance){dpadInner.style.transform=`translate(${deltaX}px, ${deltaY}px)`;this.touchControls.moveX=deltaX/maxDistance;this.touchControls.moveY=deltaY/maxDistance}else{const angle=Math.atan2(deltaY,deltaX);const limitedX=Math.cos(angle)*maxDistance;const limitedY=Math.sin(angle)*maxDistance;dpadInner.style.transform=`translate(${limitedX}px, ${limitedY}px)`;this.touchControls.moveX=limitedX/maxDistance;this.touchControls.moveY=limitedY/maxDistance}};const resetDpad=()=>{dpadInner.style.transform='translate(0px, 0px)';this.touchControls.moveX=0;this.touchControls.moveY=0;dpadPressed=!1};dpad.addEventListener('touchstart',(e)=>{e.preventDefault();dpadPressed=!0;const touch=e.touches[0];updateDpad(touch.clientX,touch.clientY)});dpad.addEventListener('touchmove',(e)=>{e.preventDefault();if(dpadPressed){const touch=e.touches[0];updateDpad(touch.clientX,touch.clientY)}});dpad.addEventListener('touchend',(e)=>{e.preventDefault();resetDpad()});fireBtn.addEventListener('touchstart',(e)=>{e.preventDefault();this.touchControls.firing=!0});fireBtn.addEventListener('touchend',(e)=>{e.preventDefault();this.touchControls.firing=!1});weaponBtn.addEventListener('touchstart',(e)=>{e.preventDefault();this.cycleWeapon()})}
-startGame(){document.getElementById('intro').classList.add('hidden');this.gameStarted=!0}
-updatePlayer(){if(!this.gameStarted)return;let moveX=0;let moveZ=0;if(this.keys.KeyW||this.keys.ArrowUp||this.touchControls.moveY<-0.3)moveZ-=1;if(this.keys.KeyS||this.keys.ArrowDown||this.touchControls.moveY>0.3)moveZ+=1;if(this.keys.KeyA||this.keys.ArrowLeft||this.touchControls.moveX<-0.3)moveX-=1;if(this.keys.KeyD||this.keys.ArrowRight||this.touchControls.moveX>0.3)moveX+=1;if(moveX!==0||moveZ!==0){if(moveX!==0&&moveZ!==0){moveX*=Math.SQRT1_2;moveZ*=Math.SQRT1_2}
-this.playerVelocity.x+=moveX*CONFIG.player.acceleration;this.playerVelocity.z+=moveZ*CONFIG.player.acceleration}
-this.playerVelocity.multiplyScalar(CONFIG.player.friction);const clampedVelocity=this.playerVelocity.clone().clampLength(0,CONFIG.player.maxSpeed);this.playerVelocity.copy(clampedVelocity);this.playerShip.position.add(this.playerVelocity);if(this.playerVelocity.length()>0.1){const angle=Math.atan2(this.playerVelocity.x,this.playerVelocity.z);this.playerShip.rotation.y=angle}
-if((this.keys.Space&&!this.spacePressed)||this.touchControls.firing){this.fireWeapon();this.spacePressed=!0}else if(!this.keys.Space&&!this.touchControls.firing){this.spacePressed=!1;if(this.laserBeam){this.scene.remove(this.laserBeam);this.laserBeam=null}}
-this.camera.position.x=this.playerShip.position.x;this.camera.position.z=this.playerShip.position.z+60;this.camera.lookAt(this.playerShip.position)}
-fireWeapon(){switch(this.player.currentWeapon){case 1:this.fireBlaster();break;case 2:this.fireScatter(3);break;case 3:this.fireScatter(5);break;case 4:this.fireMine();break;case 5:this.fireLaser();break}}
-fireBlaster(){this.createBullet(0)}
-fireScatter(count){const spreadAngle=Math.PI/6;for(let i=0;i<count;i++){const angleOffset=(i-(count-1)/2)*(spreadAngle/(count-1));this.createBullet(angleOffset)}}
-createBullet(angleOffset=0){const bulletGeometry=new THREE.SphereGeometry(0.2,8,8);const bulletMaterial=new THREE.MeshBasicMaterial({color:0x00f2fe});const bullet=new THREE.Mesh(bulletGeometry,bulletMaterial);bullet.position.copy(this.playerShip.position);bullet.position.y+=0.5;const direction=new THREE.Vector3(Math.sin(this.playerShip.rotation.y+angleOffset),0,Math.cos(this.playerShip.rotation.y+angleOffset));const bulletVelocity=direction.clone().multiplyScalar(CONFIG.bullets.speed);this.bullets.push({mesh:bullet,velocity:bulletVelocity,life:CONFIG.bullets.lifetime});this.scene.add(bullet)}
-fireMine(){const mineGeometry=new THREE.SphereGeometry(0.5,8,8);const mineMaterial=new THREE.MeshBasicMaterial({color:0xff4757,transparent:!0,opacity:0.8});const mine=new THREE.Mesh(mineGeometry,mineMaterial);mine.position.copy(this.playerShip.position);mine.position.y+=0.5;this.mines.push({mesh:mine,life:600,exploded:!1});this.scene.add(mine)}
-fireLaser(){if(this.laserBeam){this.scene.remove(this.laserBeam)}
-const direction=new THREE.Vector3(Math.sin(this.playerShip.rotation.y),0,Math.cos(this.playerShip.rotation.y));const laserEnd=this.playerShip.position.clone().add(direction.clone().multiplyScalar(CONFIG.weapons.laser.maxDistance));const laserGeometry=new THREE.BufferGeometry().setFromPoints([this.playerShip.position.clone().add(new THREE.Vector3(0,0.5,0)),laserEnd]);const laserMaterial=new THREE.LineBasicMaterial({color:0x00ff00,transparent:!0,opacity:0.8});this.laserBeam=new THREE.Line(laserGeometry,laserMaterial);this.scene.add(this.laserBeam);this.enemies.forEach(enemy=>{if(enemy.health>0){const distanceToLaser=this.distancePointToLine(enemy.mesh.position,this.playerShip.position,laserEnd);if(distanceToLaser<2){enemy.health-=CONFIG.weapons.laser.damage;if(enemy.health<=0){enemy.mesh.visible=!1;this.player.score+=100;this.updateHUD()}}}})}
-distancePointToLine(point,lineStart,lineEnd){const line=new THREE.Vector3().subVectors(lineEnd,lineStart);const pointToStart=new THREE.Vector3().subVectors(point,lineStart);const t=Math.max(0,Math.min(1,pointToStart.dot(line)/line.dot(line)));const projection=lineStart.clone().add(line.multiplyScalar(t));return point.distanceTo(projection)}
-updateEnemies(){this.enemies.forEach(enemy=>{if(enemy.health<=0)return;const distanceToPlayer=enemy.mesh.position.distanceTo(this.playerShip.position);if(distanceToPlayer<enemy.attackRange&&!enemy.attacking&&!enemy.returning){enemy.attacking=!0;enemy.returning=!1}
-if(enemy.attacking){const direction=new THREE.Vector3().subVectors(this.playerShip.position,enemy.mesh.position).normalize().multiplyScalar(enemy.chaseSpeed);enemy.mesh.position.add(direction);enemy.mesh.lookAt(this.playerShip.position);if(distanceToPlayer>enemy.attackRange*2.5){enemy.attacking=!1;enemy.returning=!0}}else if(enemy.returning){const targetPos=new THREE.Vector3(enemy.planet.center.x+Math.cos(enemy.originalAngle)*enemy.planet.radius,2,enemy.planet.center.z+Math.sin(enemy.originalAngle)*enemy.planet.radius);const distanceToTarget=enemy.mesh.position.distanceTo(targetPos);if(distanceToTarget>2){const direction=new THREE.Vector3().subVectors(targetPos,enemy.mesh.position).normalize().multiplyScalar(CONFIG.enemies.returnSpeed);enemy.mesh.position.add(direction);const lookAtTarget=enemy.mesh.position.clone().add(direction);enemy.mesh.lookAt(lookAtTarget)}else{enemy.returning=!1;enemy.angle=enemy.originalAngle}}else{enemy.angle+=enemy.speed;this.updateEnemyPosition(enemy);const nextAngle=enemy.angle+enemy.speed;const nextX=enemy.planet.center.x+Math.cos(nextAngle)*enemy.planet.radius;const nextZ=enemy.planet.center.z+Math.sin(nextAngle)*enemy.planet.radius;const nextPos=new THREE.Vector3(nextX,2,nextZ);enemy.mesh.lookAt(nextPos)}})}
-updateBullets(){this.bullets=this.bullets.filter(bullet=>{bullet.mesh.position.add(bullet.velocity);bullet.life--;for(let enemy of this.enemies){if(enemy.health>0&&bullet.mesh.position.distanceTo(enemy.mesh.position)<2){enemy.health-=CONFIG.bullets.damage;if(enemy.health<=0){enemy.mesh.visible=!1;this.player.score+=100;this.updateHUD()}
-this.scene.remove(bullet.mesh);return!1}}
-if(bullet.life<=0){this.scene.remove(bullet.mesh);return!1}
-return!0})}
-updateMines(){this.mines=this.mines.filter(mine=>{mine.life--;if(mine.life<=0&&!mine.exploded){this.scene.remove(mine.mesh);return!1}
-if(!mine.exploded){this.enemies.forEach(enemy=>{if(enemy.health>0&&mine.mesh.position.distanceTo(enemy.mesh.position)<8){mine.exploded=!0;this.explodeMine(mine);this.scene.remove(mine.mesh)}})}
-return!mine.exploded})}
-explodeMine(mine){const explosionGeometry=new THREE.SphereGeometry(8,16,16);const explosionMaterial=new THREE.MeshBasicMaterial({color:0xff4757,transparent:!0,opacity:0.6});const explosion=new THREE.Mesh(explosionGeometry,explosionMaterial);explosion.position.copy(mine.mesh.position);this.scene.add(explosion);this.enemies.forEach(enemy=>{if(enemy.health>0&&explosion.position.distanceTo(enemy.mesh.position)<8){enemy.health-=50;if(enemy.health<=0){enemy.mesh.visible=!1;this.player.score+=100;this.updateHUD()}}});setTimeout(()=>{this.scene.remove(explosion)},500)}
-checkCollisions(){if(this.collisionCooldown>0){this.collisionCooldown--;return}
-this.enemies.forEach(enemy=>{if(enemy.health>0&&enemy.mesh.position.distanceTo(this.playerShip.position)<3){this.player.health-=5;this.collisionCooldown=60;this.updateHUD();if(this.player.health<=0){this.gameOver()}}})}
-updateHUD(){document.getElementById('health').textContent=this.player.health;document.getElementById('score').textContent=this.player.score}
-gameOver(){this.gameStarted=!1;setTimeout(()=>{const playAgain=confirm(`Game Over! Final Score: ${this.player.score}\n\nWould you like to play again?`);if(playAgain){this.player.health=CONFIG.player.health;this.player.score=0;this.player.currentWeapon=1;this.selectWeapon(1);this.playerShip.position.set(0,5,0);this.playerVelocity.set(0,0,0);this.collisionCooldown=0;this.enemies.forEach(enemy=>{enemy.health=CONFIG.enemies.health;enemy.attacking=!1;enemy.returning=!1;enemy.mesh.visible=!0;enemy.angle=enemy.originalAngle;this.updateEnemyPosition(enemy)});this.bullets.forEach(bullet=>this.scene.remove(bullet.mesh));this.bullets=[];this.mines.forEach(mine=>this.scene.remove(mine.mesh));this.mines=[];if(this.laserBeam){this.scene.remove(this.laserBeam);this.laserBeam=null}
-this.updateHUD();this.gameStarted=!0}else{location.reload()}},100)}
-animate(){requestAnimationFrame(()=>this.animate());this.stars.rotation.y+=CONFIG.stars.rotationSpeed;if(this.gameStarted){this.updatePlayer();this.updateEnemies();this.updateBullets();this.updateMines();this.checkCollisions()}
-this.renderer.render(this.scene,this.camera)}}
-new SpaceShooter();</script></body></html>
+      canvas {
+        display: block
+      }
+
+      #intro {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #0a0a2e, #16213e, #0f3460);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        color: #fff;
+        z-index: 1000;
+        transition: opacity 0.5s
+      }
+
+      #intro h1 {
+        font-size: 4rem;
+        margin: 0;
+        text-shadow: 0 0 20px #4facfe;
+        background: linear-gradient(45deg, #4facfe, #00f2fe);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: glow 2s infinite alternate
+      }
+
+      #intro p {
+        font-size: 1.2rem;
+        margin: 20px 0;
+        text-align: center;
+        max-width: 600px
+      }
+
+      #startBtn {
+        padding: 15px 30px;
+        font-size: 1.5rem;
+        background: linear-gradient(45deg, #667eea, #764ba2);
+        border: none;
+        color: white;
+        cursor: pointer;
+        border-radius: 50px;
+        transition: all 0.3s;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3)
+      }
+
+      #startBtn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4)
+      }
+
+      @keyframes glow {
+        0% {
+          text-shadow: 0 0 20px #4facfe
+        }
+
+        100% {
+          text-shadow: 0 0 30px #4facfe, 0 0 40px #00f2fe
+        }
+      }
+
+      #hud {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        color: #4facfe;
+        font-size: 1.2rem;
+        z-index: 100;
+        text-shadow: 0 0 10px rgba(79, 172, 254, 0.8)
+      }
+
+      #weaponHud {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        color: #4facfe;
+        font-size: 1rem;
+        z-index: 100;
+        text-shadow: 0 0 10px rgba(79, 172, 254, 0.8)
+      }
+
+      .hidden {
+        opacity: 0;
+        pointer-events: none
+      }
+
+      #controls {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 0.9rem;
+        text-align: right;
+        z-index: 100
+      }
+
+      .weapon-active {
+        color: #00f2fe;
+        font-weight: bold
+      }
+
+      /* Mobile Controls */
+      #mobileControls {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        right: 20px;
+        display: none;
+        z-index: 200
+      }
+
+      #dpad {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        width: 120px;
+        height: 120px
+      }
+
+      #dpadOuter {
+        width: 120px;
+        height: 120px;
+        border: 3px solid rgba(79, 172, 254, 0.6);
+        border-radius: 50%;
+        position: absolute;
+        background: rgba(0, 0, 0, 0.3)
+      }
+
+      #dpadInner {
+        width: 40px;
+        height: 40px;
+        background: rgba(79, 172, 254, 0.8);
+        border-radius: 50%;
+        position: absolute;
+        top: 40px;
+        left: 40px;
+        transition: all 0.1s ease
+      }
+
+      #fireBtn {
+        position: absolute;
+        bottom: 40px;
+        right: 20px;
+        width: 80px;
+        height: 80px;
+        border: 3px solid rgba(255, 75, 87, 0.6);
+        border-radius: 50%;
+        background: rgba(255, 75, 87, 0.3);
+        color: #fff;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        user-select: none
+      }
+
+      #weaponBtn {
+        position: absolute;
+        bottom: 140px;
+        right: 20px;
+        width: 60px;
+        height: 60px;
+        border: 3px solid rgba(254, 202, 87, 0.6);
+        border-radius: 50%;
+        background: rgba(254, 202, 87, 0.3);
+        color: #fff;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        user-select: none
+      }
+
+      @media (max-width: 768px) {
+        #mobileControls {
+          display: block
+        }
+
+        #controls {
+          display: none
+        }
+
+        #intro h1 {
+          font-size: 2.5rem
+        }
+
+        #intro p {
+          font-size: 1rem;
+          padding: 0 20px
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="gameContainer">
+      <div id="intro">
+        <h1>COSMIC DEFENDER</h1>
+        <p>Navigate through hostile space territories.Defend against alien sentries orbiting distant worlds.Use WASD or Arrow Keys to move,SPACE to fire.Keys 1-5 to change weapons.Stay alert-enemies will attack when you get too close!</p>
+        <button id="startBtn">Launch Mission</button>
+      </div>
+      <div id="hud">
+        <div>Health: <span id="health">100</span>
+        </div>
+        <div>Score: <span id="score">0</span>
+        </div>
+      </div>
+      <div id="weaponHud">
+        <div>WEAPONS:</div>
+        <div id="weapon1" class="weapon-active">1-Blaster</div>
+        <div id="weapon2">2-Scatter</div>
+        <div id="weapon3">3-Shotgun</div>
+        <div id="weapon4">4-Mines</div>
+        <div id="weapon5">5-Laser</div>
+      </div>
+      <div id="controls">
+        <div>WASD/Arrows-Move</div>
+        <div>SPACE-Fire</div>
+        <div>1-5-Weapons</div>
+      </div>
+      <div id="mobileControls">
+        <div id="dpad">
+          <div id="dpadOuter"></div>
+          <div id="dpadInner"></div>
+        </div>
+        <div id="fireBtn">FIRE</div>
+        <div id="weaponBtn">W <br>1 </div>
+      </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+      const CONFIG = {
+        player: {
+          acceleration: 0.1,
+          maxSpeed: 0.8,
+          friction: 0.92,
+          health: 1000
+        },
+        stars: {
+          count: 1000,
+          rotationSpeed: 0.0002,
+          spread: 600
+        },
+        planets: {
+          count: 3,
+          configs: [{
+            radius: 18,
+            color: 0xff6b6b,
+            distance: 60,
+            enemyCount: 3,
+            enemyType: 'fighter',
+            health: 200
+          }, {
+            radius: 3,
+            color: 0x4ecdc4,
+            distance: 80,
+            enemyCount: 2,
+            enemyType: 'interceptor',
+            health: 50
+          }, {
+            radius: 50,
+            color: 0xfeca57,
+            distance: 100,
+            enemyCount: 4,
+            enemyType: 'heavy',
+            health: 500
+          }]
+        },
+        enemies: {
+          orbitMargin: 8,
+          baseSpeed: 0.015,
+          speedVariation: 0.005,
+          attackRange: 40,
+          health: 30,
+          chaseSpeed: 0.3,
+          returnSpeed: 0.3
+        },
+        bullets: {
+          speed: 2,
+          lifetime: 80,
+          damage: 10
+        },
+        weapons: {
+          laser: {
+            damage: 20,
+            width: 10,
+            maxDistance: 100
+          }
+        }
+      };
+      class SpaceShooter {
+        constructor() {
+          this.scene = new THREE.Scene();
+          const aspect = window.innerWidth / window.innerHeight;
+          const d = 60;
+          this.camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 0.1, 2000);
+          this.renderer = new THREE.WebGLRenderer({
+            antialias: !0
+          });
+          this.renderer.setSize(window.innerWidth, window.innerHeight);
+          this.renderer.setClearColor(0x000011);
+          document.getElementById('gameContainer').appendChild(this.renderer.domElement);
+          this.gameStarted = !1;
+          this.player = {
+            health: CONFIG.player.health,
+            score: 0,
+            currentWeapon: 1
+          };
+          this.keys = {};
+          this.bullets = [];
+          this.mines = [];
+          this.enemies = [];
+          this.planets = [];
+          this.stars = [];
+          this.collisionCooldown = 0;
+          this.spacePressed = !1;
+          this.playerShip = null;
+          this.playerVelocity = new THREE.Vector3();
+          this.laserBeam = null;
+          this.touchControls = {
+            moveX: 0,
+            moveY: 0,
+            firing: !1
+          };
+          this.init();
+          this.setupEventListeners();
+          this.animate()
+        }
+        init() {
+          this.camera.position.set(0, 60, 60);
+          this.camera.lookAt(0, 0, 0);
+          const ambientLight = new THREE.AmbientLight(0x404040, 0.3);
+          this.scene.add(ambientLight);
+          const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+          directionalLight.position.set(10, 10, 5);
+          this.scene.add(directionalLight);
+          this.createStarField();
+          this.createPlayer();
+          this.createPlanets();
+          this.createEnemies()
+        }
+        createStarField() {
+          const starGeometry = new THREE.BufferGeometry();
+          const positions = new Float32Array(CONFIG.stars.count * 3);
+          for (let i = 0; i < CONFIG.stars.count * 3; i += 3) {
+            positions[i] = (Math.random() - 0.5) * CONFIG.stars.spread;
+            positions[i + 1] = (Math.random() - 0.5) * CONFIG.stars.spread;
+            positions[i + 2] = (Math.random() - 0.5) * CONFIG.stars.spread
+          }
+          starGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+          const starMaterial = new THREE.PointsMaterial({
+            color: 0xffffff,
+            size: 0.5
+          });
+          this.stars = new THREE.Points(starGeometry, starMaterial);
+          this.scene.add(this.stars)
+        }
+        createShip(config = {}) {
+          const shipGroup = new THREE.Group();
+          const scale = config.scale || 1;
+          const primaryColor = config.primaryColor || 0x4facfe;
+          const secondaryColor = config.secondaryColor || 0x667eea;
+          const accentColor = config.accentColor || 0x00f2fe;
+          const cockpitColor = config.cockpitColor || 0x764ba2;
+          const bodyGeometry = new THREE.BoxGeometry(2 * scale, 0.3 * scale, 4 * scale);
+          const bodyMaterial = new THREE.MeshLambertMaterial({
+            color: primaryColor
+          });
+          const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+          shipGroup.add(body);
+          const wingGeometry = new THREE.BoxGeometry(4 * scale, 0.2 * scale, 1 * scale);
+          const wingMaterial = new THREE.MeshLambertMaterial({
+            color: secondaryColor
+          });
+          const leftWing = new THREE.Mesh(wingGeometry, wingMaterial);
+          leftWing.position.set(0, -0.1 * scale, -1 * scale);
+          shipGroup.add(leftWing);
+          const engineGeometry = new THREE.SphereGeometry(0.3 * scale, 8, 8);
+          const engineMaterial = new THREE.MeshBasicMaterial({
+            color: accentColor,
+            transparent: !0,
+            opacity: 0.8
+          });
+          const leftEngine = new THREE.Mesh(engineGeometry, engineMaterial);
+          leftEngine.position.set(-1.5 * scale, 0, -2 * scale);
+          const rightEngine = leftEngine.clone();
+          rightEngine.position.set(1.5 * scale, 0, -2 * scale);
+          shipGroup.add(leftEngine);
+          shipGroup.add(rightEngine);
+          const cockpitGeometry = new THREE.SphereGeometry(0.4 * scale, 8, 8);
+          const cockpitMaterial = new THREE.MeshLambertMaterial({
+            color: cockpitColor
+          });
+          const cockpit = new THREE.Mesh(cockpitGeometry, cockpitMaterial);
+          cockpit.position.set(0, 0.3 * scale, 0.5 * scale);
+          shipGroup.add(cockpit);
+          return shipGroup
+        }
+        createPlayer() {
+          this.playerShip = this.createShip();
+          this.playerShip.position.y = 5;
+          this.scene.add(this.playerShip)
+        }
+        createPlanets() {
+          const angleStep = (Math.PI * 2) / CONFIG.planets.count;
+          for (let i = 0; i < CONFIG.planets.count; i++) {
+            const planetConfig = CONFIG.planets.configs[i % CONFIG.planets.configs.length];
+            const angle = angleStep * i;
+            const planetGeometry = new THREE.SphereGeometry(planetConfig.radius, 16, 16);
+            const planetMaterial = new THREE.MeshLambertMaterial({
+              color: planetConfig.color
+            });
+            const planet = new THREE.Mesh(planetGeometry, planetMaterial);
+            const x = Math.cos(angle) * planetConfig.distance;
+            const z = Math.sin(angle) * planetConfig.distance;
+            planet.position.set(x, 0, z);
+            this.scene.add(planet);
+            const orbitRadius = planetConfig.radius + CONFIG.enemies.orbitMargin;
+            this.planets.push({
+              mesh: planet,
+              radius: orbitRadius,
+              center: planet.position.clone(),
+              config: planetConfig,
+              health: planetConfig.health,
+              maxHealth: planetConfig.health,
+              destroyed: false
+            })
+          }
+        }
+        createEnemies() {
+          this.planets.forEach((planet, planetIndex) => {
+            const enemyConfig = this.getEnemyConfig(planet.config.enemyType);
+            for (let i = 0; i < planet.config.enemyCount; i++) {
+              const enemyShip = this.createShip(enemyConfig.shipConfig);
+              const enemy = {
+                mesh: enemyShip,
+                planet: planet,
+                angle: (i * Math.PI * 2) / planet.config.enemyCount,
+                originalAngle: (i * Math.PI * 2) / planet.config.enemyCount,
+                speed: CONFIG.enemies.baseSpeed + Math.random() * CONFIG.enemies.speedVariation,
+                attackRange: CONFIG.enemies.attackRange,
+                attacking: !1,
+                returning: !1,
+                health: CONFIG.enemies.health,
+                type: planet.config.enemyType,
+                chaseSpeed: enemyConfig.chaseSpeed
+              };
+              this.updateEnemyPosition(enemy);
+              this.enemies.push(enemy);
+              this.scene.add(enemyShip)
+            }
+          })
+        }
+        updateEnemyPosition(enemy) {
+          const x = enemy.planet.center.x + Math.cos(enemy.angle) * enemy.planet.radius;
+          const z = enemy.planet.center.z + Math.sin(enemy.angle) * enemy.planet.radius;
+          enemy.mesh.position.set(x, 2, z)
+        }
+        getEnemyConfig(type) {
+          const configs = {
+            fighter: {
+              shipConfig: {
+                scale: 0.8,
+                primaryColor: 0xff4757,
+                secondaryColor: 0xff3838,
+                accentColor: 0xff6b6b,
+                cockpitColor: 0x2f3542
+              },
+              chaseSpeed: 0.4
+            },
+            interceptor: {
+              shipConfig: {
+                scale: 0.9,
+                primaryColor: 0x3742fa,
+                secondaryColor: 0x2f3542,
+                accentColor: 0x70a1ff,
+                cockpitColor: 0xff4757
+              },
+              chaseSpeed: 0.5
+            },
+            heavy: {
+              shipConfig: {
+                scale: 1.2,
+                primaryColor: 0x2ed573,
+                secondaryColor: 0x1e90ff,
+                accentColor: 0x7bed9f,
+                cockpitColor: 0xff5252
+              },
+              chaseSpeed: 0.3
+            }
+          };
+          return configs[type] || configs.fighter
+        }
+        selectWeapon(weaponNum) {
+          if (weaponNum >= 1 && weaponNum <= 5) {
+            document.getElementById(`weapon${this.player.currentWeapon}`).classList.remove('weapon-active');
+            this.player.currentWeapon = weaponNum;
+            document.getElementById(`weapon${weaponNum}`).classList.add('weapon-active');
+            document.getElementById('weaponBtn').innerHTML = `W
+                  <br>${weaponNum}`;
+            if (this.laserBeam) {
+              this.scene.remove(this.laserBeam);
+              this.laserBeam = null
+            }
+          }
+        }
+        cycleWeapon() {
+          const nextWeapon = this.player.currentWeapon % 5 + 1;
+          this.selectWeapon(nextWeapon)
+        }
+        setupEventListeners() {
+          document.addEventListener('keydown', (e) => {
+            this.keys[e.code] = !0;
+            if (e.code.startsWith('Digit')) {
+              const weaponNum = parseInt(e.code.charAt(5));
+              this.selectWeapon(weaponNum)
+            }
+          });
+          document.addEventListener('keyup', (e) => {
+            this.keys[e.code] = !1
+          });
+          document.getElementById('startBtn').addEventListener('click', () => {
+            this.startGame()
+          });
+          this.setupMobileControls();
+          window.addEventListener('resize', () => {
+            const aspect = window.innerWidth / window.innerHeight;
+            const d = 60;
+            this.camera.left = -d * aspect;
+            this.camera.right = d * aspect;
+            this.camera.top = d;
+            this.camera.bottom = -d;
+            this.camera.updateProjectionMatrix();
+            this.renderer.setSize(window.innerWidth, window.innerHeight)
+          })
+        }
+        setupMobileControls() {
+          const dpad = document.getElementById('dpad');
+          const dpadInner = document.getElementById('dpadInner');
+          const fireBtn = document.getElementById('fireBtn');
+          const weaponBtn = document.getElementById('weaponBtn');
+          let dpadPressed = !1;
+          const updateDpad = (clientX, clientY) => {
+            const rect = dpad.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            const deltaX = clientX - centerX;
+            const deltaY = clientY - centerY;
+            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            const maxDistance = 40;
+            if (distance <= maxDistance) {
+              dpadInner.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+              this.touchControls.moveX = deltaX / maxDistance;
+              this.touchControls.moveY = deltaY / maxDistance
+            } else {
+              const angle = Math.atan2(deltaY, deltaX);
+              const limitedX = Math.cos(angle) * maxDistance;
+              const limitedY = Math.sin(angle) * maxDistance;
+              dpadInner.style.transform = `translate(${limitedX}px, ${limitedY}px)`;
+              this.touchControls.moveX = limitedX / maxDistance;
+              this.touchControls.moveY = limitedY / maxDistance
+            }
+          };
+          const resetDpad = () => {
+            dpadInner.style.transform = 'translate(0px, 0px)';
+            this.touchControls.moveX = 0;
+            this.touchControls.moveY = 0;
+            dpadPressed = !1
+          };
+          dpad.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            dpadPressed = !0;
+            const touch = e.touches[0];
+            updateDpad(touch.clientX, touch.clientY)
+          });
+          dpad.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (dpadPressed) {
+              const touch = e.touches[0];
+              updateDpad(touch.clientX, touch.clientY)
+            }
+          });
+          dpad.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            resetDpad()
+          });
+          fireBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            this.touchControls.firing = !0
+          });
+          fireBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            this.touchControls.firing = !1
+          });
+          weaponBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            this.cycleWeapon()
+          })
+        }
+        startGame() {
+          document.getElementById('intro').classList.add('hidden');
+          this.gameStarted = !0
+        }
+        checkPlanetCollision(newPos, isPlayer = false) {
+          for (let planet of this.planets) {
+            if (planet.destroyed) continue;
+            const distance = newPos.distanceTo(planet.center);
+            const collisionDistance = planet.config.radius + (isPlayer ? 3 : 2);
+            if (distance < collisionDistance) {
+              if (isPlayer) {
+                const bounceDirection = new THREE.Vector3().subVectors(newPos, planet.center).normalize();
+                this.playerVelocity.copy(bounceDirection.multiplyScalar(0.5));
+                this.player.health -= 10;
+                this.createDamageEffect(this.playerShip.position);
+                this.updateHUD();
+                if (this.player.health <= 0) {
+                  this.gameOver()
+                }
+              }
+              return true
+            }
+          }
+          return false
+        }
+        createDamageEffect(position) {
+          const damageGeometry = new THREE.SphereGeometry(3, 32, 32);
+          const damageMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: !0,
+            opacity: 0.6
+          });
+          const damage = new THREE.Mesh(damageGeometry, damageMaterial);
+          damage.position.copy(position);
+          this.scene.add(damage);
+          let scale = 0;
+          const animate = () => {
+            scale += 0.15;
+            damage.scale.setScalar(scale);
+            damage.material.opacity = Math.max(0, 0.6 - scale * 0.3);
+            if (scale < 2) {
+              requestAnimationFrame(animate)
+            } else {
+              this.scene.remove(damage)
+            }
+          };
+          animate()
+        }
+        updatePlayer() {
+          if (!this.gameStarted) return;
+          let moveX = 0;
+          let moveZ = 0;
+          if (this.keys.KeyW || this.keys.ArrowUp || this.touchControls.moveY < -0.3) moveZ -= 1;
+          if (this.keys.KeyS || this.keys.ArrowDown || this.touchControls.moveY > 0.3) moveZ += 1;
+          if (this.keys.KeyA || this.keys.ArrowLeft || this.touchControls.moveX < -0.3) moveX -= 1;
+          if (this.keys.KeyD || this.keys.ArrowRight || this.touchControls.moveX > 0.3) moveX += 1;
+          if (moveX !== 0 || moveZ !== 0) {
+            if (moveX !== 0 && moveZ !== 0) {
+              moveX *= Math.SQRT1_2;
+              moveZ *= Math.SQRT1_2
+            }
+            this.playerVelocity.x += moveX * CONFIG.player.acceleration;
+            this.playerVelocity.z += moveZ * CONFIG.player.acceleration
+          }
+          this.playerVelocity.multiplyScalar(CONFIG.player.friction);
+          const clampedVelocity = this.playerVelocity.clone().clampLength(0, CONFIG.player.maxSpeed);
+          this.playerVelocity.copy(clampedVelocity);
+          const newPos = this.playerShip.position.clone().add(this.playerVelocity);
+          if (!this.checkPlanetCollision(newPos, true)) {
+            this.playerShip.position.copy(newPos)
+          }
+          if (this.playerVelocity.length() > 0.1) {
+            const angle = Math.atan2(this.playerVelocity.x, this.playerVelocity.z);
+            this.playerShip.rotation.y = angle
+          }
+          if ((this.keys.Space && !this.spacePressed) || this.touchControls.firing) {
+            this.fireWeapon();
+            this.spacePressed = !0
+          } else if (!this.keys.Space && !this.touchControls.firing) {
+            this.spacePressed = !1;
+            if (this.laserBeam) {
+              this.scene.remove(this.laserBeam);
+              this.laserBeam = null
+            }
+          }
+          this.camera.position.x = this.playerShip.position.x;
+          this.camera.position.z = this.playerShip.position.z + 60;
+          this.camera.lookAt(this.playerShip.position)
+        }
+        fireWeapon() {
+          switch (this.player.currentWeapon) {
+            case 1:
+              this.fireBlaster();
+              break;
+            case 2:
+              this.fireScatter(3);
+              break;
+            case 3:
+              this.fireScatter(5);
+              break;
+            case 4:
+              this.fireMine();
+              break;
+            case 5:
+              this.fireLaser();
+              break
+          }
+        }
+        fireBlaster() {
+          this.createBullet(0)
+        }
+        fireScatter(count) {
+          const spreadAngle = Math.PI / 6;
+          for (let i = 0; i < count; i++) {
+            const angleOffset = (i - (count - 1) / 2) * (spreadAngle / (count - 1));
+            this.createBullet(angleOffset)
+          }
+        }
+        createBullet(angleOffset = 0) {
+          const bulletGeometry = new THREE.SphereGeometry(0.2, 8, 8);
+          const bulletMaterial = new THREE.MeshBasicMaterial({
+            color: 0x00f2fe
+          });
+          const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
+          bullet.position.copy(this.playerShip.position);
+          bullet.position.y += 0.5;
+          const direction = new THREE.Vector3(Math.sin(this.playerShip.rotation.y + angleOffset), 0, Math.cos(this.playerShip.rotation.y + angleOffset));
+          const bulletVelocity = direction.clone().multiplyScalar(CONFIG.bullets.speed);
+          this.bullets.push({
+            mesh: bullet,
+            velocity: bulletVelocity,
+            life: CONFIG.bullets.lifetime
+          });
+          this.scene.add(bullet)
+        }
+        fireMine() {
+          const mineGeometry = new THREE.SphereGeometry(0.5, 8, 8);
+          const mineMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff4757,
+            transparent: !0,
+            opacity: 0.8
+          });
+          const mine = new THREE.Mesh(mineGeometry, mineMaterial);
+          mine.position.copy(this.playerShip.position);
+          mine.position.y += 0.5;
+          this.mines.push({
+            mesh: mine,
+            life: 600,
+            exploded: !1
+          });
+          this.scene.add(mine)
+        }
+        fireLaser() {
+          if (this.laserBeam) {
+            this.scene.remove(this.laserBeam)
+          }
+          const direction = new THREE.Vector3(Math.sin(this.playerShip.rotation.y), 0, Math.cos(this.playerShip.rotation.y));
+          const laserEnd = this.playerShip.position.clone().add(direction.clone().multiplyScalar(CONFIG.weapons.laser.maxDistance));
+          const laserGeometry = new THREE.BufferGeometry().setFromPoints([this.playerShip.position.clone().add(new THREE.Vector3(0, 0.5, 0)), laserEnd]);
+          const laserMaterial = new THREE.LineBasicMaterial({
+            color: 0x00ff00,
+            transparent: !0,
+            opacity: 0.8
+          });
+          this.laserBeam = new THREE.Line(laserGeometry, laserMaterial);
+          this.scene.add(this.laserBeam);
+          this.enemies.forEach(enemy => {
+            if (enemy.health > 0) {
+              const distanceToLaser = this.distancePointToLine(enemy.mesh.position, this.playerShip.position, laserEnd);
+              if (distanceToLaser < 2) {
+                enemy.health -= CONFIG.weapons.laser.damage;
+                if (enemy.health <= 0) {
+                  this.createExplosion(enemy.mesh.position);
+                  enemy.mesh.visible = !1;
+                  this.player.score += 100;
+                  this.updateHUD()
+                }
+              }
+            }
+          });
+          this.planets.forEach(planet => {
+            if (!planet.destroyed) {
+              const distanceToLaser = this.distancePointToLine(planet.center, this.playerShip.position, laserEnd);
+              if (distanceToLaser < planet.config.radius) {
+                planet.health -= CONFIG.weapons.laser.damage;
+                if (planet.health <= 0) {
+                  this.destroyPlanet(planet)
+                }
+              }
+            }
+          })
+        }
+        distancePointToLine(point, lineStart, lineEnd) {
+          const line = new THREE.Vector3().subVectors(lineEnd, lineStart);
+          const pointToStart = new THREE.Vector3().subVectors(point, lineStart);
+          const t = Math.max(0, Math.min(1, pointToStart.dot(line) / line.dot(line)));
+          const projection = lineStart.clone().add(line.multiplyScalar(t));
+          return point.distanceTo(projection)
+        }
+        createExplosion(position, size = 5) {
+          const explosionGeometry = new THREE.SphereGeometry(size, 16, 16);
+          const explosionMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff4757,
+            transparent: !0,
+            opacity: 0.8
+          });
+          const explosion = new THREE.Mesh(explosionGeometry, explosionMaterial);
+          explosion.position.copy(position);
+          this.scene.add(explosion);
+          let scale = 0;
+          const animate = () => {
+            scale += 0.1;
+            explosion.scale.setScalar(scale);
+            explosion.material.opacity = Math.max(0, 0.8 - scale * 0.4);
+            if (scale < 2) {
+              requestAnimationFrame(animate)
+            } else {
+              this.scene.remove(explosion)
+            }
+          };
+          animate()
+        }
+        updateEnemies() {
+          this.enemies.forEach(enemy => {
+            if (enemy.health <= 0) return;
+            const distanceToPlayer = enemy.mesh.position.distanceTo(this.playerShip.position);
+            if (distanceToPlayer < enemy.attackRange && !enemy.attacking && !enemy.returning) {
+              enemy.attacking = !0;
+              enemy.returning = !1
+            }
+            if (enemy.attacking) {
+              const direction = new THREE.Vector3().subVectors(this.playerShip.position, enemy.mesh.position).normalize().multiplyScalar(enemy.chaseSpeed);
+              const newPos = enemy.mesh.position.clone().add(direction);
+              if (!this.checkPlanetCollision(newPos)) {
+                enemy.mesh.position.copy(newPos)
+              } else {
+                const bounceDirection = new THREE.Vector3().subVectors(newPos, enemy.planet.center).normalize();
+                enemy.mesh.position.add(bounceDirection.multiplyScalar(2))
+              }
+              enemy.mesh.lookAt(this.playerShip.position);
+              if (distanceToPlayer > enemy.attackRange * 2.5) {
+                enemy.attacking = !1;
+                enemy.returning = !0
+              }
+            } else if (enemy.returning) {
+              const targetPos = new THREE.Vector3(enemy.planet.center.x + Math.cos(enemy.originalAngle) * enemy.planet.radius, 2, enemy.planet.center.z + Math.sin(enemy.originalAngle) * enemy.planet.radius);
+              const distanceToTarget = enemy.mesh.position.distanceTo(targetPos);
+              if (distanceToTarget > 2) {
+                const direction = new THREE.Vector3().subVectors(targetPos, enemy.mesh.position).normalize().multiplyScalar(CONFIG.enemies.returnSpeed);
+                enemy.mesh.position.add(direction);
+                const lookAtTarget = enemy.mesh.position.clone().add(direction);
+                enemy.mesh.lookAt(lookAtTarget)
+              } else {
+                enemy.returning = !1;
+                enemy.angle = enemy.originalAngle
+              }
+            } else {
+              enemy.angle += enemy.speed;
+              this.updateEnemyPosition(enemy);
+              const nextAngle = enemy.angle + enemy.speed;
+              const nextX = enemy.planet.center.x + Math.cos(nextAngle) * enemy.planet.radius;
+              const nextZ = enemy.planet.center.z + Math.sin(nextAngle) * enemy.planet.radius;
+              const nextPos = new THREE.Vector3(nextX, 2, nextZ);
+              enemy.mesh.lookAt(nextPos)
+            }
+          })
+        }
+        updateBullets() {
+          this.bullets = this.bullets.filter(bullet => {
+            bullet.mesh.position.add(bullet.velocity);
+            bullet.life--;
+            for (let enemy of this.enemies) {
+              if (enemy.health > 0 && bullet.mesh.position.distanceTo(enemy.mesh.position) < 2) {
+                enemy.health -= CONFIG.bullets.damage;
+                if (enemy.health <= 0) {
+                  this.createExplosion(enemy.mesh.position);
+                  enemy.mesh.visible = !1;
+                  this.player.score += 100;
+                  this.updateHUD()
+                }
+                this.scene.remove(bullet.mesh);
+                return !1
+              }
+            }
+            for (let planet of this.planets) {
+              if (!planet.destroyed && bullet.mesh.position.distanceTo(planet.center) < planet.config.radius) {
+                planet.health -= CONFIG.bullets.damage;
+                if (planet.health <= 0) {
+                  this.destroyPlanet(planet)
+                }
+                this.scene.remove(bullet.mesh);
+                return !1
+              }
+            }
+            if (bullet.life <= 0) {
+              this.scene.remove(bullet.mesh);
+              return !1
+            }
+            return !0
+          })
+        }
+        destroyPlanet(planet) {
+          planet.destroyed = true;
+          this.createExplosion(planet.center, planet.config.radius);
+          this.scene.remove(planet.mesh);
+          this.player.score += 500;
+          this.updateHUD();
+          this.enemies = this.enemies.filter(enemy => {
+            if (enemy.planet === planet) {
+              this.scene.remove(enemy.mesh);
+              return false
+            }
+            return true
+          })
+        }
+        updateMines() {
+          this.mines = this.mines.filter(mine => {
+            mine.life--;
+            if (mine.life <= 0 && !mine.exploded) {
+              this.scene.remove(mine.mesh);
+              return !1
+            }
+            if (!mine.exploded) {
+              this.enemies.forEach(enemy => {
+                if (enemy.health > 0 && mine.mesh.position.distanceTo(enemy.mesh.position) < 8) {
+                  mine.exploded = !0;
+                  this.explodeMine(mine);
+                  this.scene.remove(mine.mesh)
+                }
+              })
+            }
+            return !mine.exploded
+          })
+        }
+        explodeMine(mine) {
+          const explosionGeometry = new THREE.SphereGeometry(8, 16, 16);
+          const explosionMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff4757,
+            transparent: !0,
+            opacity: 0.6
+          });
+          const explosion = new THREE.Mesh(explosionGeometry, explosionMaterial);
+          explosion.position.copy(mine.mesh.position);
+          this.scene.add(explosion);
+          this.enemies.forEach(enemy => {
+            if (enemy.health > 0 && explosion.position.distanceTo(enemy.mesh.position) < 8) {
+              enemy.health -= 50;
+              if (enemy.health <= 0) {
+                this.createExplosion(enemy.mesh.position);
+                enemy.mesh.visible = !1;
+                this.player.score += 100;
+                this.updateHUD()
+              }
+            }
+          });
+          setTimeout(() => {
+            this.scene.remove(explosion)
+          }, 500)
+        }
+        checkCollisions() {
+          if (this.collisionCooldown > 0) {
+            this.collisionCooldown--;
+            return
+          }
+          this.enemies.forEach(enemy => {
+            if (enemy.health > 0 && enemy.mesh.position.distanceTo(this.playerShip.position) < 3) {
+              this.player.health -= 5;
+              this.collisionCooldown = 60;
+              this.updateHUD();
+              if (this.player.health <= 0) {
+                this.gameOver()
+              }
+            }
+          })
+        }
+        updateHUD() {
+          document.getElementById('health').textContent = this.player.health;
+          document.getElementById('score').textContent = this.player.score
+        }
+        gameOver() {
+          this.gameStarted = !1;
+          setTimeout(() => {
+            const playAgain = confirm(`Game Over! Final Score: ${this.player.score}\n\nWould you like to play again?`);
+            if (playAgain) {
+              this.player.health = CONFIG.player.health;
+              this.player.score = 0;
+              this.player.currentWeapon = 1;
+              this.selectWeapon(1);
+              this.playerShip.position.set(0, 5, 0);
+              this.playerVelocity.set(0, 0, 0);
+              this.collisionCooldown = 0;
+              this.enemies.forEach(enemy => {
+                enemy.health = CONFIG.enemies.health;
+                enemy.attacking = !1;
+                enemy.returning = !1;
+                enemy.mesh.visible = !0;
+                enemy.angle = enemy.originalAngle;
+                this.updateEnemyPosition(enemy)
+              });
+              this.planets.forEach(planet => {
+                if (planet.destroyed) {
+                  planet.destroyed = false;
+                  planet.health = planet.maxHealth;
+                  this.scene.add(planet.mesh)
+                } else {
+                  planet.health = planet.maxHealth
+                }
+              });
+              this.bullets.forEach(bullet => this.scene.remove(bullet.mesh));
+              this.bullets = [];
+              this.mines.forEach(mine => this.scene.remove(mine.mesh));
+              this.mines = [];
+              if (this.laserBeam) {
+                this.scene.remove(this.laserBeam);
+                this.laserBeam = null
+              }
+              this.updateHUD();
+              this.gameStarted = !0
+            } else {
+              location.reload()
+            }
+          }, 100)
+        }
+        animate() {
+          requestAnimationFrame(() => this.animate());
+          this.stars.rotation.y += CONFIG.stars.rotationSpeed;
+          if (this.gameStarted) {
+            this.updatePlayer();
+            this.updateEnemies();
+            this.updateBullets();
+            this.updateMines();
+            this.checkCollisions()
+          }
+          this.renderer.render(this.scene, this.camera)
+        }
+      }
+      new SpaceShooter();
+    </script>
+  </body>
+</html>

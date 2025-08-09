@@ -121,7 +121,7 @@
         },
         fighter: {
           t: 'classic',
-          s: 0.8,
+          s: 1,
           bw: 1.5,
           bh: 0.2,
           bl: 3,
@@ -147,7 +147,7 @@
         },
         interceptor: {
           t: 'tie',
-          s: 1,
+          s: 1.33,
           cs: 'sphere',
           css: 1.2,
           pnc: 2,
@@ -197,13 +197,13 @@
           cc: 0xff5252
         },
         scout: {
-           t:'classic',s:2.3,bw:1.5,bh:0.6,bl:5.8,
-    hw:!0,ws:3.2,wt:0.25,wp:-1.6,
-    wsw:0,wd:-90,ec:3,es:0.9,
-    ep:-2.4,esp:1.1,hc:!0,cs:'box',
-    css:0.4,cpy:0.5,cpz:1.9,
-    pc:0x54a0ff,sc:0x5f27cd,
-    ac:0xfeca57,cc:0x4ecdc4
+          t:'classic',s:1.6,bw:1.2,bh:0.6,bl:4.6,
+    hw:!0,ws:5.6,wt:0.15,wp:-1.5,
+    wsw:0,wd:0,ec:2,es:0.4,
+    ep:-2,esp:1.6,hc:!0,cs:'sphere',
+    css:0.5,cpy:0.3,cpz:-0.5,
+    pc:0xfeca57,sc:0x2ed9ff,
+    ac:0xfeca57,cc:0x616161
         },
       };
       const ENEMY_TYPES = {
@@ -226,7 +226,7 @@
         's': {
           shipConfig: 'scout',
           health: 50,
-          chaseSpeed: 0.5,
+          chaseSpeed: 0.6,
           weaponType: 'burst',
           attackRange: 40,
           score: 150
@@ -244,14 +244,14 @@
         radius: 18,
         color: 0xff6b6b,
         distance: 60,
-        enemyCount: 3,
+        enemyCount: 9,
         enemyType: 'f',
         health: 200
       }, {
         radius: 3,
         color: 0x4ecdc4,
         distance: 80,
-        enemyCount: 2,
+        enemyCount: 3,
         enemyType: 'i',
         health: 50
       }, {

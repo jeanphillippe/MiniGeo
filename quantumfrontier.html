@@ -311,205 +311,175 @@
           }
         }
       };
-     class AudioManager {
+class AudioManager {
   constructor() {
     this.audioStarted = false;
     this.ambientDrone = null;
     this.masterVolume = 0.8;
-    this.soundCache = new Map();
-    this.activeLoops = new Set();
-    this.audioContext = null;
     this.setupAudio();
   }
 
   async setupAudio() {
-    // Enhanced weapon synth with dynamic modulation
-    this.weaponSynth = new Tone.PolySynth(Tone.FMSynth, {
-      harmonicity: 3,
-      modulationIndex: 10,
-      oscillator: { type: "triangle" },
-      envelope: {
-        attack: 0.01,
-        decay: 0.1,
-        sustain: 0.1,
-        release: 0.2
-      },
-      modulation: { type: "square" },
-      modulationEnvelope: {
-        attack: 0.01,
-        decay: 0.2,
-        sustain: 0,
-        release: 0.1
-      }
-    }).toDestination();
-
-    // Multi-layered explosion system
-    this.explosionSynth = new Tone.NoiseSynth({
-      noise: { type: "brown" },
-      envelope: {
-        attack: 0.005,
-        decay: 0.4,
-        sustain: 0,
-        release: 0.8
-      }
-    }).toDestination();
-
-    this.subExplosionSynth = new Tone.MembraneSynth({
-      pitchDecay: 0.05,
-      octaves: 10,
+    // CHUNKY BLASTER - Like Star Wars/Halo
+    this.blasterSynth = new Tone.FMSynth({
+      harmonicity: 8,
+      modulationIndex: 25,
       oscillator: { type: "sine" },
       envelope: {
         attack: 0.001,
-        decay: 0.4,
-        sustain: 0.01,
-        release: 1.4
+        decay: 0.1,
+        sustain: 0.3,
+        release: 0.1
+      },
+      modulation: { type: "square" },
+      modulationEnvelope: {
+        attack: 0.002,
+        decay: 0.2,
+        sustain: 0,
+        release: 0.2
       }
     }).toDestination();
 
-    // Enhanced laser with frequency sweeping
-    this.laserSynth = new Tone.Oscillator({
-      type: "sawtooth",
-      frequency: 200
-    }).toDestination();
-
-    this.laserModulator = new Tone.LFO({
-      frequency: 8,
-      type: "sine",
-      amplitude: 0.5
-    }).connect(this.laserSynth.frequency);
-
-    // Metallic collision with resonance
-    this.collisionSynth = new Tone.MetalSynth({
-      frequency: 200,
+    // SCATTER GUN - Rapid fire pops
+    this.scatterSynth = new Tone.NoiseSynth({
+      noise: { type: "pink" },
       envelope: {
         attack: 0.001,
-        decay: 1.4,
-        release: 0.2
-      },
-      harmonicity: 5.1,
-      modulationIndex: 32,
-      resonance: 4000,
-      octaves: 1.5
+        decay: 0.05,
+        sustain: 0,
+        release: 0.02
+      }
     }).toDestination();
 
-    // Enhanced UI sounds with shimmer
-    this.uiSynth = new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: "triangle" },
+    // SHOTGUN - Deep boom with crack
+    this.shotgunNoise = new Tone.NoiseSynth({
+      noise: { type: "brown" },
       envelope: {
-        attack: 0.01,
-        decay: 0.05,
+        attack: 0.001,
+        decay: 0.2,
         sustain: 0,
         release: 0.3
       }
     }).toDestination();
 
-    // Dynamic ambient system
-    this.ambientFilter = new Tone.Filter({
+    this.shotgunTone = new Tone.Synth({
+      oscillator: { type: "triangle" },
+      envelope: {
+        attack: 0.001,
+        decay: 0.3,
+        sustain: 0,
+        release: 0.4
+      }
+    }).toDestination();
+
+    // LASER - Proper sci-fi laser with sweeping frequency
+    this.laserOsc1 = new Tone.Oscillator({ type: "sawtooth", frequency: 800 });
+    this.laserOsc2 = new Tone.Oscillator({ type: "square", frequency: 400 });
+    this.laserFilter = new Tone.Filter({ frequency: 2000, type: "lowpass", Q: 15 });
+    this.laserEnv = new Tone.AmplitudeEnvelope({
+      attack: 0.01,
+      decay: 0.1,
+      sustain: 0.8,
+      release: 0.2
+    });
+
+    this.laserOsc1.chain(this.laserFilter, this.laserEnv, Tone.Destination);
+    this.laserOsc2.chain(this.laserFilter);
+    this.laserActive = false;
+
+    // MINES - Deployment beep + armed hum
+    this.mineDeploy = new Tone.Synth({
+      oscillator: { type: "triangle" },
+      envelope: {
+        attack: 0.01,
+        decay: 0.1,
+        sustain: 0.2,
+        release: 0.3
+      }
+    }).toDestination();
+
+    this.mineArmed = new Tone.Oscillator({ type: "sine", frequency: 60 });
+    this.mineArmedFilter = new Tone.Filter({ frequency: 200, type: "bandpass" });
+    this.mineArmed.chain(this.mineArmedFilter, Tone.Destination);
+
+    // EXPLOSIONS - Multi-layer realistic booms
+    this.explosionNoise = new Tone.NoiseSynth({
+      noise: { type: "brown" },
+      envelope: {
+        attack: 0.001,
+        decay: 0.5,
+        sustain: 0.1,
+        release: 1.2
+      }
+    });
+
+    this.explosionSub = new Tone.Synth({
+      oscillator: { type: "sine" },
+      envelope: {
+        attack: 0.001,
+        decay: 0.8,
+        sustain: 0,
+        release: 1.5
+      }
+    });
+
+    this.explosionCrackle = new Tone.NoiseSynth({
+      noise: { type: "white" },
+      envelope: {
+        attack: 0.05,
+        decay: 0.3,
+        sustain: 0,
+        release: 0.4
+      }
+    });
+
+    // Explosion effects chain
+    this.explosionReverb = new Tone.Reverb({ decay: 3, wet: 0.4 }).toDestination();
+    this.explosionNoise.chain(this.explosionReverb);
+    this.explosionSub.chain(this.explosionReverb);
+    this.explosionCrackle.connect(this.explosionReverb);
+
+    // ENGINE/THRUST sounds
+    this.engineBase = new Tone.Oscillator({ type: "sawtooth", frequency: 80 });
+    this.engineMod = new Tone.LFO({ frequency: 25, type: "sine", amplitude: 20 });
+    this.engineFilter = new Tone.Filter({ frequency: 400, type: "lowpass" });
+    this.engineGain = new Tone.Gain(0);
+
+    this.engineBase.chain(this.engineFilter, this.engineGain, Tone.Destination);
+    this.engineMod.connect(this.engineBase.frequency);
+
+    // UI Sounds - Crisp and clear
+    this.uiBeep = new Tone.Synth({
+      oscillator: { type: "sine" },
+      envelope: {
+        attack: 0.01,
+        decay: 0.05,
+        sustain: 0,
+        release: 0.1
+      }
+    }).toDestination();
+
+    // HIT/DAMAGE - Metallic impacts
+    this.hitMetal = new Tone.MetalSynth({
       frequency: 400,
-      type: "lowpass",
-      rolloff: -24
-    });
+      envelope: { attack: 0.001, decay: 0.4, release: 0.1 },
+      harmonicity: 12,
+      modulationIndex: 64,
+      resonance: 2000
+    }).toDestination();
 
-    this.ambientDrone = new Tone.Oscillator({
-      type: "sine",
-      frequency: 40
-    }).connect(this.ambientFilter);
+    // AMBIENT - Space atmosphere
+    this.ambientDrone = new Tone.Oscillator({ type: "sine", frequency: 35 });
+    this.ambientDrone2 = new Tone.Oscillator({ type: "triangle", frequency: 52.5 });
+    this.ambientFilter = new Tone.Filter({ frequency: 300, type: "lowpass" });
+    this.ambientGain = new Tone.Gain(0.3);
 
-    this.ambientDrone2 = new Tone.Oscillator({
-      type: "triangle",
-      frequency: 60.5
-    }).connect(this.ambientFilter);
+    this.ambientDrone.chain(this.ambientFilter, this.ambientGain, Tone.Destination);
+    this.ambientDrone2.chain(this.ambientFilter);
 
-    this.ambientDrone3 = new Tone.Oscillator({
-      type: "sawtooth",
-      frequency: 20.25
-    }).connect(this.ambientFilter);
-
-    // Advanced effects chain
-    this.reverb = new Tone.Reverb({
-      decay: 12,
-      wet: 0.4,
-      preDelay: 0.01
-    });
-
-    this.compressor = new Tone.Compressor({
-      threshold: -30,
-      ratio: 12,
-      attack: 0.003,
-      release: 0.01
-    });
-
-    this.limiter = new Tone.Limiter(-10);
-
-    // Audio ducking system
-    this.duckingGain = new Tone.Gain(1);
-
-    // Enhanced effects routing
-    this.ambientFilter.chain(this.duckingGain, this.reverb, this.compressor, this.limiter, Tone.Destination);
-    this.weaponSynth.chain(this.compressor, this.limiter);
-    this.explosionSynth.chain(this.reverb, this.compressor, this.limiter);
-    this.subExplosionSynth.chain(this.reverb, this.compressor, this.limiter);
-    
-    // Initialize advanced features after audio setup
-    this.initializeAdvancedFeatures();
-  }
-
-  initializeAdvancedFeatures() {
-    // Dynamic audio intensity system
-    this.intensity = 0; // 0-1 scale
-    this.intensityTarget = 0;
-    this.lastActionTime = 0;
-    
-    // Procedural audio variations
-    this.weaponVariations = {
-      blaster: [
-        { note: "C5", duration: "16n", harmonicity: 3 },
-        { note: "C#5", duration: "16n", harmonicity: 2.5 },
-        { note: "D5", duration: "32n", harmonicity: 4 }
-      ],
-      scatter: [
-        { note: "A4", duration: "32n", spread: 3 },
-        { note: "G#4", duration: "32n", spread: 4 },
-        { note: "B4", duration: "64n", spread: 5 }
-      ]
-    };
-
-    // Start intensity management
-    this.startIntensityManager();
-  }
-
-  startIntensityManager() {
-    setInterval(() => {
-      // Decay intensity over time
-      const timeSinceAction = Date.now() - this.lastActionTime;
-      if (timeSinceAction > 2000) {
-        this.intensityTarget = Math.max(0, this.intensityTarget - 0.02);
-      }
-      
-      // Smooth intensity transitions
-      this.intensity += (this.intensityTarget - this.intensity) * 0.1;
-      
-      // Update ambient based on intensity
-      this.updateAmbientIntensity();
-    }, 50);
-  }
-
-  updateAmbientIntensity() {
-    if (this.ambientFilter && this.audioStarted) {
-      const baseFreq = 400 + (this.intensity * 600);
-      const modulation = Math.sin(Date.now() * 0.001) * 50 * this.intensity;
-      this.ambientFilter.frequency.value = baseFreq + modulation;
-      
-      // Dynamic reverb based on intensity
-      if (this.reverb) {
-        this.reverb.wet.value = 0.4 + (this.intensity * 0.3);
-      }
-    }
-  }
-
-  increaseIntensity(amount = 0.1) {
-    this.lastActionTime = Date.now();
-    this.intensityTarget = Math.min(1, this.intensityTarget + amount);
+    // Initialize state
+    this.engineRunning = false;
+    this.mineHumming = false;
   }
 
   async startAudio() {
@@ -523,421 +493,269 @@
   playAmbientSound() {
     if (this.ambientDrone && this.audioStarted) {
       this.ambientDrone.start();
-      this.ambientDrone2.start("+0.1");
-      this.ambientDrone3.start("+0.2");
+      this.ambientDrone2.start();
       
-      // Dynamic ambient evolution
-      this.ambientFilter.frequency.rampTo(800, 15);
-      
-      // Add subtle ambient variations
-      this.createAmbientVariations();
-      
-      setTimeout(() => {
-        if (this.ambientFilter) {
-          this.ambientFilter.frequency.rampTo(200, 20);
+      // Slow ambient evolution
+      setInterval(() => {
+        if (this.audioStarted) {
+          const variation = 35 + Math.sin(Date.now() * 0.0001) * 5;
+          this.ambientDrone.frequency.rampTo(variation, 8);
         }
-      }, 15000);
+      }, 8000);
     }
   }
 
-  createAmbientVariations() {
-    const createVariation = () => {
-      if (this.audioStarted && this.ambientDrone2) {
-        const freq = 60.5 + (Math.random() - 0.5) * 5;
-        this.ambientDrone2.frequency.rampTo(freq, 8 + Math.random() * 12);
-        
-        setTimeout(createVariation, 8000 + Math.random() * 15000);
-      }
-    };
-    
-    setTimeout(createVariation, 5000);
-  }
-
-  playBlasterSound(position = null, variation = null) {
+  // CHUNKY BLASTER - Sounds like a real energy weapon
+  playBlasterSound() {
     if (!this.audioStarted) return;
     
-    this.increaseIntensity(0.05);
+    // Main shot with pitch bend down for impact
+    this.blasterSynth.triggerAttackRelease("E5", "8n");
     
-    const vars = this.weaponVariations.blaster;
-    const selectedVar = variation || vars[Math.floor(Math.random() * vars.length)];
-    
-    // Apply spatial audio if position provided
-    if (position) {
-      this.applySpatialAudio(this.weaponSynth, position);
-    }
-    
-    // Dynamic harmonicity based on intensity
-    this.weaponSynth.set({
-      harmonicity: selectedVar.harmonicity + (this.intensity * 2),
-      modulationIndex: 10 + (this.intensity * 15)
-    });
-    
-    this.weaponSynth.triggerAttackRelease(selectedVar.note, selectedVar.duration);
-    
-    // Add subtle echo for immersion
-    setTimeout(() => {
-      if (this.intensity > 0.3) {
-        this.weaponSynth.triggerAttackRelease(selectedVar.note, "64n", "+0", 0.2);
-      }
-    }, 80 + Math.random() * 40);
+    // Frequency sweep for that "zap" sound
+    this.blasterSynth.frequency.setValueAtTime(660, Tone.now());
+    this.blasterSynth.frequency.exponentialRampTo(220, 0.1);
   }
 
-  playScatterSound(position = null, spread = 3) {
+  // RAPID SCATTER - Like a machine gun
+  playScatterSound() {
     if (!this.audioStarted) return;
     
-    this.increaseIntensity(0.08);
-    
-    const vars = this.weaponVariations.scatter;
-    const selectedVar = vars[Math.floor(Math.random() * vars.length)];
-    
-    // Create scatter pattern with variations
-    for (let i = 0; i < spread; i++) {
-      const delay = i * (30 + Math.random() * 40);
-      const pitch = selectedVar.note;
-      const variance = (Math.random() - 0.5) * 2; // Pitch variance
-      
+    const shots = 3 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < shots; i++) {
       setTimeout(() => {
-        if (position) {
-          this.applySpatialAudio(this.weaponSynth, position);
-        }
-        
-        this.weaponSynth.triggerAttackRelease(
-          Tone.Frequency(pitch).transpose(variance), 
-          selectedVar.duration,
-          "+0",
-          0.7 + Math.random() * 0.3
-        );
-      }, delay);
+        this.scatterSynth.triggerAttackRelease("32n");
+        // Add tiny blaster pops
+        this.blasterSynth.triggerAttackRelease("A4", "64n", "+0", 0.3);
+      }, i * (40 + Math.random() * 30));
     }
   }
 
-  playShotgunSound(position = null, pellets = 8) {
+  // HEAVY SHOTGUN - Deep boom with spread
+  playShotgunSound() {
     if (!this.audioStarted) return;
     
-    this.increaseIntensity(0.12);
+    // Main blast
+    this.shotgunNoise.triggerAttackRelease("4n");
+    this.shotgunTone.triggerAttackRelease("G2", "4n");
     
-    // Main shotgun blast
-    this.weaponSynth.triggerAttackRelease("F4", "8n");
-    
-    // Scatter pellets simulation
-    for (let i = 0; i < pellets; i++) {
+    // Pellet spread simulation
+    for (let i = 0; i < 8; i++) {
       setTimeout(() => {
-        const pitch = "F4";
-        const variance = (Math.random() - 0.5) * 8;
-        this.weaponSynth.triggerAttackRelease(
-          Tone.Frequency(pitch).transpose(variance), 
-          "32n",
-          "+0",
-          0.3 + Math.random() * 0.4
-        );
-      }, Math.random() * 100);
-    }
-    
-    if (position) {
-      this.applySpatialAudio(this.weaponSynth, position);
+        this.scatterSynth.triggerAttackRelease("64n", "+0", 0.4);
+      }, 20 + i * 15);
     }
   }
 
-  playMineSound(position = null, size = 1) {
-    if (!this.audioStarted) return;
+  // PROPER LASER - Continuous sci-fi beam
+  playLaserSound() {
+    if (!this.audioStarted || this.laserActive) return;
     
-    this.increaseIntensity(0.06);
+    this.laserActive = true;
+    this.laserOsc1.start();
+    this.laserOsc2.start();
+    this.laserEnv.triggerAttack();
     
-    // Enhanced mine deployment with build-up
-    this.weaponSynth.triggerAttackRelease("D3", "4n");
+    // Frequency sweep for laser effect
+    this.laserOsc1.frequency.setValueAtTime(800, Tone.now());
+    this.laserOsc1.frequency.rampTo(1200, 0.1);
+    this.laserOsc2.frequency.setValueAtTime(400, Tone.now());
+    this.laserOsc2.frequency.rampTo(600, 0.1);
     
-    // Add deployment mechanism sound
-    setTimeout(() => {
-      this.collisionSynth.triggerAttackRelease("A2", "8n", "+0", 0.5);
-    }, 200);
-    
-    // Size-based audio variations
-    if (size > 1) {
-      setTimeout(() => {
-        this.weaponSynth.triggerAttackRelease("C3", "2n", "+0", 0.8);
-      }, 400);
-    }
-    
-    if (position) {
-      this.applySpatialAudio(this.weaponSynth, position);
-    }
-  }
-
-  playLaserSound(position = null, intensity = 1) {
-    if (!this.audioStarted) return;
-    
-    this.increaseIntensity(0.03);
-    
-    if (this.laserSynth.state === "stopped") {
-      this.laserSynth.start();
-      this.laserModulator.start();
-      
-      // Dynamic laser frequency based on intensity
-      const baseFreq = 200 * intensity;
-      const targetFreq = 600 * intensity;
-      
-      this.laserSynth.frequency.setValueAtTime(baseFreq, Tone.now());
-      this.laserSynth.frequency.rampTo(targetFreq, 0.1);
-      
-      // Modulation based on global intensity
-      this.laserModulator.frequency.value = 8 + (this.intensity * 12);
-      this.laserModulator.amplitude.value = 0.5 + (this.intensity * 0.4);
-    }
-    
-    if (position) {
-      this.applySpatialAudio(this.laserSynth, position);
-    }
+    // Filter sweep for that laser "weeeooo" sound
+    this.laserFilter.frequency.setValueAtTime(2000, Tone.now());
+    this.laserFilter.frequency.rampTo(4000, 0.05);
+    this.laserFilter.frequency.rampTo(1500, 0.2);
   }
 
   stopLaserSound() {
-    if (!this.audioStarted) return;
+    if (!this.audioStarted || !this.laserActive) return;
     
-    if (this.laserSynth.state === "started") {
-      // Smooth fade out
-      this.laserSynth.frequency.rampTo(50, 0.2);
-      setTimeout(() => {
-        this.laserSynth.stop();
-        this.laserModulator.stop();
-      }, 200);
-    }
+    this.laserEnv.triggerRelease();
+    setTimeout(() => {
+      if (this.laserOsc1.state === "started") this.laserOsc1.stop();
+      if (this.laserOsc2.state === "started") this.laserOsc2.stop();
+      this.laserActive = false;
+    }, 200);
   }
 
-  playExplosionSound(size = 1, position = null) {
+  // AUDIBLE MINE - Deploy beep + armed hum
+  playMineSound() {
     if (!this.audioStarted) return;
     
-    this.increaseIntensity(0.15 * size);
-    this.duckAmbient(0.3, 1000 * size);
+    // Deployment beep sequence
+    this.mineDeploy.triggerAttackRelease("A4", "16n");
+    setTimeout(() => this.mineDeploy.triggerAttackRelease("F4", "16n"), 100);
+    setTimeout(() => this.mineDeploy.triggerAttackRelease("D4", "8n"), 200);
     
-    // Multi-layered explosion
-    this.explosionSynth.triggerAttackRelease("32n");
-    this.subExplosionSynth.triggerAttackRelease("C1", "4n");
+    // Start armed hum after deployment
+    setTimeout(() => {
+      if (!this.mineHumming && this.audioStarted) {
+        this.mineHumming = true;
+        this.mineArmed.start();
+        this.mineArmedFilter.frequency.rampTo(300, 2);
+        
+        // Stop humming after 10 seconds (mine lifetime)
+        setTimeout(() => {
+          if (this.mineArmed.state === "started") {
+            this.mineArmed.stop();
+            this.mineHumming = false;
+          }
+        }, 10000);
+      }
+    }, 500);
+  }
+
+  // MASSIVE EXPLOSIONS - Multi-layered realistic booms
+  playExplosionSound(size = 1) {
+    if (!this.audioStarted) return;
+    
+    // Main explosion blast
+    this.explosionNoise.triggerAttackRelease("2n");
+    this.explosionSub.triggerAttackRelease("C1", "1n");
+    
+    // Crackling debris
+    setTimeout(() => {
+      this.explosionCrackle.triggerAttackRelease("4n", "+0", 0.6);
+    }, 100);
     
     if (size > 1) {
-      // Large explosion effects
-      setTimeout(() => {
-        this.weaponSynth.triggerAttackRelease("C2", "4n", "+0", 0.8);
-        this.subExplosionSynth.triggerAttackRelease("F1", "2n", "+0", 0.6);
-      }, 100);
+      // Larger explosion - deeper and longer
+      this.explosionSub.triggerAttackRelease("G0", "1n", "+0.1", 0.8);
       
-      // Secondary explosions for large blasts
+      // Secondary explosions
       for (let i = 0; i < size - 1; i++) {
         setTimeout(() => {
-          this.explosionSynth.triggerAttackRelease("64n", "+0", 0.5);
-        }, 200 + (i * 150) + Math.random() * 100);
+          this.explosionNoise.triggerAttackRelease("4n", "+0", 0.7);
+          this.explosionSub.triggerAttackRelease("D1", "2n", "+0", 0.6);
+        }, 200 + i * 300);
       }
     }
     
-    // Screen shake audio simulation
-    if (size > 2) {
-      this.createScreenShakeAudio(size);
-    }
-    
-    if (position) {
-      this.applySpatialAudio(this.explosionSynth, position);
+    // Stop mine hum if exploding
+    if (this.mineHumming && this.mineArmed.state === "started") {
+      this.mineArmed.stop();
+      this.mineHumming = false;
     }
   }
 
-  createScreenShakeAudio(intensity) {
-    const shakeOsc = new Tone.Oscillator({
-      type: "sine",
-      frequency: 8
-    }).connect(this.ambientFilter);
+  // ENGINE THRUST - Audible when moving
+  startEngineSound() {
+    if (!this.audioStarted || this.engineRunning) return;
     
-    shakeOsc.start();
-    shakeOsc.volume.value = -20 + (intensity * 5);
+    this.engineRunning = true;
+    this.engineBase.start();
+    this.engineMod.start();
+    this.engineGain.gain.rampTo(0.15, 0.1);
     
+    // Engine variation
+    this.engineBase.frequency.rampTo(120, 0.3);
+    this.engineFilter.frequency.rampTo(800, 0.5);
+  }
+
+  stopEngineSound() {
+    if (!this.audioStarted || !this.engineRunning) return;
+    
+    this.engineGain.gain.rampTo(0, 0.2);
     setTimeout(() => {
-      shakeOsc.stop();
-      shakeOsc.dispose();
-    }, 500 + intensity * 200);
+      if (this.engineBase.state === "started") {
+        this.engineBase.stop();
+        this.engineMod.stop();
+        this.engineRunning = false;
+      }
+    }, 200);
   }
 
-  duckAmbient(amount = 0.5, duration = 500) {
-    if (this.duckingGain) {
-      this.duckingGain.gain.rampTo(amount, 0.05);
-      setTimeout(() => {
-        this.duckingGain.gain.rampTo(1, 0.3);
-      }, duration);
-    }
+  updateEngineIntensity(intensity) {
+    if (!this.audioStarted || !this.engineRunning) return;
+    
+    const volume = 0.05 + (intensity * 0.2);
+    const pitch = 80 + (intensity * 60);
+    const filterFreq = 400 + (intensity * 600);
+    
+    this.engineGain.gain.rampTo(volume, 0.1);
+    this.engineBase.frequency.rampTo(pitch, 0.2);
+    this.engineFilter.frequency.rampTo(filterFreq, 0.3);
   }
 
-  playCollisionSound(position = null, material = "metal") {
+  // CRISP UI SOUNDS
+  playWeaponSwitchSound() {
     if (!this.audioStarted) return;
     
-    this.increaseIntensity(0.04);
-    
-    // Material-based collision sounds
-    switch (material) {
-      case "metal":
-        this.collisionSynth.triggerAttackRelease("C4", "16n");
-        break;
-      case "rock":
-        this.collisionSynth.triggerAttackRelease("G3", "8n");
-        break;
-      case "energy":
-        this.weaponSynth.triggerAttackRelease("E5", "32n");
-        break;
-      default:
-        this.collisionSynth.triggerAttackRelease("C4", "16n");
-    }
-    
-    if (position) {
-      this.applySpatialAudio(this.collisionSynth, position);
-    }
+    this.uiBeep.triggerAttackRelease("C5", "32n");
+    setTimeout(() => this.uiBeep.triggerAttackRelease("G5", "32n"), 60);
+    setTimeout(() => this.uiBeep.triggerAttackRelease("C6", "16n"), 120);
   }
 
-  playWeaponSwitchSound(weaponType = null) {
+  // METALLIC IMPACTS
+  playCollisionSound() {
+    if (!this.audioStarted) return;
+    this.hitMetal.triggerAttackRelease("C4", "8n");
+  }
+
+  playDamageSound() {
     if (!this.audioStarted) return;
     
-    // Weapon-specific switch sounds
-    const switchSounds = {
-      blaster: ["G5", "C6"],
-      laser: ["C6", "E6"],
-      shotgun: ["F5", "A5"],
-      mine: ["D5", "F#5"]
-    };
-    
-    const sounds = weaponType ? switchSounds[weaponType] || switchSounds.blaster : ["G5", "C6"];
-    
-    this.uiSynth.triggerAttackRelease(sounds[0], "32n");
+    // Player damage - harsh and attention-grabbing
+    this.hitMetal.triggerAttackRelease("F3", "4n");
     setTimeout(() => {
-      this.uiSynth.triggerAttackRelease(sounds[1], "32n", "+0", 0.8);
+      this.uiBeep.triggerAttackRelease("C4", "16n", "+0", 0.8);
+    }, 100);
+  }
+
+  playEnemyHitSound() {
+    if (!this.audioStarted) return;
+    
+    // Satisfying enemy hit
+    this.hitMetal.triggerAttackRelease("G4", "16n", "+0", 0.7);
+    setTimeout(() => {
+      this.uiBeep.triggerAttackRelease("C5", "32n", "+0", 0.4);
     }, 50);
-    
-    // Add harmonic shimmer
-    setTimeout(() => {
-      this.uiSynth.triggerAttackRelease(sounds[1], "64n", "+0", 0.3);
-    }, 120);
   }
 
-  playDamageSound(position = null, damageType = "normal") {
+  // POWER-UP SOUNDS
+  playPowerUpSound() {
     if (!this.audioStarted) return;
     
-    this.increaseIntensity(0.08);
-    this.duckAmbient(0.7, 300);
-    
-    switch (damageType) {
-      case "critical":
-        this.collisionSynth.triggerAttackRelease("C3", "4n");
-        setTimeout(() => {
-          this.weaponSynth.triggerAttackRelease("F4", "8n", "+0", 0.6);
-        }, 100);
-        break;
-      case "energy":
-        this.weaponSynth.triggerAttackRelease("E4", "8n");
-        break;
-      default:
-        this.collisionSynth.triggerAttackRelease("F3", "8n");
-    }
-    
-    if (position) {
-      this.applySpatialAudio(this.collisionSynth, position);
-    }
-  }
-
-  playEnemyHitSound(position = null, enemyType = "normal") {
-    if (!this.audioStarted) return;
-    
-    this.increaseIntensity(0.03);
-    
-    // Enemy-specific hit sounds
-    const hitSounds = {
-      normal: "G3",
-      armored: "F3",
-      energy: "A3",
-      boss: "E3"
-    };
-    
-    const pitch = hitSounds[enemyType] || hitSounds.normal;
-    this.weaponSynth.triggerAttackRelease(pitch, "16n");
-    
-    // Add hit confirmation shimmer
-    setTimeout(() => {
-      this.uiSynth.triggerAttackRelease("C5", "64n", "+0", 0.4);
-    }, 80);
-    
-    if (position) {
-      this.applySpatialAudio(this.weaponSynth, position);
-    }
-  }
-
-  // New enhanced methods
-  applySpatialAudio(synth, position) {
-    // Simple stereo panning based on position
-    if (position && synth.volume) {
-      const pan = Math.max(-1, Math.min(1, position.x / 100));
-      const distance = Math.sqrt(position.x * position.x + position.y * position.y);
-      const volume = Math.max(0.1, 1 - (distance / 500));
-      
-      synth.volume.value = Tone.gainToDb(volume * this.masterVolume);
-    }
-  }
-
-  setMasterVolume(volume) {
-    this.masterVolume = Math.max(0, Math.min(1, volume));
-    Tone.Destination.volume.value = Tone.gainToDb(this.masterVolume);
-  }
-
-  playPowerUpSound(type = "generic") {
-    if (!this.audioStarted) return;
-    
-    const powerUpSounds = {
-      health: ["C4", "E4", "G4", "C5"],
-      weapon: ["G4", "B4", "D5", "G5"],
-      shield: ["F4", "A4", "C5", "F5"],
-      generic: ["C4", "E4", "G4", "C5"]
-    };
-    
-    const notes = powerUpSounds[type] || powerUpSounds.generic;
-    
+    const notes = ["C4", "E4", "G4", "C5", "E5"];
     notes.forEach((note, i) => {
       setTimeout(() => {
-        this.uiSynth.triggerAttackRelease(note, "16n", "+0", 0.7);
-      }, i * 80);
+        this.uiBeep.triggerAttackRelease(note, "16n", "+0", 0.8);
+      }, i * 100);
     });
   }
 
+  // HEALTH WARNING
   playLowHealthWarning() {
     if (!this.audioStarted) return;
     
-    // Pulsing warning sound
-    const pulse = () => {
-      this.weaponSynth.triggerAttackRelease("C4", "32n", "+0", 0.5);
-      setTimeout(pulse, 800);
+    const warningBeep = () => {
+      this.uiBeep.triggerAttackRelease("F4", "8n", "+0", 0.6);
+      setTimeout(() => {
+        this.uiBeep.triggerAttackRelease("F4", "8n", "+0", 0.6);
+      }, 200);
     };
     
-    pulse();
+    // Repeat every 3 seconds
+    warningBeep();
+    setTimeout(warningBeep, 3000);
   }
 
   stopAllSounds() {
-    if (this.ambientDrone) {
+    if (this.ambientDrone && this.ambientDrone.state === "started") {
       this.ambientDrone.stop();
     }
-    if (this.ambientDrone2) {
+    if (this.ambientDrone2 && this.ambientDrone2.state === "started") {
       this.ambientDrone2.stop();
     }
-    if (this.ambientDrone3) {
-      this.ambientDrone3.stop();
-    }
+    
     this.stopLaserSound();
+    this.stopEngineSound();
     
-    // Reset intensity
-    this.intensity = 0;
-    this.intensityTarget = 0;
-  }
-
-  dispose() {
-    this.stopAllSounds();
-    
-    // Dispose of all audio resources
-    [this.weaponSynth, this.explosionSynth, this.subExplosionSynth, 
-     this.laserSynth, this.laserModulator, this.collisionSynth, 
-     this.uiSynth, this.ambientFilter, this.reverb, this.compressor, 
-     this.limiter].forEach(node => {
-      if (node && node.dispose) {
-        node.dispose();
-      }
-    });
+    if (this.mineHumming && this.mineArmed.state === "started") {
+      this.mineArmed.stop();
+      this.mineHumming = false;
+    }
   }
 }
       class SpaceShooter {

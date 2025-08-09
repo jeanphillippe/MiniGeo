@@ -441,7 +441,7 @@ class AudioManager {
 
     // ENGINE/THRUST sounds
     this.engineBase = new Tone.Oscillator({ type: "sawtooth", frequency: 80 });
-    this.engineMod = new Tone.LFO({ frequency: 25, type: "sine", amplitude: 20 });
+    this.engineMod = new Tone.LFO({ frequency: 25, type: "sine", amplitude: 0.3 });
     this.engineFilter = new Tone.Filter({ frequency: 400, type: "lowpass" });
     this.engineGain = new Tone.Gain(0);
 
@@ -472,10 +472,10 @@ class AudioManager {
     this.ambientDrone = new Tone.Oscillator({ type: "sine", frequency: 35 });
     this.ambientDrone2 = new Tone.Oscillator({ type: "triangle", frequency: 52.5 });
     this.ambientFilter = new Tone.Filter({ frequency: 300, type: "lowpass" });
-    this.ambientGain = new Tone.Gain(0.3);
+    this.ambientGain = new Tone.Gain(0.6);
 
     this.ambientDrone.chain(this.ambientFilter, this.ambientGain, Tone.Destination);
-    this.ambientDrone2.chain(this.ambientFilter);
+    this.ambientDrone2.chain(this.ambientFilter, this.ambientGain);
 
     // Initialize state
     this.engineRunning = false;
@@ -495,13 +495,23 @@ class AudioManager {
       this.ambientDrone.start();
       this.ambientDrone2.start();
       
-      // Slow ambient evolution
+      // Make ambient more noticeable with filter sweeps
+      this.ambientFilter.frequency.setValueAtTime(300, Tone.now());
+      this.ambientFilter.frequency.rampTo(600, 8);
+      
+      // Slow ambient evolution with more dramatic changes
       setInterval(() => {
         if (this.audioStarted) {
-          const variation = 35 + Math.sin(Date.now() * 0.0001) * 5;
-          this.ambientDrone.frequency.rampTo(variation, 8);
+          const variation = 35 + Math.sin(Date.now() * 0.0001) * 10;
+          const variation2 = 52.5 + Math.cos(Date.now() * 0.00007) * 8;
+          this.ambientDrone.frequency.rampTo(variation, 12);
+          this.ambientDrone2.frequency.rampTo(variation2, 15);
+          
+          // Filter movements for atmosphere
+          const filterFreq = 300 + Math.sin(Date.now() * 0.00005) * 200;
+          this.ambientFilter.frequency.rampTo(filterFreq, 10);
         }
-      }, 8000);
+      }, 6000);
     }
   }
 
@@ -690,27 +700,37 @@ class AudioManager {
   // METALLIC IMPACTS
   playCollisionSound() {
     if (!this.audioStarted) return;
-    this.hitMetal.triggerAttackRelease("C4", "8n");
+    if (this.hitMetal && this.hitMetal.triggerAttackRelease) {
+      this.hitMetal.triggerAttackRelease("C4", "8n");
+    }
   }
 
   playDamageSound() {
     if (!this.audioStarted) return;
     
     // Player damage - harsh and attention-grabbing
-    this.hitMetal.triggerAttackRelease("F3", "4n");
-    setTimeout(() => {
-      this.uiBeep.triggerAttackRelease("C4", "16n", "+0", 0.8);
-    }, 100);
+    if (this.hitMetal && this.hitMetal.triggerAttackRelease) {
+      this.hitMetal.triggerAttackRelease("F3", "4n");
+      setTimeout(() => {
+        if (this.uiBeep && this.uiBeep.triggerAttackRelease) {
+          this.uiBeep.triggerAttackRelease("C4", "16n", "+0", 0.8);
+        }
+      }, 100);
+    }
   }
 
   playEnemyHitSound() {
     if (!this.audioStarted) return;
     
     // Satisfying enemy hit
-    this.hitMetal.triggerAttackRelease("G4", "16n", "+0", 0.7);
-    setTimeout(() => {
-      this.uiBeep.triggerAttackRelease("C5", "32n", "+0", 0.4);
-    }, 50);
+    if (this.hitMetal && this.hitMetal.triggerAttackRelease) {
+      this.hitMetal.triggerAttackRelease("G4", "16n", "+0", 0.7);
+      setTimeout(() => {
+        if (this.uiBeep && this.uiBeep.triggerAttackRelease) {
+          this.uiBeep.triggerAttackRelease("C5", "32n", "+0", 0.4);
+        }
+      }, 50);
+    }
   }
 
   // POWER-UP SOUNDS

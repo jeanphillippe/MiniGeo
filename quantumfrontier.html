@@ -108,32 +108,16 @@
           }
         }
       };
+
       const SHIP_CONFIGS = {
         player: {
-          t: 'classic',
-          s: 1,
-          bw: 2.2,
-          bh: 0.5,
-          bl: 4,
-          hw: !0,
-          ws: 8,
-          wt: 0.85,
-          wp: -2.9,
-          wsw: 90,
-          wd: -90,
-          ec: 6,
-          es: 0.3,
-          ep: -2,
-          esp: 1.5,
-          hc: !0,
-          cs: 'sphere',
-          css: 0.8,
-          cpy: 0.3,
-          cpz: 0.5,
-          pc: 0x4facfe,
-          sc: 0x667eea,
-          ac: 0x00f2fe,
-          cc: 0x764ba2
+          t:'tie',s:1.8,cs:'octahedron',css:2.1,
+    pnc:2,ps:'triangle',pns:1.4,pd:2,
+    pt:0.5,py:0,pz:0.1,ptx:35,
+    pty:5,pa:0,hs:!1,
+    st:'cylinder',sth:0.19,scnt:3,sa:-10,
+    pc:0x5f27cd,sc:0xfeca57,
+    ac:0x96ceb4,cc:0x5f27cd
         },
         fighter: {
           t: 'classic',
@@ -213,30 +197,13 @@
           cc: 0xff5252
         },
         scout: {
-          t: 'classic',
-          s: 0.6,
-          bw: 1.2,
-          bh: 0.15,
-          bl: 2.5,
-          hw: !0,
-          ws: 2.5,
-          wt: 0.1,
-          wp: 0,
-          wsw: 0,
-          wd: 0,
-          ec: 1,
-          es: 0.2,
-          ep: -1.2,
-          esp: 1.5,
-          hc: !0,
-          cs: 'sphere',
-          css: 0.25,
-          cpy: 0.15,
-          cpz: 0.8,
-          pc: 0xfeca57,
-          sc: 0xff9f43,
-          ac: 0xee5a24,
-          cc: 0x2f3640
+           t:'classic',s:2.3,bw:1.5,bh:0.6,bl:5.8,
+    hw:!0,ws:3.2,wt:0.25,wp:-1.6,
+    wsw:0,wd:-90,ec:3,es:0.9,
+    ep:-2.4,esp:1.1,hc:!0,cs:'box',
+    css:0.4,cpy:0.5,cpz:1.9,
+    pc:0x54a0ff,sc:0x5f27cd,
+    ac:0xfeca57,cc:0x4ecdc4
         },
       };
       const ENEMY_TYPES = {
@@ -250,6 +217,14 @@
         },
         'i': {
           shipConfig: 'interceptor',
+          health: 50,
+          chaseSpeed: 0.5,
+          weaponType: 'burst',
+          attackRange: 40,
+          score: 150
+        },
+        's': {
+          shipConfig: 'scout',
           health: 50,
           chaseSpeed: 0.5,
           weaponType: 'burst',
@@ -284,7 +259,7 @@
         color: 0xfeca57,
         distance: 100,
         enemyCount: 4,
-        enemyType: 'h',
+        enemyType: 's',
         health: 500
       }];
       const SC = {
@@ -768,24 +743,11 @@
           });
           return g
         }
-        static cs(cfg) {
-          const sg = new THREE.Group();
-          const sc = cfg.s || 1;
-          if (cfg.t === 'tie') {
-            return SF.cts(cfg)
-          } else {
-            return SF.ccs(cfg)
-          }
-        }
-        static cs(cfg) {
-          const sg = new THREE.Group();
-          const sc = cfg.scale || 1;
-          if (cfg.shipType === 'tie') {
-            return SF.cts(cfg)
-          } else {
-            return SF.ccs(cfg)
-          }
-        }
+        static cs(cfg){
+    const sg=new THREE.Group();
+    const sc=cfg.s||1;
+    if(cfg.t==='tie'){return SF.cts(cfg)}else{return SF.ccs(cfg)}
+}
         static ccs(cfg) {
           const sg = new THREE.Group();
           const sc = cfg.s || 1.8;

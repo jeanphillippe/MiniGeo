@@ -905,11 +905,44 @@ createCircleGeometry(size) {
     return new THREE.CylinderGeometry(size/2, size/2, 0.1, 16);
 }
 
-// Classic ship creation
+// Replace these methods in your Quantum Frontier game:
+
+createTriangleGeometry(size) {
+    const geometry = new THREE.ConeGeometry(size, 0.1, 3);
+    geometry.rotateX(Math.PI / 2);
+    return geometry;
+}
+
+createStarGeometry(size) {
+    const shape = new THREE.Shape();
+    const outerRadius = size;
+    const innerRadius = size * 0.5;
+    const spikes = 5;
+    
+    for (let i = 0; i < spikes * 2; i++) {
+        const angle = (i / (spikes * 2)) * Math.PI * 2;
+        const radius = i % 2 === 0 ? outerRadius : innerRadius;
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
+        
+        if (i === 0) {
+            shape.moveTo(x, y);
+        } else {
+            shape.lineTo(x, y);
+        }
+    }
+    
+    const geometry = new THREE.ExtrudeGeometry(shape, {
+        depth: 0.1,
+        bevelEnabled: false
+    });
+    return geometry;
+}
+
 createClassicShip(config = {}) {
     const shipGroup = new THREE.Group();
     
-    // Configuration with defaults
+    // Enhanced configuration with new parameters
     const scale = config.scale || 1.8;
     const bodyWidth = config.bodyWidth || 2;
     const bodyHeight = config.bodyHeight || 0.3;
@@ -918,14 +951,17 @@ createClassicShip(config = {}) {
     const wingSpan = config.wingSpan || 4;
     const wingThickness = config.wingThickness || 0.2;
     const wingPosition = config.wingPosition || -1;
+    const wingSweep = config.wingSweep || 0;        // NEW
+    const wingDihedral = config.wingDihedral || 0;  // NEW
     const engineCount = config.engineCount || 2;
     const engineSize = config.engineSize || 0.3;
     const enginePosition = config.enginePosition || -2;
+    const engineSpread = config.engineSpread || 1.5; // NEW
     const hasCockpit = config.hasCockpit !== undefined ? config.hasCockpit : true;
+    const cockpitShape = config.cockpitShape || 'sphere'; // NEW
     const cockpitSize = config.cockpitSize || 0.4;
     const cockpitPosY = config.cockpitPosY || 0.3;
     const cockpitPosZ = config.cockpitPosZ || 0.5;
-    
     const primaryColor = config.primaryColor || 0x2ed573;
     const secondaryColor = config.secondaryColor || 0x1e90ff;
     const accentColor = config.accentColor || 0x7bed9f;
@@ -937,39 +973,60 @@ createClassicShip(config = {}) {
     const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
     shipGroup.add(body);
 
-    // Wings
+    // Enhanced Wings with sweep and dihedral
     if (hasWings) {
+        const wingGroup = new THREE.Group();
         const wingGeometry = new THREE.BoxGeometry(wingSpan * scale, wingThickness * scale, 1 * scale);
         const wingMaterial = new THREE.MeshLambertMaterial({color: secondaryColor});
         const wings = new THREE.Mesh(wingGeometry, wingMaterial);
         wings.position.set(0, -0.1 * scale, wingPosition * scale);
-        shipGroup.add(wings);
+        wings.rotation.z = (wingSweep * Math.PI) / 180;
+        wings.rotation.x = (wingDihedral * Math.PI) / 180;
+        wingGroup.add(wings);
+        shipGroup.add(wingGroup);
     }
 
-    // Engines
-    for (let i = 0; i < engineCount; i++) {
+    // Enhanced Engine positioning with spread control
+    const enginePositions = [];
+    if (engineCount === 1) {
+        enginePositions.push([0, 0]);
+    } else if (engineCount === 2) {
+        enginePositions.push([-engineSpread * scale, 0], [engineSpread * scale, 0]);
+    } else if (engineCount === 3) {
+        enginePositions.push([0, 0], [-engineSpread * scale, 0], [engineSpread * scale, 0]);
+    } else if (engineCount === 4) {
+        enginePositions.push([-engineSpread * scale, 0], [engineSpread * scale, 0], [-engineSpread * scale, 0.3 * scale], [engineSpread * scale, 0.3 * scale]);
+    } else if (engineCount === 6) {
+        enginePositions.push([-engineSpread * scale, 0], [engineSpread * scale, 0], [-engineSpread * scale * 0.7, 0.3 * scale], [engineSpread * scale * 0.7, 0.3 * scale], [-engineSpread * scale * 0.7, -0.3 * scale], [engineSpread * scale * 0.7, -0.3 * scale]);
+    }
+
+    for (let i = 0; i < enginePositions.length; i++) {
         const engineGeometry = new THREE.SphereGeometry(engineSize * scale, 8, 8);
         const engineMaterial = new THREE.MeshBasicMaterial({color: accentColor, transparent: true, opacity: 0.8});
         const engine = new THREE.Mesh(engineGeometry, engineMaterial);
-        
-        if (engineCount === 1) {
-            engine.position.set(0, 0, enginePosition * scale);
-        } else if (engineCount === 2) {
-            engine.position.set(i === 0 ? -1.5 * scale : 1.5 * scale, 0, enginePosition * scale);
-        } else if (engineCount === 3) {
-            if (i === 0) engine.position.set(0, 0, enginePosition * scale);
-            else engine.position.set(i === 1 ? -1.2 * scale : 1.2 * scale, 0, enginePosition * scale);
-        } else if (engineCount === 4) {
-            const positions = [[-1.5, 0], [1.5, 0], [-1.5, 0.3], [1.5, 0.3]];
-            engine.position.set(positions[i][0] * scale, positions[i][1] * scale, enginePosition * scale);
-        }
-        
+        engine.position.set(enginePositions[i][0], enginePositions[i][1], enginePosition * scale);
         shipGroup.add(engine);
     }
 
-    // Cockpit
+    // Enhanced Cockpit with shape options
     if (hasCockpit) {
-        const cockpitGeometry = new THREE.SphereGeometry(cockpitSize * scale, 8, 8);
+        let cockpitGeometry;
+        switch (cockpitShape) {
+            case 'sphere':
+                cockpitGeometry = new THREE.SphereGeometry(cockpitSize * scale, 8, 8);
+                break;
+            case 'box':
+                cockpitGeometry = new THREE.BoxGeometry(cockpitSize * scale, cockpitSize * scale, cockpitSize * scale);
+                break;
+            case 'cylinder':
+                cockpitGeometry = new THREE.CylinderGeometry(cockpitSize * scale, cockpitSize * scale, cockpitSize * scale, 8);
+                break;
+            case 'cone':
+                cockpitGeometry = new THREE.ConeGeometry(cockpitSize * scale, cockpitSize * scale * 1.5, 8);
+                break;
+            default:
+                cockpitGeometry = new THREE.SphereGeometry(cockpitSize * scale, 8, 8);
+        }
         const cockpitMaterial = new THREE.MeshLambertMaterial({color: cockpitColor});
         const cockpit = new THREE.Mesh(cockpitGeometry, cockpitMaterial);
         cockpit.position.set(0, cockpitPosY * scale, cockpitPosZ * scale);
@@ -979,11 +1036,10 @@ createClassicShip(config = {}) {
     return shipGroup;
 }
 
-// TIE Fighter style ship creation
 createTIEShip(config = {}) {
     const shipGroup = new THREE.Group();
     
-    // Configuration with defaults
+    // Enhanced configuration with all new parameters
     const scale = config.scale || 1.8;
     const cockpitShape = config.cockpitShape || 'sphere';
     const cockpitSize = config.cockpitSize || 1.2;
@@ -992,37 +1048,70 @@ createTIEShip(config = {}) {
     const panelSize = config.panelSize || 2;
     const panelDistance = config.panelDistance || 2.5;
     const panelThickness = config.panelThickness || 0.1;
-    const panelAngle = config.panelAngle || 0;
+    const panelOffsetY = config.panelOffsetY || 0;     // NEW
+    const panelOffsetZ = config.panelOffsetZ || 0;     // NEW
+    const panelTiltX = config.panelTiltX || 0;         // NEW
+    const panelTiltY = config.panelTiltY || 0;         // NEW
+    const panelAngle = config.panelAngle || 0;         // Enhanced (was panelAngle)
     const hasStruts = config.hasStruts !== undefined ? config.hasStruts : true;
+    const strutType = config.strutType || 'cylinder';  // NEW
     const strutThickness = config.strutThickness || 0.1;
-    
+    const strutCount = config.strutCount || 1;         // NEW
+    const strutAngle = config.strutAngle || 0;         // NEW
     const primaryColor = config.primaryColor || 0x2ed573;
     const secondaryColor = config.secondaryColor || 0x1e90ff;
     const accentColor = config.accentColor || 0x7bed9f;
     const cockpitColor = config.cockpitColor || 0xff5252;
 
-    // Cockpit
+    // Enhanced Cockpit with more shapes
     let cockpitGeometry;
-    switch(cockpitShape) {
-        case 'sphere': cockpitGeometry = new THREE.SphereGeometry(cockpitSize * scale, 12, 12); break;
-        case 'box': cockpitGeometry = new THREE.BoxGeometry(cockpitSize * scale, cockpitSize * scale, cockpitSize * scale); break;
-        case 'octahedron': cockpitGeometry = new THREE.OctahedronGeometry(cockpitSize * scale); break;
-        case 'cylinder': cockpitGeometry = new THREE.CylinderGeometry(cockpitSize * scale, cockpitSize * scale, cockpitSize * scale, 8); break;
-        default: cockpitGeometry = new THREE.SphereGeometry(cockpitSize * scale, 12, 12);
+    switch (cockpitShape) {
+        case 'sphere':
+            cockpitGeometry = new THREE.SphereGeometry(cockpitSize * scale, 12, 12);
+            break;
+        case 'box':
+            cockpitGeometry = new THREE.BoxGeometry(cockpitSize * scale, cockpitSize * scale, cockpitSize * scale);
+            break;
+        case 'octahedron':
+            cockpitGeometry = new THREE.OctahedronGeometry(cockpitSize * scale);
+            break;
+        case 'cylinder':
+            cockpitGeometry = new THREE.CylinderGeometry(cockpitSize * scale, cockpitSize * scale, cockpitSize * scale, 8);
+            break;
+        case 'dodecahedron':
+            cockpitGeometry = new THREE.DodecahedronGeometry(cockpitSize * scale);
+            break;
+        default:
+            cockpitGeometry = new THREE.SphereGeometry(cockpitSize * scale, 12, 12);
     }
     const cockpitMaterial = new THREE.MeshLambertMaterial({color: cockpitColor});
     const cockpit = new THREE.Mesh(cockpitGeometry, cockpitMaterial);
     shipGroup.add(cockpit);
 
-    // Side Panels
+    // Enhanced Side Panels with full 3D positioning and rotation
     for (let i = 0; i < panelCount; i++) {
         let panelGeometry;
-        switch(panelShape) {
-            case 'hexagon': panelGeometry = this.createHexagonGeometry(panelSize * scale); break;
-            case 'square': panelGeometry = this.createSquareGeometry(panelSize * scale); break;
-            case 'diamond': panelGeometry = this.createDiamondGeometry(panelSize * scale); break;
-            case 'circle': panelGeometry = this.createCircleGeometry(panelSize * scale); break;
-            default: panelGeometry = this.createHexagonGeometry(panelSize * scale);
+        switch (panelShape) {
+            case 'hexagon':
+                panelGeometry = this.createHexagonGeometry(panelSize * scale);
+                break;
+            case 'square':
+                panelGeometry = this.createSquareGeometry(panelSize * scale);
+                break;
+            case 'diamond':
+                panelGeometry = this.createDiamondGeometry(panelSize * scale);
+                break;
+            case 'circle':
+                panelGeometry = this.createCircleGeometry(panelSize * scale);
+                break;
+            case 'triangle':
+                panelGeometry = this.createTriangleGeometry(panelSize * scale);
+                break;
+            case 'star':
+                panelGeometry = this.createStarGeometry(panelSize * scale);
+                break;
+            default:
+                panelGeometry = this.createHexagonGeometry(panelSize * scale);
         }
         
         panelGeometry.scale(1, 1, panelThickness * scale * 10);
@@ -1034,21 +1123,52 @@ createTIEShip(config = {}) {
         const x = Math.cos(angle) * panelDistance * scale;
         const z = Math.sin(angle) * panelDistance * scale;
         
-        panel.position.set(x, 0, z);
-        panel.rotation.y = angle + Math.PI / 2;
+        // Enhanced positioning with offsets
+        panel.position.set(x, panelOffsetY * scale, z + panelOffsetZ * scale);
+        
+        // Enhanced rotation with 3-axis control
+        panel.rotation.x = (panelTiltX * Math.PI) / 180;
+        panel.rotation.y = angle + Math.PI / 2 + (panelTiltY * Math.PI) / 180;
         panel.rotation.z = (panelAngle * Math.PI) / 180;
         
         shipGroup.add(panel);
         
-        // Connecting struts
+        // Enhanced Struts with types, counts, and angles
         if (hasStruts) {
-            const strutLength = panelDistance * scale;
-            const strutGeometry = new THREE.CylinderGeometry(strutThickness * scale, strutThickness * scale, strutLength, 8);
-            const strutMaterial = new THREE.MeshLambertMaterial({color: secondaryColor});
-            const strut = new THREE.Mesh(strutGeometry, strutMaterial);
-            strut.position.set(x / 2, 0, z / 2);
-            strut.rotation.z = -angle;
-            shipGroup.add(strut);
+            for (let s = 0; s < strutCount; s++) {
+                let strutGeometry;
+                const strutLength = panelDistance * scale * 0.8;
+                
+                switch (strutType) {
+                    case 'cylinder':
+                        strutGeometry = new THREE.CylinderGeometry(strutThickness * scale, strutThickness * scale, strutLength, 8);
+                        break;
+                    case 'box':
+                        strutGeometry = new THREE.BoxGeometry(strutThickness * scale * 2, strutLength, strutThickness * scale * 2);
+                        break;
+                    case 'hexagonal':
+                        strutGeometry = new THREE.CylinderGeometry(strutThickness * scale, strutThickness * scale, strutLength, 6);
+                        break;
+                    default:
+                        strutGeometry = new THREE.CylinderGeometry(strutThickness * scale, strutThickness * scale, strutLength, 8);
+                }
+                
+                const strutMaterial = new THREE.MeshLambertMaterial({color: secondaryColor});
+                const strut = new THREE.Mesh(strutGeometry, strutMaterial);
+                
+                const strutOffset = strutCount > 1 ? (s - (strutCount - 1) / 2) * 0.3 * scale : 0;
+                const strutX = x / 2;
+                const strutZ = (z + panelOffsetZ * scale) / 2 + strutOffset;
+                
+                strut.position.set(strutX, panelOffsetY * scale / 2, strutZ);
+                strut.rotation.z = -angle + (strutAngle * Math.PI) / 180;
+                
+                if (strutType === 'box') {
+                    strut.rotation.y = angle;
+                }
+                
+                shipGroup.add(strut);
+            }
         }
     }
 
@@ -1251,21 +1371,28 @@ getEnemyConfig(type) {
         interceptor: {
             shipConfig: {
                   shipType: 'tie',
-    scale: 1.2,
+    scale: 1,
     cockpitShape: 'sphere',
-    cockpitSize: 1.4,
-    panelCount: 4,
-    panelShape: 'circle',
-    panelSize: 2.7,
-    panelDistance: 2.9,
-    panelThickness: 0.05,
-    panelAngle: -10,
-    hasStruts: false,
-    strutThickness: 0.13,
-    primaryColor: 0x54a0ff,
-    secondaryColor: 0x5f27cd,
-    accentColor: 0x96ceb4,
-    cockpitColor: 0xff9f43
+    cockpitSize: 1.2,
+    panelCount: 2,
+    panelShape: 'hexagon',
+    panelSize: 2,
+    panelDistance: 2.5,
+    panelThickness: 0.1,
+    panelOffsetY: 0,
+    panelOffsetZ: 0,
+    panelTiltX: 5,
+    panelTiltY: -90,
+    panelAngle: 90,
+    hasStruts: true,
+    strutType: 'cylinder',
+    strutThickness: 0.11,
+    strutCount: 1,
+    strutAngle: 90,
+    primaryColor: 0x4facfe,
+    secondaryColor: 0x667eea,
+    accentColor: 0x00f2fe,
+    cockpitColor: 0x764ba2
             },
             chaseSpeed: 0.5,
             weaponType: 'burst'

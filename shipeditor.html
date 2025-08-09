@@ -1019,131 +1019,29 @@
                 }
             }
 
-            function generateClassicShipCode() {
-                const config = {
-                    scale: parseFloat(document.getElementById('scale').value),
-                    bodyWidth: parseFloat(document.getElementById('bodyWidth').value),
-                    bodyHeight: parseFloat(document.getElementById('bodyHeight').value),
-                    bodyLength: parseFloat(document.getElementById('bodyLength').value),
-                    hasWings: document.getElementById('hasWings').checked,
-                    wingSpan: parseFloat(document.getElementById('wingSpan').value),
-                    wingThickness: parseFloat(document.getElementById('wingThickness').value),
-                    wingPosition: parseFloat(document.getElementById('wingPosition').value),
-                    wingSweep: parseFloat(document.getElementById('wingSweep').value),
-                    wingDihedral: parseFloat(document.getElementById('wingDihedral').value),
-                    engineCount: parseInt(document.getElementById('engineCount').value),
-                    engineSize: parseFloat(document.getElementById('engineSize').value),
-                    enginePosition: parseFloat(document.getElementById('enginePosition').value),
-                    engineSpread: parseFloat(document.getElementById('engineSpread').value),
-                    hasCockpit: document.getElementById('hasCockpit').checked,
-                    cockpitShape: document.getElementById('cockpitShape').value,
-                    cockpitSize: parseFloat(document.getElementById('cockpitSize').value),
-                    cockpitPosY: parseFloat(document.getElementById('cockpitPosY').value),
-                    cockpitPosZ: parseFloat(document.getElementById('cockpitPosZ').value),
-                    primaryColor: hexToNumber(document.getElementById('primaryColor').value),
-                    secondaryColor: hexToNumber(document.getElementById('secondaryColor').value),
-                    accentColor: hexToNumber(document.getElementById('accentColor').value),
-                    cockpitColor: hexToNumber(document.getElementById('cockpitColor').value)
-                };
-                const configName = document.getElementById('configName').value || 'myCustomShip';
-                const code = `// Classic Ship Configuration for Quantum Frontier
+
+function generateClassicShipCode(){const config={t:'classic',s:parseFloat(document.getElementById('scale').value),bw:parseFloat(document.getElementById('bodyWidth').value),bh:parseFloat(document.getElementById('bodyHeight').value),bl:parseFloat(document.getElementById('bodyLength').value),hw:document.getElementById('hasWings').checked,ws:parseFloat(document.getElementById('wingSpan').value),wt:parseFloat(document.getElementById('wingThickness').value),wp:parseFloat(document.getElementById('wingPosition').value),wsw:parseFloat(document.getElementById('wingSweep').value),wd:parseFloat(document.getElementById('wingDihedral').value),ec:parseInt(document.getElementById('engineCount').value),es:parseFloat(document.getElementById('engineSize').value),ep:parseFloat(document.getElementById('enginePosition').value),esp:parseFloat(document.getElementById('engineSpread').value),hc:document.getElementById('hasCockpit').checked,cs:document.getElementById('cockpitShape').value,css:parseFloat(document.getElementById('cockpitSize').value),cpy:parseFloat(document.getElementById('cockpitPosY').value),cpz:parseFloat(document.getElementById('cockpitPosZ').value),pc:hexToNumber(document.getElementById('primaryColor').value),sc:hexToNumber(document.getElementById('secondaryColor').value),ac:hexToNumber(document.getElementById('accentColor').value),cc:hexToNumber(document.getElementById('cockpitColor').value)};const configName=document.getElementById('configName').value||'myCustomShip';const code=`// Classic Ship Configuration for Quantum Frontier
 // Copy this config object and use it in your game:
 
-const ${configName}Config = {
-    shipType: 'classic',
-    scale: ${config.scale},
-    bodyWidth: ${config.bodyWidth},
-    bodyHeight: ${config.bodyHeight},
-    bodyLength: ${config.bodyLength},
-    hasWings: ${config.hasWings},
-    wingSpan: ${config.wingSpan},
-    wingThickness: ${config.wingThickness},
-    wingPosition: ${config.wingPosition},
-    wingSweep: ${config.wingSweep},
-    wingDihedral: ${config.wingDihedral},
-    engineCount: ${config.engineCount},
-    engineSize: ${config.engineSize},
-    enginePosition: ${config.enginePosition},
-    engineSpread: ${config.engineSpread},
-    hasCockpit: ${config.hasCockpit},
-    cockpitShape: '${config.cockpitShape}',
-    cockpitSize: ${config.cockpitSize},
-    cockpitPosY: ${config.cockpitPosY},
-    cockpitPosZ: ${config.cockpitPosZ},
-    primaryColor: 0x${config.primaryColor.toString(16).padStart(6, '0')},
-    secondaryColor: 0x${config.secondaryColor.toString(16).padStart(6, '0')},
-    accentColor: 0x${config.accentColor.toString(16).padStart(6, '0')},
-    cockpitColor: 0x${config.cockpitColor.toString(16).padStart(6, '0')}
+const ${configName} = {
+    t:'classic',s:${config.s},bw:${config.bw},bh:${config.bh},bl:${config.bl},
+    hw:${config.hw?'!0':'!1'},ws:${config.ws},wt:${config.wt},wp:${config.wp},
+    wsw:${config.wsw},wd:${config.wd},ec:${config.ec},es:${config.es},
+    ep:${config.ep},esp:${config.esp},hc:${config.hc?'!0':'!1'},cs:'${config.cs}',
+    css:${config.css},cpy:${config.cpy},cpz:${config.cpz},
+    pc:0x${config.pc.toString(16)},sc:0x${config.sc.toString(16)},
+    ac:0x${config.ac.toString(16)},cc:0x${config.cc.toString(16)}
 };
 
-// Usage in Quantum Frontier:
-// this.playerShip = this.createShip(${configName}Config);
-// OR
-// const enemyShip = this.createShip(${configName}Config);`;
-                document.getElementById('codeOutput').textContent = code;
-            }
-
-            function generateTIEShipCode() {
-                const config = {
-                    scale: parseFloat(document.getElementById('scale').value),
-                    cockpitShape: document.getElementById('tieCockpitShape').value,
-                    cockpitSize: parseFloat(document.getElementById('tieCockpitSize').value),
-                    panelCount: parseInt(document.getElementById('panelCount').value),
-                    panelShape: document.getElementById('panelShape').value,
-                    panelSize: parseFloat(document.getElementById('panelSize').value),
-                    panelDistance: parseFloat(document.getElementById('panelDistance').value),
-                    panelThickness: parseFloat(document.getElementById('panelThickness').value),
-                    panelOffsetY: parseFloat(document.getElementById('panelOffsetY').value),
-                    panelOffsetZ: parseFloat(document.getElementById('panelOffsetZ').value),
-                    panelTiltX: parseFloat(document.getElementById('panelTiltX').value),
-                    panelTiltY: parseFloat(document.getElementById('panelTiltY').value),
-                    panelAngle: parseFloat(document.getElementById('panelAngle').value),
-                    hasStruts: document.getElementById('hasStruts').checked,
-                    strutType: document.getElementById('strutType').value,
-                    strutThickness: parseFloat(document.getElementById('strutThickness').value),
-                    strutCount: parseInt(document.getElementById('strutCount').value),
-                    strutAngle: parseFloat(document.getElementById('strutAngle').value),
-                    primaryColor: hexToNumber(document.getElementById('primaryColor').value),
-                    secondaryColor: hexToNumber(document.getElementById('secondaryColor').value),
-                    accentColor: hexToNumber(document.getElementById('accentColor').value),
-                    cockpitColor: hexToNumber(document.getElementById('cockpitColor').value)
-                };
-                const configName = document.getElementById('configName').value || 'myCustomShip';
-                const code = `// TIE Fighter Style Ship Configuration for Quantum Frontier
-// Copy this config object and use it in your game:
-
-const ${configName}Config = {
-    shipType: 'tie',
-    scale: ${config.scale},
-    cockpitShape: '${config.cockpitShape}',
-    cockpitSize: ${config.cockpitSize},
-    panelCount: ${config.panelCount},
-    panelShape: '${config.panelShape}',
-    panelSize: ${config.panelSize},
-    panelDistance: ${config.panelDistance},
-    panelThickness: ${config.panelThickness},
-    panelOffsetY: ${config.panelOffsetY},
-    panelOffsetZ: ${config.panelOffsetZ},
-    panelTiltX: ${config.panelTiltX},
-    panelTiltY: ${config.panelTiltY},
-    panelAngle: ${config.panelAngle},
-    hasStruts: ${config.hasStruts},
-    strutType: '${config.strutType}',
-    strutThickness: ${config.strutThickness},
-    strutCount: ${config.strutCount},
-    strutAngle: ${config.strutAngle},
-    primaryColor: 0x${config.primaryColor.toString(16).padStart(6, '0')},
-    secondaryColor: 0x${config.secondaryColor.toString(16).padStart(6, '0')},
-    accentColor: 0x${config.accentColor.toString(16).padStart(6, '0')},
-    cockpitColor: 0x${config.cockpitColor.toString(16).padStart(6, '0')}
-};
-
-// Usage in Quantum Frontier:
-// this.playerShip = this.createShip(${configName}Config);
-// OR
-// const enemyShip = this.createShip(${configName}Config);`;
-                document.getElementById('codeOutput').textContent = code;
-            }
+// Usage Examples:
+// 1. Add to SHIP_CONFIGS object in quantumfrontier.html:
+//    ${configName}: ${configName}
+//
+// 2. Use as player ship:
+//    this.ps = SF.cs(${configName});
+//
+// 3. Create enemy with this config:
+//    const enemyShip = SF.cs(${configName});`;document.getElementById('codeOutput').textContent=code}
 
             function loadPreset(presetName) {
                 const classicPresets = {

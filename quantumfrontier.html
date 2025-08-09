@@ -1,217 +1,2101 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+  <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quantum Frontier</title>
     <link rel="stylesheet" href="styles.css">
-</head>
-<body>
+  </head>
+  <body>
     <div id="gameContainer">
-        <div id="intro">
-            <h1>Quantum Frontier</h1>
-            <p>Navigate through hostile space territories. Defend against alien sentries orbiting distant worlds. Use WASD or Arrow Keys to move, SPACE to fire. Keys 1-5 to change weapons. Stay alert-enemies will attack when you get too close!</p>
-            <button id="startBtn">Launch Mission</button>
+      <div id="intro">
+        <h1>Quantum Frontier</h1>
+        <p>Navigate through hostile space territories.Defend against alien sentries orbiting distant worlds.Use WASD or Arrow Keys to move,SPACE to fire.Keys 1-5 to change weapons.Stay alert-enemies will attack when you get too close!</p>
+        <button id="startBtn">Launch Mission</button>
+      </div>
+      <div id="hud">
+        <div>Health: <span id="health">100</span>
         </div>
-        
-        <div id="hud">
-            <div>Health: <span id="health">100</span></div>
-            <div>Score: <span id="score">0</span></div>
+        <div>Score: <span id="score">0</span>
         </div>
-        
-        <div id="weaponHud">
-            <div>WEAPONS:</div>
-            <div id="weapon1" class="weapon-active">1-Blaster</div>
-            <div id="weapon2">2-Scatter</div>
-            <div id="weapon3">3-Shotgun</div>
-            <div id="weapon4">4-Mines</div>
-            <div id="weapon5">5-Laser</div>
+      </div>
+      <div id="weaponHud">
+        <div>WEAPONS:</div>
+        <div id="weapon1" class="weapon-active">1-Blaster</div>
+        <div id="weapon2">2-Scatter</div>
+        <div id="weapon3">3-Shotgun</div>
+        <div id="weapon4">4-Mines</div>
+        <div id="weapon5">5-Laser</div>
+      </div>
+      <div id="coordinates">
+        <div>X: <span id="posX">0</span>
         </div>
-        
-        <div id="coordinates">
-            <div>X: <span id="posX">0</span></div>
-            <div>Z: <span id="posZ">0</span></div>
+        <div>Z: <span id="posZ">0</span>
         </div>
-        
-        <div id="effects"></div>
-        
-        <div id="controls">
-            <div>WASD/Arrows-Move</div>
-            <div>SPACE-Fire</div>
-            <div>1-5-Weapons</div>
+      </div>
+      <div id="effects"></div>
+      <div id="controls">
+        <div>WASD/Arrows-Move</div>
+        <div>SPACE-Fire</div>
+        <div>1-5-Weapons</div>
+      </div>
+      <div id="mobileControls">
+        <div id="dpad">
+          <div id="dpadOuter"></div>
+          <div id="dpadInner"></div>
         </div>
-        
-        <div id="mobileControls">
-            <div id="dpad">
-                <div id="dpadOuter"></div>
-                <div id="dpadInner"></div>
-            </div>
-            <div id="fireBtn">FIRE</div>
-            <div id="weaponBtn">W<br>1</div>
-        </div>
+        <div id="fireBtn">FIRE</div>
+        <div id="weaponBtn">W <br>1 </div>
+      </div>
     </div>
-
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script>
-        // Optimized and minified game code
-        const C={p:{a:.1,ms:.8,f:.92,h:1000},s:{c:1000,rs:2e-4,sp:600},pl:{c:3,cfg:[{r:18,co:0xff6b6b,d:60,ec:3,et:'f',h:200},{r:3,co:0x4ecdc4,d:80,ec:2,et:'i',h:50},{r:50,co:0xfeca57,d:100,ec:4,et:'h',h:500}]},e:{om:8,bs:.015,sv:.005,ar:40,h:30,cs:.3,rs:.3,sc:120},b:{s:2,l:80,d:10,es:1.5,ed:15},w:{l:{d:20,w:10,md:100}},a:{sp:{co:0x00ff00,e:'speed',m:1.5,du:30000},da:{co:0xff0000,e:'damage',m:2,du:30000},he:{co:0x0088ff,e:'health',am:200,du:0}}};
-
-        // Ship configurations
-        const SC={
-            player:{t:'c',s:1,bw:2.2,bh:.5,bl:4,hw:!0,ws:8,wt:.85,wp:-2.9,wsw:90,wd:-90,ec:6,es:.3,ep:-2,esp:1.5,hc:!0,cs:'sphere',css:.8,cpy:.3,cpz:.5,pc:0x4facfe,sc:0x667eea,ac:0x00f2fe,cc:0x764ba2},
-            fighter:{t:'c',s:.8,bw:1.5,bh:.2,bl:3,hw:!0,ws:3,wt:.15,wp:0,ec:2,es:.25,ep:-1.5,hc:!0,css:.3,cpy:.2,cpz:1,pc:0xff4757,sc:0xff3838,ac:0xff6b6b,cc:0x2f3542},
-            interceptor:{t:'tie',s:1,cs:'sphere',css:1.2,pnc:2,ps:'hexagon',pns:2,pd:2.5,pt:.1,py:0,pz:0,ptx:5,pty:-90,pa:90,hs:!0,st:'cylinder',sth:.11,scnt:1,sa:90,pc:0x4facfe,sc:0x667eea,ac:0x00f2fe,cc:0x764ba2},
-            heavy:{t:'c',s:1.2,bw:2.5,bh:.4,bl:5,hw:!0,ws:5,wt:.3,wp:-1.5,ec:4,es:.4,ep:-2.5,hc:!0,css:.5,cpy:.4,cpz:1.5,pc:0x2ed573,sc:0x1e90ff,ac:0x7bed9f,cc:0xff5252},
-            scout:{t:'c',s:.6,bw:1.2,bh:.15,bl:2.5,hw:!0,ws:2.5,wt:.1,wp:0,ec:1,es:.2,ep:-1.2,hc:!0,css:.25,cpy:.15,cpz:.8,pc:0xfeca57,sc:0xff9f43,ac:0xee5a24,cc:0x2f3640},
-            cruiser:{t:'c',s:1.5,bw:3,bh:.6,bl:6,hw:!0,ws:6,wt:.4,wp:-2,ec:4,es:.5,ep:-3,hc:!0,css:.6,cpy:.5,cpz:2,pc:0x5f27cd,sc:0x54a0ff,ac:0xff9ff3,cc:0x00d2d3}
-        };
-
-        // Enemy weapon types
-        const EW={f:'rapid',i:'burst',h:'heavy'};
-
-        class AM{
-            constructor(){this.st=!1;this.ad=null;this.mv=.8;this.lct=0;this.setup()}
-            async setup(){
-                this.bs=new Tone.FMSynth({harmonicity:8,modulationIndex:25,oscillator:{type:"sine"},envelope:{attack:.001,decay:.1,sustain:.3,release:.1},modulation:{type:"square"},modulationEnvelope:{attack:.002,decay:.2,sustain:0,release:.2}}).toDestination();
-                this.ss=new Tone.NoiseSynth({noise:{type:"pink"},envelope:{attack:.001,decay:.05,sustain:0,release:.02}}).toDestination();
-                this.sn=new Tone.NoiseSynth({noise:{type:"brown"},envelope:{attack:.001,decay:.2,sustain:0,release:.3}}).toDestination();
-                this.st2=new Tone.Synth({oscillator:{type:"triangle"},envelope:{attack:.001,decay:.3,sustain:0,release:.4}}).toDestination();
-                this.lo1=new Tone.Oscillator({type:"sawtooth",frequency:800});
-                this.lo2=new Tone.Oscillator({type:"square",frequency:400});
-                this.lf=new Tone.Filter({frequency:2000,type:"lowpass",Q:15});
-                this.le=new Tone.AmplitudeEnvelope({attack:.01,decay:.1,sustain:.8,release:.2});
-                this.lo1.chain(this.lf,this.le,Tone.Destination);this.lo2.chain(this.lf);this.la=!1;
-                this.md=new Tone.Synth({oscillator:{type:"triangle"},envelope:{attack:.01,decay:.1,sustain:.2,release:.3}}).toDestination();
-                this.ma=new Tone.Oscillator({type:"sine",frequency:60});
-                this.maf=new Tone.Filter({frequency:200,type:"bandpass"});
-                this.ma.chain(this.maf,Tone.Destination);
-                this.en=new Tone.NoiseSynth({noise:{type:"brown"},envelope:{attack:.001,decay:.5,sustain:.1,release:1.2}});
-                this.es=new Tone.Synth({oscillator:{type:"sine"},envelope:{attack:.001,decay:.8,sustain:0,release:1.5}});
-                this.ec=new Tone.NoiseSynth({noise:{type:"white"},envelope:{attack:.05,decay:.3,sustain:0,release:.4}});
-                this.er=new Tone.Reverb({decay:3,wet:.4}).toDestination();
-                this.en.chain(this.er);this.es.chain(this.er);this.ec.connect(this.er);
-                this.eb=new Tone.Oscillator({type:"sawtooth",frequency:80});
-                this.em=new Tone.LFO({frequency:25,type:"sine",amplitude:.3});
-                this.ef=new Tone.Filter({frequency:400,type:"lowpass"});
-                this.eg=new Tone.Gain(0);
-                this.eb.chain(this.ef,this.eg,Tone.Destination);this.em.connect(this.eb.frequency);
-                this.ub=new Tone.Synth({oscillator:{type:"sine"},envelope:{attack:.01,decay:.05,sustain:0,release:.1}}).toDestination();
-                this.hm=new Tone.MetalSynth({frequency:400,envelope:{attack:.001,decay:.4,release:.1},harmonicity:12,modulationIndex:64,resonance:2000}).toDestination();
-                this.ad=new Tone.Oscillator({type:"sine",frequency:35});
-                this.ad2=new Tone.Oscillator({type:"triangle",frequency:52.5});
-                this.af=new Tone.Filter({frequency:300,type:"lowpass"});
-                this.ag=new Tone.Gain(.6);
-                this.ad.chain(this.af,this.ag,Tone.Destination);this.ad2.chain(this.af,this.ag);
-                this.er2=!1;this.mh=!1}
-            async start(){if(!this.st){await Tone.start();this.st=!0;this.amb()}}
-            amb(){if(this.ad&&this.st){this.ad.start();this.ad2.start();this.af.frequency.setValueAtTime(300,Tone.now());this.af.frequency.rampTo(600,8);setInterval(()=>{if(this.st){const v=35+Math.sin(Date.now()*.0001)*10;const v2=52.5+Math.cos(Date.now()*.00007)*8;this.ad.frequency.rampTo(v,12);this.ad2.frequency.rampTo(v2,15);const ff=300+Math.sin(Date.now()*.00005)*200;this.af.frequency.rampTo(ff,10)}},6000)}}
-            pb(){if(!this.st)return;this.bs.triggerAttackRelease("E5","8n");this.bs.frequency.setValueAtTime(660,Tone.now());this.bs.frequency.exponentialRampTo(220,.1)}
-            pes(){if(!this.st)return;this.bs.triggerAttackRelease("C4","16n","+0",.6);this.bs.frequency.setValueAtTime(440,Tone.now());this.bs.frequency.exponentialRampTo(200,.15)}
-            ps(){if(!this.st)return;const sh=3+Math.floor(Math.random()*3);for(let i=0;i<sh;i++){setTimeout(()=>{this.ss.triggerAttackRelease("32n");this.bs.triggerAttackRelease("A4","64n","+0",.3)},i*(40+Math.random()*30))}}
-            psh(){if(!this.st)return;this.sn.triggerAttackRelease("4n");this.st2.triggerAttackRelease("G2","4n");for(let i=0;i<8;i++){setTimeout(()=>{this.ss.triggerAttackRelease("64n","+0",.4)},20+i*15)}}
-            pl(){if(!this.st||this.la)return;this.la=!0;this.lo1.start();this.lo2.start();this.le.triggerAttack();this.lo1.frequency.setValueAtTime(800,Tone.now());this.lo1.frequency.rampTo(1200,.1);this.lo2.frequency.setValueAtTime(400,Tone.now());this.lo2.frequency.rampTo(600,.1);this.lf.frequency.setValueAtTime(2000,Tone.now());this.lf.frequency.rampTo(4000,.05);this.lf.frequency.rampTo(1500,.2)}
-            sl(){if(!this.st||!this.la)return;this.le.triggerRelease();setTimeout(()=>{if(this.lo1.state==="started")this.lo1.stop();if(this.lo2.state==="started")this.lo2.stop();this.la=!1},200)}
-            pm(){if(!this.st)return;this.md.triggerAttackRelease("A4","16n");setTimeout(()=>this.md.triggerAttackRelease("F4","16n"),100);setTimeout(()=>this.md.triggerAttackRelease("D4","8n"),200);setTimeout(()=>{if(!this.mh&&this.st){this.mh=!0;this.ma.start();this.maf.frequency.rampTo(300,2);setTimeout(()=>{if(this.ma.state==="started"){this.ma.stop();this.mh=!1}},10000)}},500)}
-            pe(sz=1){if(!this.st)return;this.en.triggerAttackRelease("2n");this.es.triggerAttackRelease("C1","1n");setTimeout(()=>{this.ec.triggerAttackRelease("4n","+0",.6)},100);if(sz>1){this.es.triggerAttackRelease("G0","1n","+0.1",.8);for(let i=0;i<sz-1;i++){setTimeout(()=>{this.en.triggerAttackRelease("4n","+0",.7);this.es.triggerAttackRelease("D1","2n","+0",.6)},200+i*300)}}if(this.mh&&this.ma.state==="started"){this.ma.stop();this.mh=!1}}
-            se(){if(!this.st||this.er2)return;this.er2=!0;this.eb.start();this.em.start();this.eg.gain.rampTo(.15,.1);this.eb.frequency.rampTo(120,.3);this.ef.frequency.rampTo(800,.5)}
-            ste(){if(!this.st||!this.er2)return;this.eg.gain.rampTo(0,.2);setTimeout(()=>{if(this.eb.state==="started"){this.eb.stop();this.em.stop();this.er2=!1}},200)}
-            uei(in1){if(!this.st||!this.er2)return;const v=.05+(in1*.2);const p=80+(in1*60);const ff=400+(in1*600);this.eg.gain.rampTo(v,.1);this.eb.frequency.rampTo(p,.2);this.ef.frequency.rampTo(ff,.3)}
-            pws(){if(!this.st)return;this.ub.triggerAttackRelease("C5","32n");setTimeout(()=>this.ub.triggerAttackRelease("G5","32n"),60);setTimeout(()=>this.ub.triggerAttackRelease("C6","16n"),120)}
-            pc(){if(!this.st)return;const ct=Tone.now();if(ct-this.lct<.2)return;this.lct=ct;if(this.hm&&this.hm.triggerAttackRelease){this.hm.triggerAttackRelease("C4","8n")}}
-            pd(){if(!this.st)return;const ct=Tone.now();if(ct-this.lct<.15)return;this.lct=ct;if(this.hm&&this.hm.triggerAttackRelease){this.hm.triggerAttackRelease("F3","4n");setTimeout(()=>{if(this.ub&&this.ub.triggerAttackRelease){this.ub.triggerAttackRelease("C4","16n","+0",.8)}},100)}}
-            peh(){if(!this.st)return;if(this.hm&&this.hm.triggerAttackRelease){this.hm.triggerAttackRelease("G4","16n","+0",.7);setTimeout(()=>{if(this.ub&&this.ub.triggerAttackRelease){this.ub.triggerAttackRelease("C5","32n","+0",.4)}},50)}}
-            ppu(){if(!this.st)return;const n=["C4","E4","G4","C5","E5"];n.forEach((nt,i)=>{setTimeout(()=>{this.ub.triggerAttackRelease(nt,"16n","+0",.8)},i*100)})}
-            plh(){if(!this.st)return;const wb=()=>{this.ub.triggerAttackRelease("F4","8n","+0",.6);setTimeout(()=>{this.ub.triggerAttackRelease("F4","8n","+0",.6)},200)};wb();setTimeout(wb,3000)}
-            sa(){if(this.ad&&this.ad.state==="started"){this.ad.stop()}if(this.ad2&&this.ad2.state==="started"){this.ad2.stop()}this.sl();this.ste();if(this.mh&&this.ma.state==="started"){this.ma.stop();this.mh=!1}}
+      const C = {
+        p: {
+          a: .1,
+          ms: .8,
+          f: .92,
+          h: 1000
+        },
+        s: {
+          c: 1000,
+          rs: 2e-4,
+          sp: 600
+        },
+        e: {
+          om: 8,
+          bs: .015,
+          sv: .005,
+          ar: 40,
+          h: 30,
+          cs: .3,
+          rs: .3,
+          sc: 120
+        },
+        b: {
+          s: 2,
+          l: 80,
+          d: 10,
+          es: 1.5,
+          ed: 15
+        },
+        w: {
+          l: {
+            d: 20,
+            w: 10,
+            md: 100
+          }
+        },
+        a: {
+          sp: {
+            co: 0x00ff00,
+            e: 'speed',
+            m: 1.5,
+            du: 30000
+          },
+          da: {
+            co: 0xff0000,
+            e: 'damage',
+            m: 2,
+            du: 30000
+          },
+          he: {
+            co: 0x0088ff,
+            e: 'health',
+            am: 200,
+            du: 0
+          }
         }
-
-        class SF{
-            static cg(sz){const g=new THREE.CylinderGeometry(sz,sz,.1,6);return g}
-            static sg(sz){return new THREE.BoxGeometry(sz,sz,.1)}
-            static dg(sz){const g=new THREE.OctahedronGeometry(sz/1.4);g.scale(1,1,.1);return g}
-            static ccg(sz){return new THREE.CylinderGeometry(sz/2,sz/2,.1,16)}
-            static tg(sz){const g=new THREE.ConeGeometry(sz,.1,3);g.rotateX(Math.PI/2);return g}
-            static stg(sz){const sh=new THREE.Shape();const or=sz;const ir=sz*.5;const sp=5;for(let i=0;i<sp*2;i++){const a=(i/(sp*2))*Math.PI*2;const r=i%2===0?or:ir;const x=Math.cos(a)*r;const y=Math.sin(a)*r;if(i===0){sh.moveTo(x,y)}else{sh.lineTo(x,y)}}const g=new THREE.ExtrudeGeometry(sh,{depth:.1,bevelEnabled:!1});return g}
-            static cs(cfg){const sg=new THREE.Group();const sc=cfg.s||1;if(cfg.t==='tie'){return SF.cts(cfg)}else{return SF.ccs(cfg)}}
-            static ccs(cfg){const sg=new THREE.Group();const sc=cfg.s||1.8;const bg=new THREE.BoxGeometry((cfg.bw||2)*sc,(cfg.bh||.3)*sc,(cfg.bl||4)*sc);const bm=new THREE.MeshLambertMaterial({color:cfg.pc||0x2ed573});const b=new THREE.Mesh(bg,bm);sg.add(b);if(cfg.hw!==!1){const wg=new THREE.BoxGeometry((cfg.ws||4)*sc,(cfg.wt||.2)*sc,1*sc);const wm=new THREE.MeshLambertMaterial({color:cfg.sc||0x1e90ff});const w=new THREE.Mesh(wg,wm);w.position.set(0,-.1*sc,(cfg.wp||-1)*sc);w.rotation.z=((cfg.wsw||0)*Math.PI)/180;w.rotation.x=((cfg.wd||0)*Math.PI)/180;sg.add(w)}const ec=cfg.ec||2;const esp=cfg.esp||1.5;const ep=[];if(ec===1){ep.push([0,0])}else if(ec===2){ep.push([-(esp*sc),0],[esp*sc,0])}else if(ec===3){ep.push([0,0],[-(esp*sc),0],[esp*sc,0])}else if(ec===4){ep.push([-(esp*sc),0],[esp*sc,0],[-(esp*sc),.3*sc],[esp*sc,.3*sc])}else if(ec===6){ep.push([-(esp*sc),0],[esp*sc,0],[-(esp*sc)*.7,.3*sc],[esp*sc*.7,.3*sc],[-(esp*sc)*.7,-.3*sc],[esp*sc*.7,-.3*sc])}for(let i=0;i<ep.length;i++){const eg=new THREE.SphereGeometry((cfg.es||.3)*sc,8,8);const em=new THREE.MeshBasicMaterial({color:cfg.ac||0x7bed9f,transparent:!0,opacity:.8});const e=new THREE.Mesh(eg,em);e.position.set(ep[i][0],ep[i][1],(cfg.ep||-2)*sc);sg.add(e)}if(cfg.hc!==!1){let cg;switch(cfg.cs||'sphere'){case 'sphere':cg=new THREE.SphereGeometry((cfg.css||.4)*sc,8,8);break;case 'box':cg=new THREE.BoxGeometry((cfg.css||.4)*sc,(cfg.css||.4)*sc,(cfg.css||.4)*sc);break;case 'cylinder':cg=new THREE.CylinderGeometry((cfg.css||.4)*sc,(cfg.css||.4)*sc,(cfg.css||.4)*sc,8);break;case 'cone':cg=new THREE.ConeGeometry((cfg.css||.4)*sc,(cfg.css||.4)*sc*1.5,8);break;default:cg=new THREE.SphereGeometry((cfg.css||.4)*sc,8,8)}const cm=new THREE.MeshLambertMaterial({color:cfg.cc||0xff5252});const c=new THREE.Mesh(cg,cm);c.position.set(0,(cfg.cpy||.3)*sc,(cfg.cpz||.5)*sc);sg.add(c)}return sg}
-            static cts(cfg){const sg=new THREE.Group();const sc=cfg.s||1.8;let cg;switch(cfg.cs||'sphere'){case 'sphere':cg=new THREE.SphereGeometry((cfg.css||1.2)*sc,12,12);break;case 'box':cg=new THREE.BoxGeometry((cfg.css||1.2)*sc,(cfg.css||1.2)*sc,(cfg.css||1.2)*sc);break;case 'octahedron':cg=new THREE.OctahedronGeometry((cfg.css||1.2)*sc);break;case 'cylinder':cg=new THREE.CylinderGeometry((cfg.css||1.2)*sc,(cfg.css||1.2)*sc,(cfg.css||1.2)*sc,8);break;case 'dodecahedron':cg=new THREE.DodecahedronGeometry((cfg.css||1.2)*sc);break;default:cg=new THREE.SphereGeometry((cfg.css||1.2)*sc,12,12)}const cm=new THREE.MeshLambertMaterial({color:cfg.cc||0xff5252});const c=new THREE.Mesh(cg,cm);sg.add(c);for(let i=0;i<(cfg.pnc||2);i++){let pg;switch(cfg.ps||'hexagon'){case 'hexagon':pg=SF.cg((cfg.pns||2)*sc);break;case 'square':pg=SF.sg((cfg.pns||2)*sc);break;case 'diamond':pg=SF.dg((cfg.pns||2)*sc);break;case 'circle':pg=SF.ccg((cfg.pns||2)*sc);break;case 'triangle':pg=SF.tg((cfg.pns||2)*sc);break;case 'star':pg=SF.stg((cfg.pns||2)*sc);break;default:pg=SF.cg((cfg.pns||2)*sc)}pg.scale(1,1,(cfg.pt||.1)*sc*10);const pm=new THREE.MeshLambertMaterial({color:cfg.pc||0x2ed573});const p=new THREE.Mesh(pg,pm);const a=(i*Math.PI*2)/(cfg.pnc||2);const x=Math.cos(a)*(cfg.pd||2.5)*sc;const z=Math.sin(a)*(cfg.pd||2.5)*sc;p.position.set(x,(cfg.py||0)*sc,z+(cfg.pz||0)*sc);p.rotation.x=((cfg.ptx||0)*Math.PI)/180;p.rotation.y=a+Math.PI/2+((cfg.pty||0)*Math.PI)/180;p.rotation.z=((cfg.pa||0)*Math.PI)/180;sg.add(p);if(cfg.hs!==!1){for(let s=0;s<(cfg.scnt||1);s++){let stg;const stl=(cfg.pd||2.5)*sc*.8;switch(cfg.st||'cylinder'){case 'cylinder':stg=new THREE.CylinderGeometry((cfg.sth||.1)*sc,(cfg.sth||.1)*sc,stl,8);break;case 'box':stg=new THREE.BoxGeometry((cfg.sth||.1)*sc*2,stl,(cfg.sth||.1)*sc*2);break;case 'hexagonal':stg=new THREE.CylinderGeometry((cfg.sth||.1)*sc,(cfg.sth||.1)*sc,stl,6);break;default:stg=new THREE.CylinderGeometry((cfg.sth||.1)*sc,(cfg.sth||.1)*sc,stl,8)}const stm=new THREE.MeshLambertMaterial({color:cfg.sc||0x1e90ff});const st=new THREE.Mesh(stg,stm);const sto=(cfg.scnt||1)>1?(s-((cfg.scnt||1)-1)/2)*.3*sc:0;const stx=x/2;const stz=(z+(cfg.pz||0)*sc)/2+sto;st.position.set(stx,(cfg.py||0)*sc/2,stz);st.rotation.z=-a+((cfg.sa||0)*Math.PI)/180;if((cfg.st||'cylinder')==='box'){st.rotation.y=a}sg.add(st)}}}return sg}
+      };
+      const SHIP_CONFIGS = {
+        player: {
+          t: 'classic',
+          s: 1,
+          bw: 2.2,
+          bh: 0.5,
+          bl: 4,
+          hw: !0,
+          ws: 8,
+          wt: 0.85,
+          wp: -2.9,
+          wsw: 90,
+          wd: -90,
+          ec: 6,
+          es: 0.3,
+          ep: -2,
+          esp: 1.5,
+          hc: !0,
+          cs: 'sphere',
+          css: 0.8,
+          cpy: 0.3,
+          cpz: 0.5,
+          pc: 0x4facfe,
+          sc: 0x667eea,
+          ac: 0x00f2fe,
+          cc: 0x764ba2
+        },
+        fighter: {
+          t: 'classic',
+          s: 0.8,
+          bw: 1.5,
+          bh: 0.2,
+          bl: 3,
+          hw: !0,
+          ws: 3,
+          wt: 0.15,
+          wp: 0,
+          wsw: 0,
+          wd: 0,
+          ec: 2,
+          es: 0.25,
+          ep: -1.5,
+          esp: 1.5,
+          hc: !0,
+          cs: 'sphere',
+          css: 0.3,
+          cpy: 0.2,
+          cpz: 1,
+          pc: 0xff4757,
+          sc: 0xff3838,
+          ac: 0xff6b6b,
+          cc: 0x2f3542
+        },
+        interceptor: {
+          t: 'tie',
+          s: 1,
+          cs: 'sphere',
+          css: 1.2,
+          pnc: 2,
+          ps: 'hexagon',
+          pns: 2,
+          pd: 2.5,
+          pt: 0.1,
+          py: 0,
+          pz: 0,
+          ptx: 5,
+          pty: -90,
+          pa: 90,
+          hs: !0,
+          st: 'cylinder',
+          sth: 0.11,
+          scnt: 1,
+          sa: 90,
+          pc: 0x9b59b6,
+          sc: 0x8e44ad,
+          ac: 0xd63031,
+          cc: 0x2d3436
+        },
+        heavy: {
+          t: 'classic',
+          s: 1.2,
+          bw: 2.5,
+          bh: 0.4,
+          bl: 5,
+          hw: !0,
+          ws: 5,
+          wt: 0.3,
+          wp: -1.5,
+          wsw: 0,
+          wd: 0,
+          ec: 4,
+          es: 0.4,
+          ep: -2.5,
+          esp: 1.5,
+          hc: !0,
+          cs: 'sphere',
+          css: 0.5,
+          cpy: 0.4,
+          cpz: 1.5,
+          pc: 0x2ed573,
+          sc: 0x1e90ff,
+          ac: 0x7bed9f,
+          cc: 0xff5252
+        },
+        scout: {
+          t: 'classic',
+          s: 0.6,
+          bw: 1.2,
+          bh: 0.15,
+          bl: 2.5,
+          hw: !0,
+          ws: 2.5,
+          wt: 0.1,
+          wp: 0,
+          wsw: 0,
+          wd: 0,
+          ec: 1,
+          es: 0.2,
+          ep: -1.2,
+          esp: 1.5,
+          hc: !0,
+          cs: 'sphere',
+          css: 0.25,
+          cpy: 0.15,
+          cpz: 0.8,
+          pc: 0xfeca57,
+          sc: 0xff9f43,
+          ac: 0xee5a24,
+          cc: 0x2f3640
+        },
+      };
+      const ENEMY_TYPES = {
+        'f': {
+          shipConfig: 'fighter',
+          health: 30,
+          chaseSpeed: 0.4,
+          weaponType: 'rapid',
+          attackRange: 40,
+          score: 100
+        },
+        'i': {
+          shipConfig: 'interceptor',
+          health: 50,
+          chaseSpeed: 0.5,
+          weaponType: 'burst',
+          attackRange: 40,
+          score: 150
+        },
+        'h': {
+          shipConfig: 'heavy',
+          health: 100,
+          chaseSpeed: 0.3,
+          weaponType: 'heavy',
+          attackRange: 45,
+          score: 200
         }
-
-        class SS{
-            constructor(){this.sc=new THREE.Scene();const as=window.innerWidth/window.innerHeight;const d=60;this.ca=new THREE.OrthographicCamera(-d*as,d*as,d,-d,.1,2000);this.re=new THREE.WebGLRenderer({antialias:!0});this.re.setSize(window.innerWidth,window.innerHeight);this.re.setClearColor(0x000011);document.getElementById('gameContainer').appendChild(this.re.domElement);this.gs=!1;this.pl={h:C.p.h,sc:0,cw:1,ef:{sp:{ac:!1,et:0},da:{ac:!1,et:0}}};this.k={};this.bu=[];this.eb=[];this.ar=[];this.mi=[];this.en=[];this.pn=[];this.st=[];this.cc=0;this.sp=!1;this.ps=null;this.pv=new THREE.Vector3();this.lb=null;this.tc={mx:0,my:0,fi:!1};this.am=new AM();this.i();this.se();this.an()}
-            i(){this.ca.position.set(0,60,60);this.ca.lookAt(0,0,0);const al=new THREE.AmbientLight(0x404040,.3);this.sc.add(al);const dl=new THREE.DirectionalLight(0xffffff,.8);dl.position.set(10,10,5);this.sc.add(dl);this.csf();this.cp();this.cpl();this.ce()}
-            csf(){const sg=new THREE.BufferGeometry();const po=new Float32Array(C.s.c*3);for(let i=0;i<C.s.c*3;i+=3){po[i]=(Math.random()-.5)*C.s.sp;po[i+1]=(Math.random()-.5)*C.s.sp;po[i+2]=(Math.random()-.5)*C.s.sp}sg.setAttribute('position',new THREE.BufferAttribute(po,3));const sm=new THREE.PointsMaterial({color:0xffffff,size:.5});this.st=new THREE.Points(sg,sm);this.sc.add(this.st)}
-            cp(){this.ps=SF.cs(SC.player);this.ps.position.y=5;this.sc.add(this.ps)}
-            cpl(){const as=(Math.PI*2)/C.pl.c;for(let i=0;i<C.pl.c;i++){const pc=C.pl.cfg[i%C.pl.cfg.length];const a=as*i;const pg=new THREE.SphereGeometry(pc.r,16,16);const pm=new THREE.MeshLambertMaterial({color:pc.co});const p=new THREE.Mesh(pg,pm);const x=Math.cos(a)*pc.d;const z=Math.sin(a)*pc.d;p.position.set(x,0,z);this.sc.add(p);const or=pc.r+C.e.om;this.pn.push({m:p,r:or,ce:p.position.clone(),cfg:pc,h:pc.h,mh:pc.h,de:!1})}}
-            ce(){this.pn.forEach((pn,pi)=>{const shipType=this.getShipForEnemyType(pn.cfg.et);for(let i=0;i<pn.cfg.ec;i++){const es=SF.cs(shipType);const en={m:es,pl:pn,an:(i*Math.PI*2)/pn.cfg.ec,oa:(i*Math.PI*2)/pn.cfg.ec,sp:C.e.bs+Math.random()*C.e.sv,ar:C.e.ar,at:!1,re:!1,h:C.e.h,ty:pn.cfg.et,cs:this.getChaseSpeed(pn.cfg.et),sc2:0,wt:EW[pn.cfg.et]};this.uep(en);this.en.push(en);this.sc.add(es)}})}
-            getShipForEnemyType(et){switch(et){case 'f':return SC.fighter;case 'i':return SC.interceptor;case 'h':return SC.heavy;default:return SC.fighter}}
-            getChaseSpeed(et){switch(et){case 'f':return .4;case 'i':return .5;case 'h':return .3;default:return .4}}
-            uep(en){const x=en.pl.ce.x+Math.cos(en.an)*en.pl.r;const z=en.pl.ce.z+Math.sin(en.an)*en.pl.r;en.m.position.set(x,2,z)}
-            ca2(po,ty){const ag=new THREE.SphereGeometry(1.5,12,12);const am=new THREE.MeshBasicMaterial({color:C.a[ty].co,transparent:!0,opacity:.9});const ar=new THREE.Mesh(ag,am);ar.position.copy(po);ar.position.y=1;const ao={m:ar,ty:ty,lf:900,bo:Math.random()*Math.PI*2};this.ar.push(ao);this.sc.add(ar);return ao}
-            sw(wn){if(wn>=1&&wn<=5){document.getElementById(`weapon${this.pl.cw}`).classList.remove('weapon-active');this.pl.cw=wn;document.getElementById(`weapon${wn}`).classList.add('weapon-active');document.getElementById('weaponBtn').innerHTML=`W<br>${wn}`;if(this.lb){this.sc.remove(this.lb);this.lb=null;this.am.sl()}this.am.pws()}}
-            cw(){const nw=this.pl.cw%5+1;this.sw(nw)}
-            se(){document.addEventListener('keydown',(e)=>{this.k[e.code]=!0;if(e.code.startsWith('Digit')){const wn=parseInt(e.code.charAt(5));this.sw(wn)}});document.addEventListener('keyup',(e)=>{this.k[e.code]=!1});document.getElementById('startBtn').addEventListener('click',()=>{this.sg()});this.smc();window.addEventListener('resize',()=>{const as=window.innerWidth/window.innerHeight;const d=60;this.ca.left=-d*as;this.ca.right=d*as;this.ca.top=d;this.ca.bottom=-d;this.ca.updateProjectionMatrix();this.re.setSize(window.innerWidth,window.innerHeight)})}
-            smc(){const dp=document.getElementById('dpad');const di=document.getElementById('dpadInner');const fb=document.getElementById('fireBtn');const wb=document.getElementById('weaponBtn');let dp2=!1;const ud=(cx,cy)=>{const r=dp.getBoundingClientRect();const cex=r.left+r.width/2;const cey=r.top+r.height/2;const dx=cx-cex;const dy=cy-cey;const di2=Math.sqrt(dx*dx+dy*dy);const md=40;if(di2<=md){di.style.transform=`translate(${dx}px, ${dy}px)`;this.tc.mx=dx/md;this.tc.my=dy/md}else{const a=Math.atan2(dy,dx);const lx=Math.cos(a)*md;const ly=Math.sin(a)*md;di.style.transform=`translate(${lx}px, ${ly}px)`;this.tc.mx=lx/md;this.tc.my=ly/md}};const rd=()=>{di.style.transform='translate(0px, 0px)';this.tc.mx=0;this.tc.my=0;dp2=!1};dp.addEventListener('touchstart',(e)=>{e.preventDefault();dp2=!0;const t=e.touches[0];ud(t.clientX,t.clientY)});dp.addEventListener('touchmove',(e)=>{e.preventDefault();if(dp2){const t=e.touches[0];ud(t.clientX,t.clientY)}});dp.addEventListener('touchend',(e)=>{e.preventDefault();rd()});fb.addEventListener('touchstart',(e)=>{e.preventDefault();this.tc.fi=!0});fb.addEventListener('touchend',(e)=>{e.preventDefault();this.tc.fi=!1});wb.addEventListener('touchstart',(e)=>{e.preventDefault();this.cw()})}
-            async sg(){document.getElementById('intro').classList.add('hidden');await this.am.start();this.gs=!0}
-            cpc(np,ip=!1){for(let pn of this.pn){if(pn.de)continue;const di=np.distanceTo(pn.ce);const cd=pn.cfg.r+(ip?3:2);if(di<cd){if(ip){const bd=new THREE.Vector3().subVectors(np,pn.ce).normalize();this.pv.copy(bd.multiplyScalar(.5));this.pl.h-=10;this.cde(this.ps.position);this.am.pd();this.uh();if(this.pl.h<=0){this.go()}}return!0}}return!1}
-            cde(po){const dg=new THREE.SphereGeometry(3,32,32);const dm=new THREE.MeshBasicMaterial({color:0xffffff,transparent:!0,opacity:.6});const da=new THREE.Mesh(dg,dm);da.position.copy(po);this.sc.add(da);let sc=0;const an=()=>{sc+=.15;da.scale.setScalar(sc);da.material.opacity=Math.max(0,.6-sc*.3);if(sc<2){requestAnimationFrame(an)}else{this.sc.remove(da)}};an()}
-            up(){if(!this.gs)return;let mx=0;let mz=0;if(this.k.KeyW||this.k.ArrowUp||this.tc.my<-.3)mz-=1;if(this.k.KeyS||this.k.ArrowDown||this.tc.my>.3)mz+=1;if(this.k.KeyA||this.k.ArrowLeft||this.tc.mx<-.3)mx-=1;if(this.k.KeyD||this.k.ArrowRight||this.tc.mx>.3)mx+=1;if(mx!==0||mz!==0){if(mx!==0&&mz!==0){mx*=Math.SQRT1_2;mz*=Math.SQRT1_2}const sm=this.pl.ef.sp.ac?C.a.sp.m:1;this.pv.x+=mx*C.p.a*sm;this.pv.z+=mz*C.p.a*sm}this.pv.multiplyScalar(C.p.f);const ms=C.p.ms*(this.pl.ef.sp.ac?C.a.sp.m:1);const cv=this.pv.clone().clampLength(0,ms);this.pv.copy(cv);const np=this.ps.position.clone().add(this.pv);if(!this.cpc(np,!0)){this.ps.position.copy(np)}if(this.pv.length()>.1){const a=Math.atan2(this.pv.x,this.pv.z);this.ps.rotation.y=a}if((this.k.Space&&!this.sp)||this.tc.fi){this.fw();this.sp=!0}else if(!this.k.Space&&!this.tc.fi){this.sp=!1;if(this.lb){this.sc.remove(this.lb);this.lb=null;this.am.sl()}}this.ca.position.x=this.ps.position.x;this.ca.position.z=this.ps.position.z+60;this.ca.lookAt(this.ps.position);this.uc();this.uef()}
-            uc(){document.getElementById('posX').textContent=Math.round(this.ps.position.x);document.getElementById('posZ').textContent=Math.round(this.ps.position.z)}
-            uef(){const ct=Date.now();let et='';if(this.pl.ef.sp.ac){if(ct>this.pl.ef.sp.et){this.pl.ef.sp.ac=!1}else{const re=Math.ceil((this.pl.ef.sp.et-ct)/1000);et+=`SPEED BOOST: ${re}s<br>`}}if(this.pl.ef.da.ac){if(ct>this.pl.ef.da.et){this.pl.ef.da.ac=!1}else{const re=Math.ceil((this.pl.ef.da.et-ct)/1000);et+=`DAMAGE BOOST: ${re}s<br>`}}document.getElementById('effects').innerHTML=et}
-            aae(ty){const ar=C.a[ty];const ct=Date.now();if(ty==='he'){this.pl.h=Math.min(C.p.h,this.pl.h+ar.am)}else{this.pl.ef[ty].ac=!0;this.pl.ef[ty].et=ct+ar.du}this.am.ppu();this.uh()}
-            fw(){switch(this.pl.cw){case 1:this.fb();break;case 2:this.fs(3);break;case 3:this.fs(5);break;case 4:this.fm();break;case 5:this.fl();break}}
-            fb(){this.cb(0);this.am.pb()}
-            fs(co){const sa=Math.PI/6;for(let i=0;i<co;i++){const ao=(i-(co-1)/2)*(sa/(co-1));this.cb(ao)}if(co===3){this.am.ps()}else{this.am.psh()}}
-            cb(ao=0){const bg=new THREE.SphereGeometry(.2,8,8);const bm=new THREE.MeshBasicMaterial({color:0x00f2fe});const bu=new THREE.Mesh(bg,bm);bu.position.copy(this.ps.position);bu.position.y+=.5;const di=new THREE.Vector3(Math.sin(this.ps.rotation.y+ao),0,Math.cos(this.ps.rotation.y+ao));const bv=di.clone().multiplyScalar(C.b.s);this.bu.push({m:bu,v:bv,lf:C.b.l});this.sc.add(bu)}
-            ceb(en){const bg=new THREE.SphereGeometry(.3,8,8);const bm=new THREE.MeshBasicMaterial({color:0xff4757,emissive:0xff2030,emissiveIntensity:.5});const bu=new THREE.Mesh(bg,bm);bu.position.copy(en.m.position);bu.position.y+=.5;const di=new THREE.Vector3().subVectors(this.ps.position,en.m.position).normalize();const bv=di.clone().multiplyScalar(C.b.es);this.eb.push({m:bu,v:bv,lf:C.b.l});this.sc.add(bu)}
-            fm(){const mg=new THREE.SphereGeometry(.5,8,8);const mm=new THREE.MeshBasicMaterial({color:0xff4757,transparent:!0,opacity:.8});const mi=new THREE.Mesh(mg,mm);mi.position.copy(this.ps.position);mi.position.y+=.5;this.mi.push({m:mi,lf:600,ex:!1});this.sc.add(mi);this.am.pm()}
-            fl(){if(this.lb){this.sc.remove(this.lb)}const di=new THREE.Vector3(Math.sin(this.ps.rotation.y),0,Math.cos(this.ps.rotation.y));const le=this.ps.position.clone().add(di.clone().multiplyScalar(C.w.l.md));const lg=new THREE.BufferGeometry().setFromPoints([this.ps.position.clone().add(new THREE.Vector3(0,.5,0)),le]);const lm=new THREE.LineBasicMaterial({color:0x00ff00,transparent:!0,opacity:.8});this.lb=new THREE.Line(lg,lm);this.sc.add(this.lb);this.am.pl();let hs=!1;const da=this.pl.ef.da.ac?C.w.l.d*C.a.da.m:C.w.l.d;this.en.forEach(en=>{if(en.h>0){const dl=this.dptl(en.m.position,this.ps.position,le);if(dl<2){en.h-=da;hs=!0;if(en.h<=0){this.ce2(en.m.position);this.am.pe();en.m.visible=!1;this.pl.sc+=100;this.da2(en.m.position);this.uh()}else{this.am.peh()}}}});this.pn.forEach(pn=>{if(!pn.de){const dl=this.dptl(pn.ce,this.ps.position,le);if(dl<pn.cfg.r){pn.h-=da;hs=!0;if(pn.h<=0){this.dp(pn)}}}})}
-            da2(po){const at=['sp','da','he'];const rt=at[Math.floor(Math.random()*at.length)];this.ca2(po,rt)}
-            dptl(po,ls,le){const li=new THREE.Vector3().subVectors(le,ls);const pts=new THREE.Vector3().subVectors(po,ls);const t=Math.max(0,Math.min(1,pts.dot(li)/li.dot(li)));const pr=ls.clone().add(li.multiplyScalar(t));return po.distanceTo(pr)}
-            ce2(po,sz=5){const eg=new THREE.SphereGeometry(sz,16,16);const em=new THREE.MeshBasicMaterial({color:0xff4757,transparent:!0,opacity:.8});const ex=new THREE.Mesh(eg,em);ex.position.copy(po);this.sc.add(ex);let sc=0;const an=()=>{sc+=.1;ex.scale.setScalar(sc);ex.material.opacity=Math.max(0,.8-sc*.4);if(sc<2){requestAnimationFrame(an)}else{this.sc.remove(ex)}};an()}
-            uen(){this.en.forEach(en=>{if(en.h<=0)return;const dp=en.m.position.distanceTo(this.ps.position);en.sc2--;if(dp<en.ar&&!en.at&&!en.re){en.at=!0;en.re=!1}if(en.at){const di=new THREE.Vector3().subVectors(this.ps.position,en.m.position).normalize().multiplyScalar(en.cs);const np=en.m.position.clone().add(di);if(!this.cpc(np)){en.m.position.copy(np)}else{const bd=new THREE.Vector3().subVectors(np,en.pl.ce).normalize();en.m.position.add(bd.multiplyScalar(2))}en.m.lookAt(this.ps.position);if(en.sc2<=0&&dp<30){this.esh(en);en.sc2=this.gsc(en.wt)}if(dp>en.ar*2.5){en.at=!1;en.re=!0}}else if(en.re){const tp=new THREE.Vector3(en.pl.ce.x+Math.cos(en.oa)*en.pl.r,2,en.pl.ce.z+Math.sin(en.oa)*en.pl.r);const dt=en.m.position.distanceTo(tp);if(dt>2){const di=new THREE.Vector3().subVectors(tp,en.m.position).normalize().multiplyScalar(C.e.rs);en.m.position.add(di);const lat=en.m.position.clone().add(di);en.m.lookAt(lat)}else{en.re=!1;en.an=en.oa}}else{en.an+=en.sp;this.uep(en);const na=en.an+en.sp;const nx=en.pl.ce.x+Math.cos(na)*en.pl.r;const nz=en.pl.ce.z+Math.sin(na)*en.pl.r;const np=new THREE.Vector3(nx,2,nz);en.m.lookAt(np)}})}
-            esh(en){switch(en.wt){case 'rapid':this.ceb(en);this.am.pes();break;case 'burst':for(let i=0;i<3;i++){setTimeout(()=>{if(en.h>0){this.ceb(en);this.am.pes()}},i*100)}break;case 'heavy':this.ceb(en);this.am.pes();break}}
-            gsc(wt){switch(wt){case 'rapid':return 60;case 'burst':return 180;case 'heavy':return 150;default:return 120}}
-            ub(){this.bu=this.bu.filter(bu=>{bu.m.position.add(bu.v);bu.lf--;const da=this.pl.ef.da.ac?C.b.d*C.a.da.m:C.b.d;for(let en of this.en){if(en.h>0&&bu.m.position.distanceTo(en.m.position)<2){en.h-=da;this.am.peh();if(en.h<=0){this.ce2(en.m.position);this.am.pe();en.m.visible=!1;this.pl.sc+=100;this.da2(en.m.position);this.uh()}this.sc.remove(bu.m);return!1}}for(let pn of this.pn){if(!pn.de&&bu.m.position.distanceTo(pn.ce)<pn.cfg.r){pn.h-=da;if(pn.h<=0){this.dp(pn)}this.sc.remove(bu.m);return!1}}if(bu.lf<=0){this.sc.remove(bu.m);return!1}return!0})}
-            ueb(){this.eb=this.eb.filter(bu=>{bu.m.position.add(bu.v);bu.lf--;const di=bu.m.position.distanceTo(this.ps.position);if(di<3){this.pl.h-=C.b.ed;this.am.pd();this.cde(this.ps.position);this.uh();if(this.pl.h<=0){this.go()}this.sc.remove(bu.m);return!1}if(bu.lf<=0){this.sc.remove(bu.m);return!1}return!0})}
-            ua(){this.ar=this.ar.filter(ar=>{ar.lf--;ar.m.position.y=1+Math.sin(Date.now()*.005+ar.bo)*.5;ar.m.rotation.y+=.08;ar.m.rotation.x+=.03;const di=ar.m.position.distanceTo(this.ps.position);if(di<5){this.aae(ar.ty);this.sc.remove(ar.m);return!1}if(ar.lf<=0){this.sc.remove(ar.m);return!1}return!0})}
-            dp(pn){pn.de=!0;this.ce2(pn.ce,pn.cfg.r);this.am.pe(2);this.sc.remove(pn.m);this.pl.sc+=500;this.uh();this.en=this.en.filter(en=>{if(en.pl===pn){this.sc.remove(en.m);return!1}return!0})}
-            um(){this.mi=this.mi.filter(mi=>{mi.lf--;if(mi.lf<=0&&!mi.ex){this.sc.remove(mi.m);return!1}if(!mi.ex){this.en.forEach(en=>{if(en.h>0&&mi.m.position.distanceTo(en.m.position)<8){mi.ex=!0;this.em(mi);this.sc.remove(mi.m)}})}return!mi.ex})}
-            em(mi){const eg=new THREE.SphereGeometry(8,16,16);const em=new THREE.MeshBasicMaterial({color:0xff4757,transparent:!0,opacity:.6});const ex=new THREE.Mesh(eg,em);ex.position.copy(mi.m.position);this.sc.add(ex);this.am.pe(1.5);this.en.forEach(en=>{if(en.h>0&&ex.position.distanceTo(en.m.position)<8){en.h-=50;this.am.peh();if(en.h<=0){this.ce2(en.m.position);this.am.pe();en.m.visible=!1;this.pl.sc+=100;this.da2(en.m.position);this.uh()}}});setTimeout(()=>{this.sc.remove(ex)},500)}
-            cc2(){if(this.cc>0){this.cc--;return}this.en.forEach(en=>{if(en.h>0&&en.m.position.distanceTo(this.ps.position)<3){this.pl.h-=5;this.cc=60;this.am.pc();this.uh();if(this.pl.h<=0){this.go()}}})}
-            uh(){document.getElementById('health').textContent=this.pl.h;document.getElementById('score').textContent=this.pl.sc}
-            go(){this.gs=!1;this.am.sa();setTimeout(()=>{const pa=confirm(`Game Over! Final Score: ${this.pl.sc}\n\nWould you like to play again?`);if(pa){this.pl.h=C.p.h;this.pl.sc=0;this.pl.cw=1;this.pl.ef.sp.ac=!1;this.pl.ef.da.ac=!1;this.sw(1);this.ps.position.set(0,5,0);this.pv.set(0,0,0);this.cc=0;this.en.forEach(en=>{en.h=C.e.h;en.at=!1;en.re=!1;en.sc2=0;en.m.visible=!0;en.an=en.oa;this.uep(en)});this.pn.forEach(pn=>{if(pn.de){pn.de=!1;pn.h=pn.mh;this.sc.add(pn.m)}else{pn.h=pn.mh}});this.bu.forEach(bu=>this.sc.remove(bu.m));this.bu=[];this.eb.forEach(bu=>this.sc.remove(bu.m));this.eb=[];this.ar.forEach(ar=>this.sc.remove(ar.m));this.ar=[];this.mi.forEach(mi=>this.sc.remove(mi.m));this.mi=[];if(this.lb){this.sc.remove(this.lb);this.lb=null}this.uh();this.am.amb();this.gs=!0}else{location.reload()}},100)}
-            an(){requestAnimationFrame(()=>this.an());this.st.rotation.y+=C.s.rs;if(this.gs){this.up();this.uen();this.ub();this.ueb();this.ua();this.um();this.cc2()}this.re.render(this.sc,this.ca)}
+      };
+      const PLANET_CONFIGS = [{
+        radius: 18,
+        color: 0xff6b6b,
+        distance: 60,
+        enemyCount: 3,
+        enemyType: 'f',
+        health: 200
+      }, {
+        radius: 3,
+        color: 0x4ecdc4,
+        distance: 80,
+        enemyCount: 2,
+        enemyType: 'i',
+        health: 50
+      }, {
+        radius: 50,
+        color: 0xfeca57,
+        distance: 100,
+        enemyCount: 4,
+        enemyType: 'h',
+        health: 500
+      }];
+      const SC = {
+        player: SHIP_CONFIGS.player,
+        fighter: SHIP_CONFIGS.fighter,
+        interceptor: SHIP_CONFIGS.interceptor,
+        heavy: SHIP_CONFIGS.heavy,
+        scout: SHIP_CONFIGS.scout
+      };
+      const EW = {
+        f: 'rapid',
+        i: 'burst',
+        h: 'heavy'
+      };
+      class AM {
+        constructor() {
+          this.st = !1;
+          this.ad = null;
+          this.mv = .8;
+          this.lct = 0;
+          this.setup()
         }
-
-        new SS();
+        async setup() {
+          this.bs = new Tone.FMSynth({
+            harmonicity: 8,
+            modulationIndex: 25,
+            oscillator: {
+              type: "sine"
+            },
+            envelope: {
+              attack: .001,
+              decay: .1,
+              sustain: .3,
+              release: .1
+            },
+            modulation: {
+              type: "square"
+            },
+            modulationEnvelope: {
+              attack: .002,
+              decay: .2,
+              sustain: 0,
+              release: .2
+            }
+          }).toDestination();
+          this.ss = new Tone.NoiseSynth({
+            noise: {
+              type: "pink"
+            },
+            envelope: {
+              attack: .001,
+              decay: .05,
+              sustain: 0,
+              release: .02
+            }
+          }).toDestination();
+          this.sn = new Tone.NoiseSynth({
+            noise: {
+              type: "brown"
+            },
+            envelope: {
+              attack: .001,
+              decay: .2,
+              sustain: 0,
+              release: .3
+            }
+          }).toDestination();
+          this.st2 = new Tone.Synth({
+            oscillator: {
+              type: "triangle"
+            },
+            envelope: {
+              attack: .001,
+              decay: .3,
+              sustain: 0,
+              release: .4
+            }
+          }).toDestination();
+          this.lo1 = new Tone.Oscillator({
+            type: "sawtooth",
+            frequency: 800
+          });
+          this.lo2 = new Tone.Oscillator({
+            type: "square",
+            frequency: 400
+          });
+          this.lf = new Tone.Filter({
+            frequency: 2000,
+            type: "lowpass",
+            Q: 15
+          });
+          this.le = new Tone.AmplitudeEnvelope({
+            attack: .01,
+            decay: .1,
+            sustain: .8,
+            release: .2
+          });
+          this.lo1.chain(this.lf, this.le, Tone.Destination);
+          this.lo2.chain(this.lf);
+          this.la = !1;
+          this.md = new Tone.Synth({
+            oscillator: {
+              type: "triangle"
+            },
+            envelope: {
+              attack: .01,
+              decay: .1,
+              sustain: .2,
+              release: .3
+            }
+          }).toDestination();
+          this.ma = new Tone.Oscillator({
+            type: "sine",
+            frequency: 60
+          });
+          this.maf = new Tone.Filter({
+            frequency: 200,
+            type: "bandpass"
+          });
+          this.ma.chain(this.maf, Tone.Destination);
+          this.en = new Tone.NoiseSynth({
+            noise: {
+              type: "brown"
+            },
+            envelope: {
+              attack: .001,
+              decay: .5,
+              sustain: .1,
+              release: 1.2
+            }
+          });
+          this.es = new Tone.Synth({
+            oscillator: {
+              type: "sine"
+            },
+            envelope: {
+              attack: .001,
+              decay: .8,
+              sustain: 0,
+              release: 1.5
+            }
+          });
+          this.ec = new Tone.NoiseSynth({
+            noise: {
+              type: "white"
+            },
+            envelope: {
+              attack: .05,
+              decay: .3,
+              sustain: 0,
+              release: .4
+            }
+          });
+          this.er = new Tone.Reverb({
+            decay: 3,
+            wet: .4
+          }).toDestination();
+          this.en.chain(this.er);
+          this.es.chain(this.er);
+          this.ec.connect(this.er);
+          this.eb = new Tone.Oscillator({
+            type: "sawtooth",
+            frequency: 80
+          });
+          this.em = new Tone.LFO({
+            frequency: 25,
+            type: "sine",
+            amplitude: .3
+          });
+          this.ef = new Tone.Filter({
+            frequency: 400,
+            type: "lowpass"
+          });
+          this.eg = new Tone.Gain(0);
+          this.eb.chain(this.ef, this.eg, Tone.Destination);
+          this.em.connect(this.eb.frequency);
+          this.ub = new Tone.Synth({
+            oscillator: {
+              type: "sine"
+            },
+            envelope: {
+              attack: .01,
+              decay: .05,
+              sustain: 0,
+              release: .1
+            }
+          }).toDestination();
+          this.hm = new Tone.MetalSynth({
+            frequency: 400,
+            envelope: {
+              attack: .001,
+              decay: .4,
+              release: .1
+            },
+            harmonicity: 12,
+            modulationIndex: 64,
+            resonance: 2000
+          }).toDestination();
+          this.ad = new Tone.Oscillator({
+            type: "sine",
+            frequency: 35
+          });
+          this.ad2 = new Tone.Oscillator({
+            type: "triangle",
+            frequency: 52.5
+          });
+          this.af = new Tone.Filter({
+            frequency: 300,
+            type: "lowpass"
+          });
+          this.ag = new Tone.Gain(.6);
+          this.ad.chain(this.af, this.ag, Tone.Destination);
+          this.ad2.chain(this.af, this.ag);
+          this.er2 = !1;
+          this.mh = !1
+        }
+        async start() {
+          if (!this.st) {
+            await Tone.start();
+            this.st = !0;
+            this.amb()
+          }
+        }
+        amb() {
+          if (this.ad && this.st) {
+            this.ad.start();
+            this.ad2.start();
+            this.af.frequency.setValueAtTime(300, Tone.now());
+            this.af.frequency.rampTo(600, 8);
+            setInterval(() => {
+              if (this.st) {
+                const v = 35 + Math.sin(Date.now() * .0001) * 10;
+                const v2 = 52.5 + Math.cos(Date.now() * .00007) * 8;
+                this.ad.frequency.rampTo(v, 12);
+                this.ad2.frequency.rampTo(v2, 15);
+                const ff = 300 + Math.sin(Date.now() * .00005) * 200;
+                this.af.frequency.rampTo(ff, 10)
+              }
+            }, 6000)
+          }
+        }
+        pb() {
+          if (!this.st) return;
+          this.bs.triggerAttackRelease("E5", "8n");
+          this.bs.frequency.setValueAtTime(660, Tone.now());
+          this.bs.frequency.exponentialRampTo(220, .1)
+        }
+        pes() {
+          if (!this.st) return;
+          this.bs.triggerAttackRelease("C4", "16n", "+0", .6);
+          this.bs.frequency.setValueAtTime(440, Tone.now());
+          this.bs.frequency.exponentialRampTo(200, .15)
+        }
+        ps() {
+          if (!this.st) return;
+          const sh = 3 + Math.floor(Math.random() * 3);
+          for (let i = 0; i < sh; i++) {
+            setTimeout(() => {
+              this.ss.triggerAttackRelease("32n");
+              this.bs.triggerAttackRelease("A4", "64n", "+0", .3)
+            }, i * (40 + Math.random() * 30))
+          }
+        }
+        psh() {
+          if (!this.st) return;
+          this.sn.triggerAttackRelease("4n");
+          this.st2.triggerAttackRelease("G2", "4n");
+          for (let i = 0; i < 8; i++) {
+            setTimeout(() => {
+              this.ss.triggerAttackRelease("64n", "+0", .4)
+            }, 20 + i * 15)
+          }
+        }
+        pl() {
+          if (!this.st || this.la) return;
+          this.la = !0;
+          this.lo1.start();
+          this.lo2.start();
+          this.le.triggerAttack();
+          this.lo1.frequency.setValueAtTime(800, Tone.now());
+          this.lo1.frequency.rampTo(1200, .1);
+          this.lo2.frequency.setValueAtTime(400, Tone.now());
+          this.lo2.frequency.rampTo(600, .1);
+          this.lf.frequency.setValueAtTime(2000, Tone.now());
+          this.lf.frequency.rampTo(4000, .05);
+          this.lf.frequency.rampTo(1500, .2)
+        }
+        sl() {
+          if (!this.st || !this.la) return;
+          this.le.triggerRelease();
+          setTimeout(() => {
+            if (this.lo1.state === "started") this.lo1.stop();
+            if (this.lo2.state === "started") this.lo2.stop();
+            this.la = !1
+          }, 200)
+        }
+        pm() {
+          if (!this.st) return;
+          this.md.triggerAttackRelease("A4", "16n");
+          setTimeout(() => this.md.triggerAttackRelease("F4", "16n"), 100);
+          setTimeout(() => this.md.triggerAttackRelease("D4", "8n"), 200);
+          setTimeout(() => {
+            if (!this.mh && this.st) {
+              this.mh = !0;
+              this.ma.start();
+              this.maf.frequency.rampTo(300, 2);
+              setTimeout(() => {
+                if (this.ma.state === "started") {
+                  this.ma.stop();
+                  this.mh = !1
+                }
+              }, 10000)
+            }
+          }, 500)
+        }
+        pe(sz = 1) {
+          if (!this.st) return;
+          this.en.triggerAttackRelease("2n");
+          this.es.triggerAttackRelease("C1", "1n");
+          setTimeout(() => {
+            this.ec.triggerAttackRelease("4n", "+0", .6)
+          }, 100);
+          if (sz > 1) {
+            this.es.triggerAttackRelease("G0", "1n", "+0.1", .8);
+            for (let i = 0; i < sz - 1; i++) {
+              setTimeout(() => {
+                this.en.triggerAttackRelease("4n", "+0", .7);
+                this.es.triggerAttackRelease("D1", "2n", "+0", .6)
+              }, 200 + i * 300)
+            }
+          }
+          if (this.mh && this.ma.state === "started") {
+            this.ma.stop();
+            this.mh = !1
+          }
+        }
+        se() {
+          if (!this.st || this.er2) return;
+          this.er2 = !0;
+          this.eb.start();
+          this.em.start();
+          this.eg.gain.rampTo(.15, .1);
+          this.eb.frequency.rampTo(120, .3);
+          this.ef.frequency.rampTo(800, .5)
+        }
+        ste() {
+          if (!this.st || !this.er2) return;
+          this.eg.gain.rampTo(0, .2);
+          setTimeout(() => {
+            if (this.eb.state === "started") {
+              this.eb.stop();
+              this.em.stop();
+              this.er2 = !1
+            }
+          }, 200)
+        }
+        uei(in1) {
+          if (!this.st || !this.er2) return;
+          const v = .05 + (in1 * .2);
+          const p = 80 + (in1 * 60);
+          const ff = 400 + (in1 * 600);
+          this.eg.gain.rampTo(v, .1);
+          this.eb.frequency.rampTo(p, .2);
+          this.ef.frequency.rampTo(ff, .3)
+        }
+        pws() {
+          if (!this.st) return;
+          this.ub.triggerAttackRelease("C5", "32n");
+          setTimeout(() => this.ub.triggerAttackRelease("G5", "32n"), 60);
+          setTimeout(() => this.ub.triggerAttackRelease("C6", "16n"), 120)
+        }
+        pc() {
+          if (!this.st) return;
+          const ct = Tone.now();
+          if (ct - this.lct < .2) return;
+          this.lct = ct;
+          if (this.hm && this.hm.triggerAttackRelease) {
+            this.hm.triggerAttackRelease("C4", "8n")
+          }
+        }
+        pd() {
+          if (!this.st) return;
+          const ct = Tone.now();
+          if (ct - this.lct < .15) return;
+          this.lct = ct;
+          if (this.hm && this.hm.triggerAttackRelease) {
+            this.hm.triggerAttackRelease("F3", "4n");
+            setTimeout(() => {
+              if (this.ub && this.ub.triggerAttackRelease) {
+                this.ub.triggerAttackRelease("C4", "16n", "+0", .8)
+              }
+            }, 100)
+          }
+        }
+        peh() {
+          if (!this.st) return;
+          if (this.hm && this.hm.triggerAttackRelease) {
+            this.hm.triggerAttackRelease("G4", "16n", "+0", .7);
+            setTimeout(() => {
+              if (this.ub && this.ub.triggerAttackRelease) {
+                this.ub.triggerAttackRelease("C5", "32n", "+0", .4)
+              }
+            }, 50)
+          }
+        }
+        ppu() {
+          if (!this.st) return;
+          const n = ["C4", "E4", "G4", "C5", "E5"];
+          n.forEach((nt, i) => {
+            setTimeout(() => {
+              this.ub.triggerAttackRelease(nt, "16n", "+0", .8)
+            }, i * 100)
+          })
+        }
+        plh() {
+          if (!this.st) return;
+          const wb = () => {
+            this.ub.triggerAttackRelease("F4", "8n", "+0", .6);
+            setTimeout(() => {
+              this.ub.triggerAttackRelease("F4", "8n", "+0", .6)
+            }, 200)
+          };
+          wb();
+          setTimeout(wb, 3000)
+        }
+        sa() {
+          if (this.ad && this.ad.state === "started") {
+            this.ad.stop()
+          }
+          if (this.ad2 && this.ad2.state === "started") {
+            this.ad2.stop()
+          }
+          this.sl();
+          this.ste();
+          if (this.mh && this.ma.state === "started") {
+            this.ma.stop();
+            this.mh = !1
+          }
+        }
+      }
+      class SF {
+        static cg(sz) {
+          const g = new THREE.CylinderGeometry(sz, sz, .1, 6);
+          return g
+        }
+        static sg(sz) {
+          return new THREE.BoxGeometry(sz, sz, .1)
+        }
+        static dg(sz) {
+          const g = new THREE.OctahedronGeometry(sz / 1.4);
+          g.scale(1, 1, .1);
+          return g
+        }
+        static ccg(sz) {
+          return new THREE.CylinderGeometry(sz / 2, sz / 2, .1, 16)
+        }
+        static tg(sz) {
+          const g = new THREE.ConeGeometry(sz, .1, 3);
+          g.rotateX(Math.PI / 2);
+          return g
+        }
+        static stg(sz) {
+          const sh = new THREE.Shape();
+          const or = sz;
+          const ir = sz * .5;
+          const sp = 5;
+          for (let i = 0; i < sp * 2; i++) {
+            const a = (i / (sp * 2)) * Math.PI * 2;
+            const r = i % 2 === 0 ? or : ir;
+            const x = Math.cos(a) * r;
+            const y = Math.sin(a) * r;
+            if (i === 0) {
+              sh.moveTo(x, y)
+            } else {
+              sh.lineTo(x, y)
+            }
+          }
+          const g = new THREE.ExtrudeGeometry(sh, {
+            depth: .1,
+            bevelEnabled: !1
+          });
+          return g
+        }
+        static cs(cfg) {
+          const sg = new THREE.Group();
+          const sc = cfg.s || 1;
+          if (cfg.t === 'tie') {
+            return SF.cts(cfg)
+          } else {
+            return SF.ccs(cfg)
+          }
+        }
+        static cs(cfg) {
+          const sg = new THREE.Group();
+          const sc = cfg.scale || 1;
+          if (cfg.shipType === 'tie') {
+            return SF.cts(cfg)
+          } else {
+            return SF.ccs(cfg)
+          }
+        }
+        static ccs(cfg) {
+          const sg = new THREE.Group();
+          const sc = cfg.s || 1.8;
+          const bg = new THREE.BoxGeometry((cfg.bw || 2) * sc, (cfg.bh || .3) * sc, (cfg.bl || 4) * sc);
+          const bm = new THREE.MeshLambertMaterial({
+            color: cfg.pc || 0x2ed573
+          });
+          const b = new THREE.Mesh(bg, bm);
+          sg.add(b);
+          if (cfg.hw !== !1) {
+            const wg = new THREE.BoxGeometry((cfg.ws || 4) * sc, (cfg.wt || .2) * sc, 1 * sc);
+            const wm = new THREE.MeshLambertMaterial({
+              color: cfg.sc || 0x1e90ff
+            });
+            const w = new THREE.Mesh(wg, wm);
+            w.position.set(0, -.1 * sc, (cfg.wp || -1) * sc);
+            w.rotation.z = ((cfg.wsw || 0) * Math.PI) / 180;
+            w.rotation.x = ((cfg.wd || 0) * Math.PI) / 180;
+            sg.add(w)
+          }
+          const ec = cfg.ec || 2;
+          const esp = cfg.esp || 1.5;
+          const ep = [];
+          if (ec === 1) {
+            ep.push([0, 0])
+          } else if (ec === 2) {
+            ep.push([-(esp * sc), 0], [esp * sc, 0])
+          } else if (ec === 3) {
+            ep.push([0, 0], [-(esp * sc), 0], [esp * sc, 0])
+          } else if (ec === 4) {
+            ep.push([-(esp * sc), 0], [esp * sc, 0], [-(esp * sc), .3 * sc], [esp * sc, .3 * sc])
+          } else if (ec === 6) {
+            ep.push([-(esp * sc), 0], [esp * sc, 0], [-(esp * sc) * .7, .3 * sc], [esp * sc * .7, .3 * sc], [-(esp * sc) * .7, -.3 * sc], [esp * sc * .7, -.3 * sc])
+          }
+          for (let i = 0; i < ep.length; i++) {
+            const eg = new THREE.SphereGeometry((cfg.es || .3) * sc, 8, 8);
+            const em = new THREE.MeshBasicMaterial({
+              color: cfg.ac || 0x7bed9f,
+              transparent: !0,
+              opacity: .8
+            });
+            const e = new THREE.Mesh(eg, em);
+            e.position.set(ep[i][0], ep[i][1], (cfg.ep || -2) * sc);
+            sg.add(e)
+          }
+          if (cfg.hc !== !1) {
+            let cg;
+            switch (cfg.cs || 'sphere') {
+              case 'sphere':
+                cg = new THREE.SphereGeometry((cfg.css || .4) * sc, 8, 8);
+                break;
+              case 'box':
+                cg = new THREE.BoxGeometry((cfg.css || .4) * sc, (cfg.css || .4) * sc, (cfg.css || .4) * sc);
+                break;
+              case 'cylinder':
+                cg = new THREE.CylinderGeometry((cfg.css || .4) * sc, (cfg.css || .4) * sc, (cfg.css || .4) * sc, 8);
+                break;
+              case 'cone':
+                cg = new THREE.ConeGeometry((cfg.css || .4) * sc, (cfg.css || .4) * sc * 1.5, 8);
+                break;
+              default:
+                cg = new THREE.SphereGeometry((cfg.css || .4) * sc, 8, 8)
+            }
+            const cm = new THREE.MeshLambertMaterial({
+              color: cfg.cc || 0xff5252
+            });
+            const c = new THREE.Mesh(cg, cm);
+            c.position.set(0, (cfg.cpy || .3) * sc, (cfg.cpz || .5) * sc);
+            sg.add(c)
+          }
+          return sg
+        }
+        static cts(cfg) {
+          const sg = new THREE.Group();
+          const sc = cfg.s || 1.8;
+          let cg;
+          switch (cfg.cs || 'sphere') {
+            case 'sphere':
+              cg = new THREE.SphereGeometry((cfg.css || 1.2) * sc, 12, 12);
+              break;
+            case 'box':
+              cg = new THREE.BoxGeometry((cfg.css || 1.2) * sc, (cfg.css || 1.2) * sc, (cfg.css || 1.2) * sc);
+              break;
+            case 'octahedron':
+              cg = new THREE.OctahedronGeometry((cfg.css || 1.2) * sc);
+              break;
+            case 'cylinder':
+              cg = new THREE.CylinderGeometry((cfg.css || 1.2) * sc, (cfg.css || 1.2) * sc, (cfg.css || 1.2) * sc, 8);
+              break;
+            case 'dodecahedron':
+              cg = new THREE.DodecahedronGeometry((cfg.css || 1.2) * sc);
+              break;
+            default:
+              cg = new THREE.SphereGeometry((cfg.css || 1.2) * sc, 12, 12)
+          }
+          const cm = new THREE.MeshLambertMaterial({
+            color: cfg.cc || 0xff5252
+          });
+          const c = new THREE.Mesh(cg, cm);
+          sg.add(c);
+          for (let i = 0; i < (cfg.pnc || 2); i++) {
+            let pg;
+            switch (cfg.ps || 'hexagon') {
+              case 'hexagon':
+                pg = SF.cg((cfg.pns || 2) * sc);
+                break;
+              case 'square':
+                pg = SF.sg((cfg.pns || 2) * sc);
+                break;
+              case 'diamond':
+                pg = SF.dg((cfg.pns || 2) * sc);
+                break;
+              case 'circle':
+                pg = SF.ccg((cfg.pns || 2) * sc);
+                break;
+              case 'triangle':
+                pg = SF.tg((cfg.pns || 2) * sc);
+                break;
+              case 'star':
+                pg = SF.stg((cfg.pns || 2) * sc);
+                break;
+              default:
+                pg = SF.cg((cfg.pns || 2) * sc)
+            }
+            pg.scale(1, 1, (cfg.pt || .1) * sc * 10);
+            const pm = new THREE.MeshLambertMaterial({
+              color: cfg.pc || 0x2ed573
+            });
+            const p = new THREE.Mesh(pg, pm);
+            const a = (i * Math.PI * 2) / (cfg.pnc || 2);
+            const x = Math.cos(a) * (cfg.pd || 2.5) * sc;
+            const z = Math.sin(a) * (cfg.pd || 2.5) * sc;
+            p.position.set(x, (cfg.py || 0) * sc, z + (cfg.pz || 0) * sc);
+            p.rotation.x = ((cfg.ptx || 0) * Math.PI) / 180;
+            p.rotation.y = a + Math.PI / 2 + ((cfg.pty || 0) * Math.PI) / 180;
+            p.rotation.z = ((cfg.pa || 0) * Math.PI) / 180;
+            sg.add(p);
+            if (cfg.hs !== !1) {
+              for (let s = 0; s < (cfg.scnt || 1); s++) {
+                let stg;
+                const stl = (cfg.pd || 2.5) * sc * .8;
+                switch (cfg.st || 'cylinder') {
+                  case 'cylinder':
+                    stg = new THREE.CylinderGeometry((cfg.sth || .1) * sc, (cfg.sth || .1) * sc, stl, 8);
+                    break;
+                  case 'box':
+                    stg = new THREE.BoxGeometry((cfg.sth || .1) * sc * 2, stl, (cfg.sth || .1) * sc * 2);
+                    break;
+                  case 'hexagonal':
+                    stg = new THREE.CylinderGeometry((cfg.sth || .1) * sc, (cfg.sth || .1) * sc, stl, 6);
+                    break;
+                  default:
+                    stg = new THREE.CylinderGeometry((cfg.sth || .1) * sc, (cfg.sth || .1) * sc, stl, 8)
+                }
+                const stm = new THREE.MeshLambertMaterial({
+                  color: cfg.sc || 0x1e90ff
+                });
+                const st = new THREE.Mesh(stg, stm);
+                const sto = (cfg.scnt || 1) > 1 ? (s - ((cfg.scnt || 1) - 1) / 2) * .3 * sc : 0;
+                const stx = x / 2;
+                const stz = (z + (cfg.pz || 0) * sc) / 2 + sto;
+                st.position.set(stx, (cfg.py || 0) * sc / 2, stz);
+                st.rotation.z = -a + ((cfg.sa || 0) * Math.PI) / 180;
+                if ((cfg.st || 'cylinder') === 'box') {
+                  st.rotation.y = a
+                }
+                sg.add(st)
+              }
+            }
+          }
+          return sg
+        }
+      }
+      class SS {
+        constructor() {
+          this.sc = new THREE.Scene();
+          const as = window.innerWidth / window.innerHeight;
+          const d = 60;
+          this.ca = new THREE.OrthographicCamera(-d * as, d * as, d, -d, .1, 2000);
+          this.re = new THREE.WebGLRenderer({
+            antialias: !0
+          });
+          this.re.setSize(window.innerWidth, window.innerHeight);
+          this.re.setClearColor(0x000011);
+          document.getElementById('gameContainer').appendChild(this.re.domElement);
+          this.gs = !1;
+          this.pl = {
+            h: C.p.h,
+            sc: 0,
+            cw: 1,
+            ef: {
+              sp: {
+                ac: !1,
+                et: 0
+              },
+              da: {
+                ac: !1,
+                et: 0
+              }
+            }
+          };
+          this.k = {};
+          this.bu = [];
+          this.eb = [];
+          this.ar = [];
+          this.mi = [];
+          this.en = [];
+          this.pn = [];
+          this.st = [];
+          this.cc = 0;
+          this.sp = !1;
+          this.ps = null;
+          this.pv = new THREE.Vector3();
+          this.lb = null;
+          this.tc = {
+            mx: 0,
+            my: 0,
+            fi: !1
+          };
+          this.am = new AM();
+          this.i();
+          this.se();
+          this.an()
+        }
+        i() {
+          this.ca.position.set(0, 60, 60);
+          this.ca.lookAt(0, 0, 0);
+          const al = new THREE.AmbientLight(0x404040, .3);
+          this.sc.add(al);
+          const dl = new THREE.DirectionalLight(0xffffff, .8);
+          dl.position.set(10, 10, 5);
+          this.sc.add(dl);
+          this.csf();
+          this.cp();
+          this.cpl();
+          this.ce()
+        }
+        csf() {
+          const sg = new THREE.BufferGeometry();
+          const po = new Float32Array(C.s.c * 3);
+          for (let i = 0; i < C.s.c * 3; i += 3) {
+            po[i] = (Math.random() - .5) * C.s.sp;
+            po[i + 1] = (Math.random() - .5) * C.s.sp;
+            po[i + 2] = (Math.random() - .5) * C.s.sp
+          }
+          sg.setAttribute('position', new THREE.BufferAttribute(po, 3));
+          const sm = new THREE.PointsMaterial({
+            color: 0xffffff,
+            size: .5
+          });
+          this.st = new THREE.Points(sg, sm);
+          this.sc.add(this.st)
+        }
+        cp() {
+          this.ps = SF.cs(SC.player);
+          this.ps.position.y = 5;
+          this.sc.add(this.ps)
+        }
+        cpl() {
+          const as = (Math.PI * 2) / PLANET_CONFIGS.length;
+          for (let i = 0; i < PLANET_CONFIGS.length; i++) {
+            const pc = PLANET_CONFIGS[i];
+            const a = as * i;
+            const pg = new THREE.SphereGeometry(pc.radius, 16, 16);
+            const pm = new THREE.MeshLambertMaterial({
+              color: pc.color
+            });
+            const p = new THREE.Mesh(pg, pm);
+            const x = Math.cos(a) * pc.distance;
+            const z = Math.sin(a) * pc.distance;
+            p.position.set(x, 0, z);
+            this.sc.add(p);
+            const or = pc.radius + C.e.om;
+            this.pn.push({
+              m: p,
+              r: or,
+              ce: p.position.clone(),
+              cfg: pc,
+              h: pc.health,
+              mh: pc.health,
+              de: !1
+            })
+          }
+        }
+        ce() {
+          this.pn.forEach((planet, planetIndex) => {
+            const enemyTypeConfig = ENEMY_TYPES[planet.cfg.enemyType];
+            if (!enemyTypeConfig) {
+              console.warn(`Enemy type '${planet.cfg.enemyType}' not found in ENEMY_TYPES`);
+              return
+            }
+            const shipConfig = SHIP_CONFIGS[enemyTypeConfig.shipConfig];
+            if (!shipConfig) {
+              console.warn(`Ship config '${enemyTypeConfig.shipConfig}' not found in SHIP_CONFIGS`);
+              return
+            }
+            for (let i = 0; i < planet.cfg.enemyCount; i++) {
+              const enemyShip = SF.cs(shipConfig);
+              const enemy = {
+                m: enemyShip,
+                pl: planet,
+                an: (i * Math.PI * 2) / planet.cfg.enemyCount,
+                oa: (i * Math.PI * 2) / planet.cfg.enemyCount,
+                sp: C.e.bs + Math.random() * C.e.sv,
+                ar: enemyTypeConfig.attackRange,
+                at: !1,
+                re: !1,
+                h: enemyTypeConfig.health,
+                ty: planet.cfg.enemyType,
+                cs: enemyTypeConfig.chaseSpeed,
+                sc2: 0,
+                wt: enemyTypeConfig.weaponType
+              };
+              this.uep(enemy);
+              this.en.push(enemy);
+              this.sc.add(enemyShip)
+            }
+          })
+        }
+        uep(en) {
+          const x = en.pl.ce.x + Math.cos(en.an) * en.pl.r;
+          const z = en.pl.ce.z + Math.sin(en.an) * en.pl.r;
+          en.m.position.set(x, 2, z)
+        }
+        ca2(po, ty) {
+          const ag = new THREE.SphereGeometry(1.5, 12, 12);
+          const am = new THREE.MeshBasicMaterial({
+            color: C.a[ty].co,
+            transparent: !0,
+            opacity: .9
+          });
+          const ar = new THREE.Mesh(ag, am);
+          ar.position.copy(po);
+          ar.position.y = 1;
+          const ao = {
+            m: ar,
+            ty: ty,
+            lf: 900,
+            bo: Math.random() * Math.PI * 2
+          };
+          this.ar.push(ao);
+          this.sc.add(ar);
+          return ao
+        }
+        sw(wn) {
+          if (wn >= 1 && wn <= 5) {
+            document.getElementById(`weapon${this.pl.cw}`).classList.remove('weapon-active');
+            this.pl.cw = wn;
+            document.getElementById(`weapon${wn}`).classList.add('weapon-active');
+            document.getElementById('weaponBtn').innerHTML = `W
+                              <br>${wn}`;
+            if (this.lb) {
+              this.sc.remove(this.lb);
+              this.lb = null;
+              this.am.sl()
+            }
+            this.am.pws()
+          }
+        }
+        cw() {
+          const nw = this.pl.cw % 5 + 1;
+          this.sw(nw)
+        }
+        se() {
+          document.addEventListener('keydown', (e) => {
+            this.k[e.code] = !0;
+            if (e.code.startsWith('Digit')) {
+              const wn = parseInt(e.code.charAt(5));
+              this.sw(wn)
+            }
+          });
+          document.addEventListener('keyup', (e) => {
+            this.k[e.code] = !1
+          });
+          document.getElementById('startBtn').addEventListener('click', () => {
+            this.sg()
+          });
+          this.smc();
+          window.addEventListener('resize', () => {
+            const as = window.innerWidth / window.innerHeight;
+            const d = 60;
+            this.ca.left = -d * as;
+            this.ca.right = d * as;
+            this.ca.top = d;
+            this.ca.bottom = -d;
+            this.ca.updateProjectionMatrix();
+            this.re.setSize(window.innerWidth, window.innerHeight)
+          })
+        }
+        smc() {
+          const dp = document.getElementById('dpad');
+          const di = document.getElementById('dpadInner');
+          const fb = document.getElementById('fireBtn');
+          const wb = document.getElementById('weaponBtn');
+          let dp2 = !1;
+          const ud = (cx, cy) => {
+            const r = dp.getBoundingClientRect();
+            const cex = r.left + r.width / 2;
+            const cey = r.top + r.height / 2;
+            const dx = cx - cex;
+            const dy = cy - cey;
+            const di2 = Math.sqrt(dx * dx + dy * dy);
+            const md = 40;
+            if (di2 <= md) {
+              di.style.transform = `translate(${dx}px, ${dy}px)`;
+              this.tc.mx = dx / md;
+              this.tc.my = dy / md
+            } else {
+              const a = Math.atan2(dy, dx);
+              const lx = Math.cos(a) * md;
+              const ly = Math.sin(a) * md;
+              di.style.transform = `translate(${lx}px, ${ly}px)`;
+              this.tc.mx = lx / md;
+              this.tc.my = ly / md
+            }
+          };
+          const rd = () => {
+            di.style.transform = 'translate(0px, 0px)';
+            this.tc.mx = 0;
+            this.tc.my = 0;
+            dp2 = !1
+          };
+          dp.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            dp2 = !0;
+            const t = e.touches[0];
+            ud(t.clientX, t.clientY)
+          });
+          dp.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (dp2) {
+              const t = e.touches[0];
+              ud(t.clientX, t.clientY)
+            }
+          });
+          dp.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            rd()
+          });
+          fb.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            this.tc.fi = !0
+          });
+          fb.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            this.tc.fi = !1
+          });
+          wb.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            this.cw()
+          })
+        }
+        async sg() {
+          document.getElementById('intro').classList.add('hidden');
+          await this.am.start();
+          this.gs = !0
+        }
+        cpc(np, ip = !1) {
+          for (let pn of this.pn) {
+            if (pn.de) continue;
+            const di = np.distanceTo(pn.ce);
+            const cd = pn.cfg.radius + (ip ? 3 : 2);
+            if (di < cd) {
+              if (ip) {
+                const bd = new THREE.Vector3().subVectors(np, pn.ce).normalize();
+                this.pv.copy(bd.multiplyScalar(.5));
+                this.pl.h -= 10;
+                this.cde(this.ps.position);
+                this.am.pd();
+                this.uh();
+                if (this.pl.h <= 0) {
+                  this.go()
+                }
+              }
+              return !0
+            }
+          }
+          return !1
+        }
+        cde(po) {
+          const dg = new THREE.SphereGeometry(3, 32, 32);
+          const dm = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: !0,
+            opacity: .6
+          });
+          const da = new THREE.Mesh(dg, dm);
+          da.position.copy(po);
+          this.sc.add(da);
+          let sc = 0;
+          const an = () => {
+            sc += .15;
+            da.scale.setScalar(sc);
+            da.material.opacity = Math.max(0, .6 - sc * .3);
+            if (sc < 2) {
+              requestAnimationFrame(an)
+            } else {
+              this.sc.remove(da)
+            }
+          };
+          an()
+        }
+        up() {
+          if (!this.gs) return;
+          let mx = 0;
+          let mz = 0;
+          if (this.k.KeyW || this.k.ArrowUp || this.tc.my < -.3) mz -= 1;
+          if (this.k.KeyS || this.k.ArrowDown || this.tc.my > .3) mz += 1;
+          if (this.k.KeyA || this.k.ArrowLeft || this.tc.mx < -.3) mx -= 1;
+          if (this.k.KeyD || this.k.ArrowRight || this.tc.mx > .3) mx += 1;
+          if (mx !== 0 || mz !== 0) {
+            if (mx !== 0 && mz !== 0) {
+              mx *= Math.SQRT1_2;
+              mz *= Math.SQRT1_2
+            }
+            const sm = this.pl.ef.sp.ac ? C.a.sp.m : 1;
+            this.pv.x += mx * C.p.a * sm;
+            this.pv.z += mz * C.p.a * sm
+          }
+          this.pv.multiplyScalar(C.p.f);
+          const ms = C.p.ms * (this.pl.ef.sp.ac ? C.a.sp.m : 1);
+          const cv = this.pv.clone().clampLength(0, ms);
+          this.pv.copy(cv);
+          const np = this.ps.position.clone().add(this.pv);
+          if (!this.cpc(np, !0)) {
+            this.ps.position.copy(np)
+          }
+          if (this.pv.length() > .1) {
+            const a = Math.atan2(this.pv.x, this.pv.z);
+            this.ps.rotation.y = a
+          }
+          if ((this.k.Space && !this.sp) || this.tc.fi) {
+            this.fw();
+            this.sp = !0
+          } else if (!this.k.Space && !this.tc.fi) {
+            this.sp = !1;
+            if (this.lb) {
+              this.sc.remove(this.lb);
+              this.lb = null;
+              this.am.sl()
+            }
+          }
+          this.ca.position.x = this.ps.position.x;
+          this.ca.position.z = this.ps.position.z + 60;
+          this.ca.lookAt(this.ps.position);
+          this.uc();
+          this.uef()
+        }
+        uc() {
+          document.getElementById('posX').textContent = Math.round(this.ps.position.x);
+          document.getElementById('posZ').textContent = Math.round(this.ps.position.z)
+        }
+        uef() {
+          const ct = Date.now();
+          let et = '';
+          if (this.pl.ef.sp.ac) {
+            if (ct > this.pl.ef.sp.et) {
+              this.pl.ef.sp.ac = !1
+            } else {
+              const re = Math.ceil((this.pl.ef.sp.et - ct) / 1000);
+              et += `SPEED BOOST: ${re}s
+                                    <br>`
+            }
+          }
+          if (this.pl.ef.da.ac) {
+            if (ct > this.pl.ef.da.et) {
+              this.pl.ef.da.ac = !1
+            } else {
+              const re = Math.ceil((this.pl.ef.da.et - ct) / 1000);
+              et += `DAMAGE BOOST: ${re}s
+                                      <br>`
+            }
+          }
+          document.getElementById('effects').innerHTML = et
+        }
+        aae(ty) {
+          const ar = C.a[ty];
+          const ct = Date.now();
+          if (ty === 'he') {
+            this.pl.h = Math.min(C.p.h, this.pl.h + ar.am)
+          } else {
+            this.pl.ef[ty].ac = !0;
+            this.pl.ef[ty].et = ct + ar.du
+          }
+          this.am.ppu();
+          this.uh()
+        }
+        fw() {
+          switch (this.pl.cw) {
+            case 1:
+              this.fb();
+              break;
+            case 2:
+              this.fs(3);
+              break;
+            case 3:
+              this.fs(5);
+              break;
+            case 4:
+              this.fm();
+              break;
+            case 5:
+              this.fl();
+              break
+          }
+        }
+        fb() {
+          this.cb(0);
+          this.am.pb()
+        }
+        fs(co) {
+          const sa = Math.PI / 6;
+          for (let i = 0; i < co; i++) {
+            const ao = (i - (co - 1) / 2) * (sa / (co - 1));
+            this.cb(ao)
+          }
+          if (co === 3) {
+            this.am.ps()
+          } else {
+            this.am.psh()
+          }
+        }
+        cb(ao = 0) {
+          const bg = new THREE.SphereGeometry(.2, 8, 8);
+          const bm = new THREE.MeshBasicMaterial({
+            color: 0x00f2fe
+          });
+          const bu = new THREE.Mesh(bg, bm);
+          bu.position.copy(this.ps.position);
+          bu.position.y += .5;
+          const di = new THREE.Vector3(Math.sin(this.ps.rotation.y + ao), 0, Math.cos(this.ps.rotation.y + ao));
+          const bv = di.clone().multiplyScalar(C.b.s);
+          this.bu.push({
+            m: bu,
+            v: bv,
+            lf: C.b.l
+          });
+          this.sc.add(bu)
+        }
+        ceb(en) {
+          const bg = new THREE.SphereGeometry(.3, 8, 8);
+          const bm = new THREE.MeshBasicMaterial({
+            color: 0xff4757,
+            emissive: 0xff2030,
+            emissiveIntensity: .5
+          });
+          const bu = new THREE.Mesh(bg, bm);
+          bu.position.copy(en.m.position);
+          bu.position.y += .5;
+          const di = new THREE.Vector3().subVectors(this.ps.position, en.m.position).normalize();
+          const bv = di.clone().multiplyScalar(C.b.es);
+          this.eb.push({
+            m: bu,
+            v: bv,
+            lf: C.b.l
+          });
+          this.sc.add(bu)
+        }
+        fm() {
+          const mg = new THREE.SphereGeometry(.5, 8, 8);
+          const mm = new THREE.MeshBasicMaterial({
+            color: 0xff4757,
+            transparent: !0,
+            opacity: .8
+          });
+          const mi = new THREE.Mesh(mg, mm);
+          mi.position.copy(this.ps.position);
+          mi.position.y += .5;
+          this.mi.push({
+            m: mi,
+            lf: 600,
+            ex: !1
+          });
+          this.sc.add(mi);
+          this.am.pm()
+        }
+        fl() {
+          if (this.lb) {
+            this.sc.remove(this.lb)
+          }
+          const di = new THREE.Vector3(Math.sin(this.ps.rotation.y), 0, Math.cos(this.ps.rotation.y));
+          const le = this.ps.position.clone().add(di.clone().multiplyScalar(C.w.l.md));
+          const lg = new THREE.BufferGeometry().setFromPoints([this.ps.position.clone().add(new THREE.Vector3(0, .5, 0)), le]);
+          const lm = new THREE.LineBasicMaterial({
+            color: 0x00ff00,
+            transparent: !0,
+            opacity: .8
+          });
+          this.lb = new THREE.Line(lg, lm);
+          this.sc.add(this.lb);
+          this.am.pl();
+          let hs = !1;
+          const da = this.pl.ef.da.ac ? C.w.l.d * C.a.da.m : C.w.l.d;
+          this.en.forEach(en => {
+            if (en.h > 0) {
+              const dl = this.dptl(en.m.position, this.ps.position, le);
+              if (dl < 2) {
+                en.h -= da;
+                hs = !0;
+                if (en.h <= 0) {
+                  this.ce2(en.m.position);
+                  this.am.pe();
+                  en.m.visible = !1;
+                  this.pl.sc += (ENEMY_TYPES[en.ty]?.score || 100);
+                  this.da2(en.m.position);
+                  this.uh()
+                } else {
+                  this.am.peh()
+                }
+              }
+            }
+          });
+          this.pn.forEach(pn => {
+            if (!pn.de) {
+              const dl = this.dptl(pn.ce, this.ps.position, le);
+              if (dl < pn.cfg.radius) {
+                pn.h -= da;
+                hs = !0;
+                if (pn.h <= 0) {
+                  this.dp(pn)
+                }
+              }
+            }
+          })
+        }
+        da2(po) {
+          const at = ['sp', 'da', 'he'];
+          const rt = at[Math.floor(Math.random() * at.length)];
+          this.ca2(po, rt)
+        }
+        dptl(po, ls, le) {
+          const li = new THREE.Vector3().subVectors(le, ls);
+          const pts = new THREE.Vector3().subVectors(po, ls);
+          const t = Math.max(0, Math.min(1, pts.dot(li) / li.dot(li)));
+          const pr = ls.clone().add(li.multiplyScalar(t));
+          return po.distanceTo(pr)
+        }
+        ce2(po, sz = 5) {
+          const eg = new THREE.SphereGeometry(sz, 16, 16);
+          const em = new THREE.MeshBasicMaterial({
+            color: 0xff4757,
+            transparent: !0,
+            opacity: .8
+          });
+          const ex = new THREE.Mesh(eg, em);
+          ex.position.copy(po);
+          this.sc.add(ex);
+          let sc = 0;
+          const an = () => {
+            sc += .1;
+            ex.scale.setScalar(sc);
+            ex.material.opacity = Math.max(0, .8 - sc * .4);
+            if (sc < 2) {
+              requestAnimationFrame(an)
+            } else {
+              this.sc.remove(ex)
+            }
+          };
+          an()
+        }
+        uen() {
+          this.en.forEach(en => {
+            if (en.h <= 0) return;
+            const dp = en.m.position.distanceTo(this.ps.position);
+            en.sc2--;
+            if (dp < en.ar && !en.at && !en.re) {
+              en.at = !0;
+              en.re = !1
+            }
+            if (en.at) {
+              const di = new THREE.Vector3().subVectors(this.ps.position, en.m.position).normalize().multiplyScalar(en.cs);
+              const np = en.m.position.clone().add(di);
+              if (!this.cpc(np)) {
+                en.m.position.copy(np)
+              } else {
+                const bd = new THREE.Vector3().subVectors(np, en.pl.ce).normalize();
+                en.m.position.add(bd.multiplyScalar(2))
+              }
+              en.m.lookAt(this.ps.position);
+              if (en.sc2 <= 0 && dp < 30) {
+                this.esh(en);
+                en.sc2 = this.gsc(en.wt)
+              }
+              if (dp > en.ar * 2.5) {
+                en.at = !1;
+                en.re = !0
+              }
+            } else if (en.re) {
+              const tp = new THREE.Vector3(en.pl.ce.x + Math.cos(en.oa) * en.pl.r, 2, en.pl.ce.z + Math.sin(en.oa) * en.pl.r);
+              const dt = en.m.position.distanceTo(tp);
+              if (dt > 2) {
+                const di = new THREE.Vector3().subVectors(tp, en.m.position).normalize().multiplyScalar(C.e.rs);
+                en.m.position.add(di);
+                const lat = en.m.position.clone().add(di);
+                en.m.lookAt(lat)
+              } else {
+                en.re = !1;
+                en.an = en.oa
+              }
+            } else {
+              en.an += en.sp;
+              this.uep(en);
+              const na = en.an + en.sp;
+              const nx = en.pl.ce.x + Math.cos(na) * en.pl.r;
+              const nz = en.pl.ce.z + Math.sin(na) * en.pl.r;
+              const np = new THREE.Vector3(nx, 2, nz);
+              en.m.lookAt(np)
+            }
+          })
+        }
+        esh(en) {
+          switch (en.wt) {
+            case 'rapid':
+              this.ceb(en);
+              this.am.pes();
+              break;
+            case 'burst':
+              for (let i = 0; i < 3; i++) {
+                setTimeout(() => {
+                  if (en.h > 0) {
+                    this.ceb(en);
+                    this.am.pes()
+                  }
+                }, i * 100)
+              }
+              break;
+            case 'heavy':
+              this.ceb(en);
+              this.am.pes();
+              break
+          }
+        }
+        gsc(wt) {
+          switch (wt) {
+            case 'rapid':
+              return 60;
+            case 'burst':
+              return 180;
+            case 'heavy':
+              return 150;
+            default:
+              return 120
+          }
+        }
+        ub() {
+          this.bu = this.bu.filter(bu => {
+            bu.m.position.add(bu.v);
+            bu.lf--;
+            const da = this.pl.ef.da.ac ? C.b.d * C.a.da.m : C.b.d;
+            for (let en of this.en) {
+              if (en.h > 0 && bu.m.position.distanceTo(en.m.position) < 2) {
+                en.h -= da;
+                this.am.peh();
+                if (en.h <= 0) {
+                  this.ce2(en.m.position);
+                  this.am.pe();
+                  en.m.visible = !1;
+                  this.pl.sc += (ENEMY_TYPES[en.ty]?.score || 100);
+                  this.da2(en.m.position);
+                  this.uh()
+                }
+                this.sc.remove(bu.m);
+                return !1
+              }
+            }
+            for (let pn of this.pn) {
+              if (!pn.de && bu.m.position.distanceTo(pn.ce) < pn.cfg.radius) {
+                pn.h -= da;
+                if (pn.h <= 0) {
+                  this.dp(pn)
+                }
+                this.sc.remove(bu.m);
+                return !1
+              }
+            }
+            if (bu.lf <= 0) {
+              this.sc.remove(bu.m);
+              return !1
+            }
+            return !0
+          })
+        }
+        ueb() {
+          this.eb = this.eb.filter(bu => {
+            bu.m.position.add(bu.v);
+            bu.lf--;
+            const di = bu.m.position.distanceTo(this.ps.position);
+            if (di < 3) {
+              this.pl.h -= C.b.ed;
+              this.am.pd();
+              this.cde(this.ps.position);
+              this.uh();
+              if (this.pl.h <= 0) {
+                this.go()
+              }
+              this.sc.remove(bu.m);
+              return !1
+            }
+            if (bu.lf <= 0) {
+              this.sc.remove(bu.m);
+              return !1
+            }
+            return !0
+          })
+        }
+        ua() {
+          this.ar = this.ar.filter(ar => {
+            ar.lf--;
+            ar.m.position.y = 1 + Math.sin(Date.now() * .005 + ar.bo) * .5;
+            ar.m.rotation.y += .08;
+            ar.m.rotation.x += .03;
+            const di = ar.m.position.distanceTo(this.ps.position);
+            if (di < 5) {
+              this.aae(ar.ty);
+              this.sc.remove(ar.m);
+              return !1
+            }
+            if (ar.lf <= 0) {
+              this.sc.remove(ar.m);
+              return !1
+            }
+            return !0
+          })
+        }
+        dp(pn) {
+          pn.de = !0;
+          this.ce2(pn.ce, pn.cfg.radius);
+          this.am.pe(2);
+          this.sc.remove(pn.m);
+          this.pl.sc += 500;
+          this.uh();
+          this.en = this.en.filter(en => {
+            if (en.pl === pn) {
+              this.sc.remove(en.m);
+              return !1
+            }
+            return !0
+          })
+        }
+        um() {
+          this.mi = this.mi.filter(mi => {
+            mi.lf--;
+            if (mi.lf <= 0 && !mi.ex) {
+              this.sc.remove(mi.m);
+              return !1
+            }
+            if (!mi.ex) {
+              this.en.forEach(en => {
+                if (en.h > 0 && mi.m.position.distanceTo(en.m.position) < 8) {
+                  mi.ex = !0;
+                  this.em(mi);
+                  this.sc.remove(mi.m)
+                }
+              })
+            }
+            return !mi.ex
+          })
+        }
+        em(mi) {
+          const eg = new THREE.SphereGeometry(8, 16, 16);
+          const em = new THREE.MeshBasicMaterial({
+            color: 0xff4757,
+            transparent: !0,
+            opacity: .6
+          });
+          const ex = new THREE.Mesh(eg, em);
+          ex.position.copy(mi.m.position);
+          this.sc.add(ex);
+          this.am.pe(1.5);
+          this.en.forEach(en => {
+            if (en.h > 0 && ex.position.distanceTo(en.m.position) < 8) {
+              en.h -= 50;
+              this.am.peh();
+              if (en.h <= 0) {
+                this.ce2(en.m.position);
+                this.am.pe();
+                en.m.visible = !1;
+                this.pl.sc += (ENEMY_TYPES[en.ty]?.score || 100);
+                this.da2(en.m.position);
+                this.uh()
+              }
+            }
+          });
+          setTimeout(() => {
+            this.sc.remove(ex)
+          }, 500)
+        }
+        cc2() {
+          if (this.cc > 0) {
+            this.cc--;
+            return
+          }
+          this.en.forEach(en => {
+            if (en.h > 0 && en.m.position.distanceTo(this.ps.position) < 3) {
+              this.pl.h -= 5;
+              this.cc = 60;
+              this.am.pc();
+              this.uh();
+              if (this.pl.h <= 0) {
+                this.go()
+              }
+            }
+          })
+        }
+        uh() {
+          document.getElementById('health').textContent = this.pl.h;
+          document.getElementById('score').textContent = this.pl.sc
+        }
+        go() {
+          this.gs = !1;
+          this.am.sa();
+          setTimeout(() => {
+            const pa = confirm(`Game Over! Final Score: ${this.pl.sc}\n\nWould you like to play again?`);
+            if (pa) {
+              this.pl.h = C.p.h;
+              this.pl.sc = 0;
+              this.pl.cw = 1;
+              this.pl.ef.sp.ac = !1;
+              this.pl.ef.da.ac = !1;
+              this.sw(1);
+              this.ps.position.set(0, 5, 0);
+              this.pv.set(0, 0, 0);
+              this.cc = 0;
+              this.en.forEach(en => {
+                en.h = C.e.h;
+                en.at = !1;
+                en.re = !1;
+                en.sc2 = 0;
+                en.m.visible = !0;
+                en.an = en.oa;
+                this.uep(en)
+              });
+              this.pn.forEach(pn => {
+                if (pn.de) {
+                  pn.de = !1;
+                  pn.h = pn.mh;
+                  this.sc.add(pn.m)
+                } else {
+                  pn.h = pn.mh
+                }
+              });
+              this.bu.forEach(bu => this.sc.remove(bu.m));
+              this.bu = [];
+              this.eb.forEach(bu => this.sc.remove(bu.m));
+              this.eb = [];
+              this.ar.forEach(ar => this.sc.remove(ar.m));
+              this.ar = [];
+              this.mi.forEach(mi => this.sc.remove(mi.m));
+              this.mi = [];
+              if (this.lb) {
+                this.sc.remove(this.lb);
+                this.lb = null
+              }
+              this.uh();
+              this.am.amb();
+              this.gs = !0
+            } else {
+              location.reload()
+            }
+          }, 100)
+        }
+        an() {
+          requestAnimationFrame(() => this.an());
+          this.st.rotation.y += C.s.rs;
+          if (this.gs) {
+            this.up();
+            this.uen();
+            this.ub();
+            this.ueb();
+            this.ua();
+            this.um();
+            this.cc2()
+          }
+          this.re.render(this.sc, this.ca)
+        }
+      }
+      new SS();
     </script>
-
     <style>
-        body{margin:0;padding:0;background:#000;font-family:'Courier New',monospace;overflow:hidden}
-        #gameContainer{position:relative;width:100vw;height:100vh}
-        canvas{display:block}
-        #intro{position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#0a0a2e,#16213e,#0f3460);display:flex;flex-direction:column;justify-content:center;align-items:center;color:#fff;z-index:1000;transition:opacity 0.5s}
-        #intro h1{font-size:4rem;margin:0;text-shadow:0 0 20px #4facfe;background:linear-gradient(45deg,#4facfe,#00f2fe);-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:glow 2s infinite alternate}
-        #intro p{font-size:1.2rem;margin:20px 0;text-align:center;max-width:600px}
-        #startBtn{padding:15px 30px;font-size:1.5rem;background:linear-gradient(45deg,#667eea,#764ba2);border:none;color:white;cursor:pointer;border-radius:50px;transition:all 0.3s;box-shadow:0 4px 15px rgba(0,0,0,0.3)}
-        #startBtn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.4)}
-        @keyframes glow{0%{text-shadow:0 0 20px #4facfe}100%{text-shadow:0 0 30px #4facfe,0 0 40px #00f2fe}}
-        #hud{position:absolute;top:20px;left:20px;color:#4facfe;font-size:1.2rem;z-index:100;text-shadow:0 0 10px rgba(79,172,254,0.8)}
-        #weaponHud{position:absolute;top:20px;right:20px;color:#4facfe;font-size:1rem;z-index:100;text-shadow:0 0 10px rgba(79,172,254,0.8)}
-        .hidden{opacity:0;pointer-events:none}
-        #controls{position:absolute;bottom:20px;right:20px;color:rgba(255,255,255,0.7);font-size:0.9rem;text-align:right;z-index:100}
-        .weapon-active{color:#00f2fe;font-weight:bold}
-        #coordinates{position:absolute;bottom:20px;left:20px;color:#4facfe;font-size:1rem;z-index:100;text-shadow:0 0 10px rgba(79,172,254,0.8)}
-        #effects{position:absolute;top:120px;left:20px;color:#feca57;font-size:1rem;z-index:100;text-shadow:0 0 10px rgba(254,202,87,0.8)}
-        #mobileControls{position:absolute;bottom:80px;left:20px;right:20px;display:none;z-index:200}
-        #dpad{position:absolute;bottom:80px;left:20px;width:120px;height:120px}
-        #dpadOuter{width:120px;height:120px;border:3px solid rgba(79,172,254,0.6);border-radius:50%;position:absolute;background:rgba(0,0,0,0.3)}
-        #dpadInner{width:40px;height:40px;background:rgba(79,172,254,0.8);border-radius:50%;position:absolute;top:40px;left:40px;transition:all 0.1s ease}
-        #fireBtn{position:absolute;bottom:100px;right:20px;width:80px;height:80px;border:3px solid rgba(255,75,87,0.6);border-radius:50%;background:rgba(255,75,87,0.3);color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;user-select:none}
-        #weaponBtn{position:absolute;bottom:200px;right:20px;width:60px;height:60px;border:3px solid rgba(254,202,87,0.6);border-radius:50%;background:rgba(254,202,87,0.3);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;user-select:none}
-        @media(max-width:768px){#mobileControls{display:block}#controls{display:none}#intro h1{font-size:2.5rem}#intro p{font-size:1rem;padding:0 20px}#coordinates{bottom:60px}}
+      body {
+        margin: 0;
+        padding: 0;
+        background: #000;
+        font-family: 'Courier New', monospace;
+        overflow: hidden
+      }
+
+      #gameContainer {
+        position: relative;
+        width: 100vw;
+        height: 100vh
+      }
+
+      canvas {
+        display: block
+      }
+
+      #intro {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #0a0a2e, #16213e, #0f3460);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        color: #fff;
+        z-index: 1000;
+        transition: opacity 0.5s
+      }
+
+      #intro h1 {
+        font-size: 4rem;
+        margin: 0;
+        text-shadow: 0 0 20px #4facfe;
+        background: linear-gradient(45deg, #4facfe, #00f2fe);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: glow 2s infinite alternate
+      }
+
+      #intro p {
+        font-size: 1.2rem;
+        margin: 20px 0;
+        text-align: center;
+        max-width: 600px
+      }
+
+      #startBtn {
+        padding: 15px 30px;
+        font-size: 1.5rem;
+        background: linear-gradient(45deg, #667eea, #764ba2);
+        border: none;
+        color: white;
+        cursor: pointer;
+        border-radius: 50px;
+        transition: all 0.3s;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3)
+      }
+
+      #startBtn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4)
+      }
+
+      @keyframes glow {
+        0% {
+          text-shadow: 0 0 20px #4facfe
+        }
+
+        100% {
+          text-shadow: 0 0 30px #4facfe, 0 0 40px #00f2fe
+        }
+      }
+
+      #hud {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        color: #4facfe;
+        font-size: 1.2rem;
+        z-index: 100;
+        text-shadow: 0 0 10px rgba(79, 172, 254, 0.8)
+      }
+
+      #weaponHud {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        color: #4facfe;
+        font-size: 1rem;
+        z-index: 100;
+        text-shadow: 0 0 10px rgba(79, 172, 254, 0.8)
+      }
+
+      .hidden {
+        opacity: 0;
+        pointer-events: none
+      }
+
+      #controls {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 0.9rem;
+        text-align: right;
+        z-index: 100
+      }
+
+      .weapon-active {
+        color: #00f2fe;
+        font-weight: bold
+      }
+
+      #coordinates {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        color: #4facfe;
+        font-size: 1rem;
+        z-index: 100;
+        text-shadow: 0 0 10px rgba(79, 172, 254, 0.8)
+      }
+
+      #effects {
+        position: absolute;
+        top: 120px;
+        left: 20px;
+        color: #feca57;
+        font-size: 1rem;
+        z-index: 100;
+        text-shadow: 0 0 10px rgba(254, 202, 87, 0.8)
+      }
+
+      #mobileControls {
+        position: absolute;
+        bottom: 80px;
+        left: 20px;
+        right: 20px;
+        display: none;
+        z-index: 200
+      }
+
+      #dpad {
+        position: absolute;
+        bottom: 80px;
+        left: 20px;
+        width: 120px;
+        height: 120px
+      }
+
+      #dpadOuter {
+        width: 120px;
+        height: 120px;
+        border: 3px solid rgba(79, 172, 254, 0.6);
+        border-radius: 50%;
+        position: absolute;
+        background: rgba(0, 0, 0, 0.3)
+      }
+
+      #dpadInner {
+        width: 40px;
+        height: 40px;
+        background: rgba(79, 172, 254, 0.8);
+        border-radius: 50%;
+        position: absolute;
+        top: 40px;
+        left: 40px;
+        transition: all 0.1s ease
+      }
+
+      #fireBtn {
+        position: absolute;
+        bottom: 100px;
+        right: 20px;
+        width: 80px;
+        height: 80px;
+        border: 3px solid rgba(255, 75, 87, 0.6);
+        border-radius: 50%;
+        background: rgba(255, 75, 87, 0.3);
+        color: #fff;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        user-select: none
+      }
+
+      #weaponBtn {
+        position: absolute;
+        bottom: 200px;
+        right: 20px;
+        width: 60px;
+        height: 60px;
+        border: 3px solid rgba(254, 202, 87, 0.6);
+        border-radius: 50%;
+        background: rgba(254, 202, 87, 0.3);
+        color: #fff;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        user-select: none
+      }
+
+      @media(max-width:768px) {
+        #mobileControls {
+          display: block
+        }
+
+        #controls {
+          display: none
+        }
+
+        #intro h1 {
+          font-size: 2.5rem
+        }
+
+        #intro p {
+          font-size: 1rem;
+          padding: 0 20px
+        }
+
+        #coordinates {
+          bottom: 60px
+        }
+      }
     </style>
-</body>
+  </body>
 </html>

@@ -1225,141 +1225,167 @@ const SC = {
           this.cpl();
           this.ce()
         }
-        csf(){
-    const sg = new THREE.BufferGeometry();
-    const starCount = C.s.c;
-    const po = new Float32Array(starCount * 3);
-    const colors = new Float32Array(starCount * 3);
-    const sizes = new Float32Array(starCount);
-    
-    for(let i = 0; i < starCount; i++){
-        const i3 = i * 3;
-        po[i3] = (Math.random() - 0.5) * C.s.sp;
-        po[i3 + 1] = (Math.random() - 0.5) * C.s.sp;
-        po[i3 + 2] = (Math.random() - 0.5) * C.s.sp;
-        
-        const starType = Math.random();
-        if(starType < 0.7){
-            colors[i3] = 1.0;
-            colors[i3 + 1] = 1.0;
-            colors[i3 + 2] = 1.0;
-        }else if(starType < 0.85){
-            colors[i3] = 0.7;
-            colors[i3 + 1] = 0.8;
-            colors[i3 + 2] = 1.0;
-        }else if(starType < 0.95){
-            colors[i3] = 1.0;
-            colors[i3 + 1] = 1.0;
-            colors[i3 + 2] = 0.7;
-        }else{
-            colors[i3] = 1.0;
-            colors[i3 + 1] = 0.7;
-            colors[i3 + 2] = 0.7;
+        csf() {
+          const sg = new THREE.BufferGeometry();
+          const starCount = C.s.c;
+          const po = new Float32Array(starCount * 3);
+          const colors = new Float32Array(starCount * 3);
+          const sizes = new Float32Array(starCount);
+          for (let i = 0; i < starCount; i++) {
+            const i3 = i * 3;
+            po[i3] = (Math.random() - 0.5) * C.s.sp;
+            po[i3 + 1] = (Math.random() - 0.5) * C.s.sp;
+            po[i3 + 2] = (Math.random() - 0.5) * C.s.sp;
+            const starType = Math.random();
+            if (starType < 0.7) {
+              colors[i3] = 1.0;
+              colors[i3 + 1] = 1.0;
+              colors[i3 + 2] = 1.0
+            } else if (starType < 0.85) {
+              colors[i3] = 0.7;
+              colors[i3 + 1] = 0.8;
+              colors[i3 + 2] = 1.0
+            } else if (starType < 0.95) {
+              colors[i3] = 1.0;
+              colors[i3 + 1] = 1.0;
+              colors[i3 + 2] = 0.7
+            } else {
+              colors[i3] = 1.0;
+              colors[i3 + 1] = 0.7;
+              colors[i3 + 2] = 0.7
+            }
+            sizes[i] = Math.random() * 2 + 0.5
+          }
+          sg.setAttribute('position', new THREE.BufferAttribute(po, 3));
+          sg.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+          sg.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+          const sm = new THREE.PointsMaterial({
+            size: 1.0,
+            vertexColors: !0,
+            transparent: !0,
+            opacity: 0.8,
+            sizeAttenuation: !0
+          });
+          this.st = new THREE.Points(sg, sm);
+          this.sc.add(this.st);
+          this.createNebulaBackground()
         }
-        
-        sizes[i] = Math.random() * 2 + 0.5;
-    }
-    
-    sg.setAttribute('position', new THREE.BufferAttribute(po, 3));
-    sg.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    sg.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-    
-    const sm = new THREE.PointsMaterial({
-        size: 1.0,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.8,
-        sizeAttenuation: true
-    });
-    
-    this.st = new THREE.Points(sg, sm);
-    this.sc.add(this.st);
-    
-    this.createNebulaBackground();
-}
-createNebulaBackground(){
-    this.nebulaLayers = [];
-    
-    // Create multiple parallax layers of nebula clouds
-    for(let layer = 0; layer < 3; layer++){
-        const layerGroup = new THREE.Group();
-        const cloudCount = 12 - layer * 3; // Fewer clouds in distant layers
-        const layerDistance = 200 + layer * 150; // Increasing distance
-        const parallaxSpeed = 1 - layer * 0.3; // Slower for distant layers
-        
-        for(let i = 0; i < cloudCount; i++){
-            // Create organic cloud shape using multiple overlapping planes
-            const cloudGroup = this.createCloudCluster();
-            
-            // Position around in a circle with some randomness
-            const angle = (i / cloudCount) * Math.PI * 2 + (Math.random() - 0.5) * 1;
-            const distance = layerDistance + (Math.random() - 0.5) * 80;
-            
-            cloudGroup.position.x = Math.cos(angle) * distance;
-            cloudGroup.position.z = Math.sin(angle) * distance;
-            cloudGroup.position.y = (Math.random() - 0.5) * 100;
-            
-            // Random rotation for variety
-            cloudGroup.rotation.x = Math.random() * Math.PI * 2;
-            cloudGroup.rotation.y = Math.random() * Math.PI * 2;
-            cloudGroup.rotation.z = Math.random() * Math.PI * 2;
-            
-            layerGroup.add(cloudGroup);
+        createNebulaBackground() {
+          this.nebulaLayers = [];
+          for (let layer = 0; layer < 3; layer++) {
+            const layerGroup = new THREE.Group();
+            const cloudCount = 12 - layer * 3;
+            const layerDistance = 200 + layer * 150;
+            const parallaxSpeed = 1 - layer * 0.3;
+            for (let i = 0; i < cloudCount; i++) {
+              const cloudGroup = this.createCloudCluster();
+              const angle = (i / cloudCount) * Math.PI * 2 + (Math.random() - 0.5) * 1;
+              const distance = layerDistance + (Math.random() - 0.5) * 80;
+              cloudGroup.position.x = Math.cos(angle) * distance;
+              cloudGroup.position.z = Math.sin(angle) * distance;
+              cloudGroup.position.y = (Math.random() - 0.5) * 100;
+              cloudGroup.rotation.x = Math.random() * Math.PI * 2;
+              cloudGroup.rotation.y = Math.random() * Math.PI * 2;
+              cloudGroup.rotation.z = Math.random() * Math.PI * 2;
+              layerGroup.add(cloudGroup)
+            }
+            this.nebulaLayers.push({
+              group: layerGroup,
+              parallaxSpeed: parallaxSpeed,
+              originalPositions: []
+            });
+            layerGroup.children.forEach(cloud => {
+              this.nebulaLayers[layer].originalPositions.push(cloud.position.clone())
+            });
+            this.sc.add(layerGroup)
+          }
+          this.createGalaxyBackdrop()
         }
-        
-        this.nebulaLayers.push({
-            group: layerGroup,
-            parallaxSpeed: parallaxSpeed,
-            originalPositions: []
-        });
-        
-        // Store original positions for parallax calculation
-        layerGroup.children.forEach(cloud => {
-            this.nebulaLayers[layer].originalPositions.push(cloud.position.clone());
-        });
-        
-        this.sc.add(layerGroup);
-    }
-    
-    // Add distant galaxy backdrop
-    this.createGalaxyBackdrop();
-}
-
-createCloudCluster(){const cloudGroup=new THREE.Group();const particleCount=200+Math.floor(Math.random()*300);const geometry=new THREE.BufferGeometry();const positions=new Float32Array(particleCount*3);const colors=new Float32Array(particleCount*3);const sizes=new Float32Array(particleCount);const colorPalettes=[{r:0.4,g:0.1,b:0.6},{r:0.25,g:0.32,b:0.71},{r:0,g:0.74,b:0.83},{r:0.61,g:0.15,b:0.69},{r:1,g:0.34,b:0.13}];const palette=colorPalettes[Math.floor(Math.random()*colorPalettes.length)];const clusterRadius=40+Math.random()*30;for(let i=0;i<particleCount;i++){const i3=i*3;const theta=Math.random()*Math.PI*2;const phi=Math.random()*Math.PI;const r=Math.pow(Math.random(),0.6)*clusterRadius;positions[i3]=r*Math.sin(phi)*Math.cos(theta);positions[i3+1]=r*Math.cos(phi)*0.4;positions[i3+2]=r*Math.sin(phi)*Math.sin(theta);const density=1-Math.pow(r/clusterRadius,2);const alpha=density*(0.3+Math.random()*0.4);colors[i3]=palette.r*alpha;colors[i3+1]=palette.g*alpha;colors[i3+2]=palette.b*alpha;sizes[i]=Math.random()*8+2}
-geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));geometry.setAttribute('size',new THREE.BufferAttribute(sizes,1));const material=new THREE.PointsMaterial({size:4,vertexColors:!0,transparent:!0,opacity:0.8,sizeAttenuation:!0,blending:THREE.AdditiveBlending});const particles=new THREE.Points(geometry,material);cloudGroup.add(particles);return cloudGroup}
-createGalaxyBackdrop(){
-    // Create distant galaxy/nebula backdrop
-    const size = 800;
-    const geometry = new THREE.PlaneGeometry(size, size);
-    
-    // Create galaxy texture
-    const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 256;
-    const ctx = canvas.getContext('2d');
-    
-    // Galaxy spiral gradient
-    const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
-    gradient.addColorStop(0, 'rgba(106, 27, 154, 0.3)');
-    gradient.addColorStop(0.3, 'rgba(63, 81, 181, 0.2)');
-    gradient.addColorStop(0.6, 'rgba(26, 35, 126, 0.1)');
-    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 256, 256);
-    
-    const texture = new THREE.CanvasTexture(canvas);
-    const material = new THREE.MeshBasicMaterial({
-        map: texture,
-        transparent: true,
-        opacity: 0.4,
-        side: THREE.DoubleSide
-    });
-    
-    const backdrop = new THREE.Mesh(geometry, material);
-    backdrop.position.set(0, 0, -500);
-    this.sc.add(backdrop);
-}
+        createCloudCluster() {
+          const cloudGroup = new THREE.Group();
+          const particleCount = 200 + Math.floor(Math.random() * 300);
+          const geometry = new THREE.BufferGeometry();
+          const positions = new Float32Array(particleCount * 3);
+          const colors = new Float32Array(particleCount * 3);
+          const sizes = new Float32Array(particleCount);
+          const colorPalettes = [{
+            r: 0.4,
+            g: 0.1,
+            b: 0.6
+          }, {
+            r: 0.25,
+            g: 0.32,
+            b: 0.71
+          }, {
+            r: 0,
+            g: 0.74,
+            b: 0.83
+          }, {
+            r: 0.61,
+            g: 0.15,
+            b: 0.69
+          }, {
+            r: 1,
+            g: 0.34,
+            b: 0.13
+          }];
+          const palette = colorPalettes[Math.floor(Math.random() * colorPalettes.length)];
+          const clusterRadius = 40 + Math.random() * 30;
+          for (let i = 0; i < particleCount; i++) {
+            const i3 = i * 3;
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.random() * Math.PI;
+            const r = Math.pow(Math.random(), 0.6) * clusterRadius;
+            positions[i3] = r * Math.sin(phi) * Math.cos(theta);
+            positions[i3 + 1] = r * Math.cos(phi) * 0.4;
+            positions[i3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+            const density = 1 - Math.pow(r / clusterRadius, 2);
+            const alpha = density * (0.3 + Math.random() * 0.4);
+            colors[i3] = palette.r * alpha;
+            colors[i3 + 1] = palette.g * alpha;
+            colors[i3 + 2] = palette.b * alpha;
+            sizes[i] = Math.random() * 8 + 2
+          }
+          geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+          geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+          geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+          const material = new THREE.PointsMaterial({
+            size: 4,
+            vertexColors: !0,
+            transparent: !0,
+            opacity: 0.8,
+            sizeAttenuation: !0,
+            blending: THREE.AdditiveBlending
+          });
+          const particles = new THREE.Points(geometry, material);
+          cloudGroup.add(particles);
+          return cloudGroup
+        }
+        createGalaxyBackdrop() {
+          const size = 800;
+          const geometry = new THREE.PlaneGeometry(size, size);
+          const canvas = document.createElement('canvas');
+          canvas.width = 256;
+          canvas.height = 256;
+          const ctx = canvas.getContext('2d');
+          const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+          gradient.addColorStop(0, 'rgba(106, 27, 154, 0.3)');
+          gradient.addColorStop(0.3, 'rgba(63, 81, 181, 0.2)');
+          gradient.addColorStop(0.6, 'rgba(26, 35, 126, 0.1)');
+          gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, 0, 256, 256);
+          const texture = new THREE.CanvasTexture(canvas);
+          const material = new THREE.MeshBasicMaterial({
+            map: texture,
+            transparent: !0,
+            opacity: 0.4,
+            side: THREE.DoubleSide
+          });
+          const backdrop = new THREE.Mesh(geometry, material);
+          backdrop.position.set(0, 0, -500);
+          this.sc.add(backdrop)
+        }
         cp() {
           this.ps = SF.cs(SC.player);
           this.ps.position.y = 5;
@@ -1458,7 +1484,8 @@ createGalaxyBackdrop(){
             document.getElementById(`weapon${wn}`).classList.add('weapon-active');
             document.getElementById('weaponBtn').innerHTML = `W
                               
-                            <br>${wn}`;
+                            
+                                        <br>${wn}`;
             if (this.lb) {
               this.sc.remove(this.lb);
               this.lb = null;
@@ -1670,7 +1697,8 @@ createGalaxyBackdrop(){
               const re = Math.ceil((this.pl.ef.sp.et - ct) / 1000);
               et += `SPEED BOOST: ${re}s
                                     
-                                  <br>`
+                                  
+                                              <br>`
             }
           }
           if (this.pl.ef.da.ac) {
@@ -1680,7 +1708,8 @@ createGalaxyBackdrop(){
               const re = Math.ceil((this.pl.ef.da.et - ct) / 1000);
               et += `DAMAGE BOOST: ${re}s
                                       
-                                    <br>`
+                                    
+                                                <br>`
             }
           }
           document.getElementById('effects').innerHTML = et
@@ -2174,27 +2203,21 @@ createGalaxyBackdrop(){
         an() {
           requestAnimationFrame(() => this.an());
           this.st.rotation.y += C.s.rs;
-
-// Update nebula parallax
-if(this.nebulaLayers && this.ps) {
-    this.nebulaLayers.forEach((layer, layerIndex) => {
-        layer.group.children.forEach((cloud, cloudIndex) => {
-            const originalPos = layer.originalPositions[cloudIndex];
-            if(originalPos) {
-                // Calculate parallax offset based on player position
-                const parallaxX = this.ps.position.x * (1 - layer.parallaxSpeed) * 0.1;
-                const parallaxZ = this.ps.position.z * (1 - layer.parallaxSpeed) * 0.1;
-                
-                cloud.position.x = originalPos.x - parallaxX;
-                cloud.position.z = originalPos.z - parallaxZ;
-                
-                // Subtle rotation for dynamic feel
-                cloud.rotation.y += 0.001 * (layerIndex + 1);
-                cloud.rotation.z += 0.0005 * (layerIndex + 1);
-            }
-        });
-    });
-}
+          if (this.nebulaLayers && this.ps) {
+            this.nebulaLayers.forEach((layer, layerIndex) => {
+              layer.group.children.forEach((cloud, cloudIndex) => {
+                const originalPos = layer.originalPositions[cloudIndex];
+                if (originalPos) {
+                  const parallaxX = this.ps.position.x * (1 - layer.parallaxSpeed) * 0.1;
+                  const parallaxZ = this.ps.position.z * (1 - layer.parallaxSpeed) * 0.1;
+                  cloud.position.x = originalPos.x - parallaxX;
+                  cloud.position.z = originalPos.z - parallaxZ;
+                  cloud.rotation.y += 0.001 * (layerIndex + 1);
+                  cloud.rotation.z += 0.0005 * (layerIndex + 1)
+                }
+              })
+            })
+          }
           if (this.gs) {
             this.up();
             this.uen();

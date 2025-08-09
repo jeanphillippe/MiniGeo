@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quantum Frontier Ship Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #0a0a2e, #16213e, #0f3460);
+            color: #fff;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            height: 100vh;
+        }
+
+        .control-panel {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-right: 2px solid #4facfe;
+            overflow-y: auto;
+            backdrop-filter: blur(10px);
+        }
+
+        .preview-panel {
+            display: flex;
+            flex-direction: column;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .preview-container {
+            flex: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .code-output {
+            height: 200px;
+            background: rgba(0, 0, 0, 0.9);
+            border-top: 2px solid #4facfe;
+            padding: 20px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            background: linear-gradient(45deg, #4facfe, #00f2fe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 1.6rem;
+        }
+
+        .ship-type-selector {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .ship-type-btn {
+            padding: 10px;
+            background: rgba(79, 172, 254, 0.2);
+            border: 2px solid rgba(79, 172, 254, 0.5);
+            color: #fff;
+            cursor: pointer;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .ship-type-btn.active {
+            background: rgba(79, 172, 254, 0.5);
+            border-color: #4facfe;
+            box-shadow: 0 0 15px rgba(79, 172, 254, 0.3);
+        }
+
+        .ship-type-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .section {
+            margin-bottom: 20px;
+            background: rgba(79, 172, 254, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(79, 172, 254, 0.3);
+        }
+
+        .section-title {
+            color: #4facfe;
+            font-size: 1rem;
+            margin-bottom: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .control-group {
+            margin-bottom: 12px;
+        }
+
+        .control-label {
+            display: block;
+            margin-bottom: 6px;
+            color: #00f2fe;
+            font-size: 0.85rem;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .slider {
+            flex: 1;
+            -webkit-appearance: none;
+            height: 5px;
+            border-radius: 3px;
+            background: rgba(79, 172, 254, 0.3);
+            outline: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #4facfe;
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(79, 172, 254, 0.5);
+        }
+
+        .slider::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #4facfe;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 8px rgba(79, 172, 254, 0.5);
+        }
+
+        .value-display {
+            min-width: 35px;
+            text-align: right;
+            color: #feca57;
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
+
+        .select {
+            width: 100%;
+            padding: 6px 10px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid #4facfe;
+            border-radius: 4px;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+
+        .select option {
+            background: #16213e;
+            color: #fff;
+        }
+
+        .color-input {
+            width: 100%;
+            height: 32px;
+            padding: 0;
+            border: 2px solid #4facfe;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .btn {
+            padding: 8px 15px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border: none;
+            color: white;
+            cursor: pointer;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+        }
+
+        .btn-copy {
+            grid-column: 1 / -1;
+            background: linear-gradient(45deg, #00f2fe, #4facfe);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .checkbox {
+            width: 14px;
+            height: 14px;
+            accent-color: #4facfe;
+        }
+
+        #codeOutput {
+            background: #1a1a1a;
+            color: #4facfe;
+            font-size: 11px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 15px;
+        }
+
+        canvas {
+            border: 2px solid #4facfe;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(79, 172, 254, 0.3);
+        }
+
+        .preset-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .btn-preset {
+            padding: 6px 8px;
+            background: linear-gradient(45deg, #ff6b6b, #ff8e53);
+            border: none;
+            color: white;
+            cursor: pointer;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.7rem;
+            transition: all 0.3s;
+        }
+
+        .btn-preset:hover {
+            transform: scale(1.05);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 1fr;
+            }
+            
+            .control-panel {
+                max-height: 40vh;
+                border-right: none;
+                border-bottom: 2px solid #4facfe;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="control-panel">
+            <h1>Ship Generator</h1>
+            
+            <div class="ship-type-selector">
+                <button class="ship-type-btn active" id="btnClassic" onclick="selectShipType('classic')">Classic Ship</button>
+                <button class="ship-type-btn" id="btnTie" onclick="selectShipType('tie')">TIE Style</button>
+            </div>
+            <div class="section">
+    <div class="section-title">Configuration Name</div>
+    <div class="control-group">
+        <input type="text" class="select" id="configName" placeholder="myCustomShip" value="myCustomShip" oninput="generateCode()">
+    </div>
+</div>
+
+            <div class="section">
+                <div class="section-title">Quick Presets</div>
+                <div class="preset-row">
+                    <button class="btn-preset" onclick="loadPreset('fighter')">Fighter</button>
+                    <button class="btn-preset" onclick="loadPreset('interceptor')">Fast</button>
+                    <button class="btn-preset" onclick="loadPreset('heavy')">Heavy</button>
+                </div>
+                <div class="preset-row">
+                    <button class="btn-preset" onclick="loadPreset('scout')">Scout</button>
+                    <button class="btn-preset" onclick="loadPreset('bomber')">Bomber</button>
+                    <button class="btn-preset" onclick="loadPreset('advanced')">Advanced</button>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Ship Scale</div>
+                <div class="control-group">
+                    <label class="control-label">Overall Scale</label>
+                    <div class="slider-container">
+                        <input type="range" class="slider" id="scale" min="0.5" max="3" step="0.1" value="1" oninput="updateShip()">
+                        <span class="value-display" id="scaleValue">1.0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Classic Ship Controls -->
+            <div id="classicControls">
+                <div class="section">
+                    <div class="section-title">Body</div>
+                    <div class="control-group">
+                        <label class="control-label">Body Width</label>
+                        <div class="slider-container">
+                            <input type="range" class="slider" id="bodyWidth" min="0.5" max="4" step="0.1" value="2" oninput="updateShip()">
+                            <span class="value-display" id="bodyWidthValue">2.0</span>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">Body Height</label>
+                        <div class="slider-container">
+                            <input type="range" class="slider" id="bodyHeight" min="0.1" max="2" step="0.1" value="0.3" oninput="updateShip()">
+                            <span class="value-display" id="bodyHeightValue">0.3</span>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">Body Length</label>
+                        <div class="slider-container">
+                            <input type="range" class="slider" id="bodyLength" min="1" max="8" step="0.1" value="4" oninput="updateShip()">
+                            <span class="value-display" id="bodyLengthValue">4.0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">Wings</div>
+                    <div class="control-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" class="checkbox" id="hasWings" checked onchange="updateShip()">
+                            <label class="control-label">Enable Wings</label>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">Wing Span</label>
+                        <div class="slider-container">
+                            <input type="range" class="slider" id="wingSpan" min="2" max="8" step="0.1" value="4" oninput="updateShip()">
+                            <span class="value-display" id="wingSpanValue">4.0</span>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">Wing Thickness</label>
+                        <div class="slider-container">
+                            <input type="range" class="slider" id="wingThickness" min="0.1" max="1" step="0.05" value="0.2" oninput="updateShip()">
+                            <span class="value-display" id="wingThicknessValue">0.2</span>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">Wing Position</label>
+                        <div class="slider-container">
+                            <input type="range" class="slider" id="wingPosition" min="-3" max="3" step="0.1" value="-1" oninput="updateShip()">
+                            <span class="value-display" id="wingPositionValue">-1.0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">Engines</div>
+                    <div class="control-group">
+                        <label class="control-label">Engine Count</label>
+                        <select class="select" id="engineCount" onchange="updateShip()">
+                            <option value="1">1 Engine</option>
+                            <option value="2" selected>2 Engines</option>
+                            <option value="3">3 Engines</option>
+                            <option value="4">4 Engines</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">Engine Size</label>
+                        <div class="slider-container">
+                            <input type="range" class="slider" id="engineSize" min="0.2" max="1.5" step="0.1" value="0.3" oninput="updateShip()">
+                            <span class="value-display" id="engineSizeValue">0.3</span>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">Engine Position</label>
+                        <div class="slider-container">
+                            <input type="range" class="slider" id="enginePosition" min="-4" max="2" step="0.1" value="-2" oninput="updateShip()">
+                            <span class="value-display" id="enginePositionValue">-2.0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">Cockpit</div>
+                    <div class="control-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" class="checkbox" id="hasCockpit" checked onchange="updateShip()">
+                            <label class="control-label">Enable Cockpit</label>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">Cockpit Size</label>
+                        <div class="slider-container">
+                            <input type="range" class="slider" id="cockpitSize" min="0.2" max="1.2" step="0.1" value="0.4" oninput="updateShip()">
+                            <span class="value-display" id="cockpitSizeValue">0.4</span>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">Cockpit Y Position</label>
+                        <div class="slider-container">
+                            <input type="range" class="slider" id="cockpitPosY" min="-0.5" max="1" step="0.1" value="0.3" oninput="updateShip()">
+                            <span class="value-display" id="cockpitPosYValue">0.3</span>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">Cockpit Z Position</label>
+                        <div class="slider-container">
+                            <input type="range" class="slider" id="cockpitPosZ" min="-2" max="3" step="0.1" value="0.5" oninput="updateShip()">
+                            <span class="value-display" id="cockpitPosZValue">0.5</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TIE Fighter Style Controls -->
+            <div id="tieControls" style="display: none;">
+                <div class="section">
+                    <div class="section-title">Cockpit</div>
+                    <div class="control-group">
+                        <label class="control-label">Cockpit Shape</label>
+                        <select class="select" id="tieCockpitShape" onchange="updateShip()">
+                            <option value="sphere" selected>Sphere</option>
+                            <option value="box">Box</option>
+                            <option value="octahedron">Octahedron</option>
+                            <option value="cylinder">Cylinder</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">Cockpit Size</label>
+                        <div class="slider-container">
+                            <input type="range" class="slider" id="tieCockpitSize" min="0.5" max="2.5" step="0.1" value="1.2" oninput="updateShip()">
+                            <span class="value-display" id="tieCockpitSizeValue">1.2</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">Side Panels</div>
+                    <div class="control-group">
+                        <label class="control-label">Panel Count</label>
+                        <select class="select" id="panelCount" onchange="updateShip()">
+                            <option value="2" selected>2 Panels</option>
+                            <option value="3">3 Panels</option>
+                            <option value="4">4 Panels</option>
+                            <option value="6">6 Panels</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">Panel Shape</label>
+                        <select class="select" id="panelShape" onchange="updateShip()">
+                            <option value="hexagon" selected>Hexagon</option>
+                            <option value="square">Square</option>
+                            <option value="diamond">Diamond</option>
+                            <option value="circle">Circle</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">Panel Size</label>
+                        <div class="slider-container">
+                            <input type="range" class="slider" id="panelSize" min="1" max="4" step="0.1" value="2" oninput="updateShip()">
+                            <span class="value-display" id="panelSizeValue">2.0</span>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">Panel Distance</label>
+                        <div class="slider-container">
+                            <input type="range" class="slider" id="panelDistance" min="1.5" max="5" step="0.1" value="2.5" oninput="updateShip()">
+                            <span class="value-display" id="panelDistanceValue">2.5</span>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">Panel Thickness</label>
+                        <div class="slider-container">
+                            <input type="range" class="slider" id="panelThickness" min="0.05" max="0.5" step="0.05" value="0.1" oninput="updateShip()">
+                            <span class="value-display" id="panelThicknessValue">0.1</span>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">Panel Angle</label>
+                        <div class="slider-container">
+                            <input type="range" class="slider" id="panelAngle" min="-45" max="45" step="5" value="0" oninput="updateShip()">
+                            <span class="value-display" id="panelAngleValue">0°</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">Connecting Struts</div>
+                    <div class="control-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" class="checkbox" id="hasStruts" checked onchange="updateShip()">
+                            <label class="control-label">Enable Struts</label>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">Strut Thickness</label>
+                        <div class="slider-container">
+                            <input type="range" class="slider" id="strutThickness" min="0.05" max="0.3" step="0.02" value="0.1" oninput="updateShip()">
+                            <span class="value-display" id="strutThicknessValue">0.1</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Colors</div>
+                <div class="control-group">
+                    <label class="control-label">Primary Color</label>
+                    <input type="color" class="color-input" id="primaryColor" value="#4facfe" onchange="updateShip()">
+                </div>
+                <div class="control-group">
+                    <label class="control-label">Secondary Color</label>
+                    <input type="color" class="color-input" id="secondaryColor" value="#667eea" onchange="updateShip()">
+                </div>
+                <div class="control-group">
+                    <label class="control-label">Accent Color</label>
+                    <input type="color" class="color-input" id="accentColor" value="#00f2fe" onchange="updateShip()">
+                </div>
+                <div class="control-group">
+                    <label class="control-label">Cockpit Color</label>
+                    <input type="color" class="color-input" id="cockpitColor" value="#764ba2" onchange="updateShip()">
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button class="btn" onclick="randomizeShip()">Random</button>
+                <button class="btn" onclick="resetShip()">Reset</button>
+                <button class="btn btn-copy" onclick="copyCode()">Copy Code</button>
+            </div>
+        </div>
+
+        <div class="preview-panel">
+            <div class="preview-container">
+                <canvas id="preview" width="600" height="400"></canvas>
+            </div>
+            <div class="code-output">
+                <div style="margin-bottom: 10px; color: #4facfe; font-weight: bold;">Ship Configuration Code:</div>
+                <pre id="codeOutput"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        let scene, camera, renderer, shipGroup;
+        let animationId;
+        let currentShipType = 'classic';
+
+        // Initialize the 3D preview
+        function initPreview() {
+            const canvas = document.getElementById('preview');
+            
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000011);
+            
+            camera = new THREE.PerspectiveCamera(75, canvas.width / canvas.height, 0.1, 1000);
+            camera.position.set(8, 5, 8);
+            camera.lookAt(0, 0, 0);
+            
+            renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+            renderer.setSize(canvas.width, canvas.height);
+            
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 10, 5);
+            scene.add(directionalLight);
+            
+            const pointLight = new THREE.PointLight(0x4facfe, 0.6, 50);
+            pointLight.position.set(-10, 5, -10);
+            scene.add(pointLight);
+            
+            updateShip();
+            animate();
+        }
+
+        function animate() {
+            animationId = requestAnimationFrame(animate);
+            
+            if (shipGroup) {
+                shipGroup.rotation.y += 0.01;
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        function selectShipType(type) {
+            currentShipType = type;
+            
+            document.getElementById('btnClassic').classList.toggle('active', type === 'classic');
+            document.getElementById('btnTie').classList.toggle('active', type === 'tie');
+            
+            document.getElementById('classicControls').style.display = type === 'classic' ? 'block' : 'none';
+            document.getElementById('tieControls').style.display = type === 'tie' ? 'block' : 'none';
+            
+            updateShip();
+        }
+
+        function hexToNumber(hex) {
+            return parseInt(hex.replace('#', ''), 16);
+        }
+
+        function createHexagonGeometry(size) {
+            const geometry = new THREE.CylinderGeometry(size, size, 0.1, 6);
+            return geometry;
+        }
+
+        function createSquareGeometry(size) {
+            return new THREE.BoxGeometry(size, size, 0.1);
+        }
+
+        function createDiamondGeometry(size) {
+            const geometry = new THREE.OctahedronGeometry(size/1.4);
+            geometry.scale(1, 1, 0.1);
+            return geometry;
+        }
+
+        function createCircleGeometry(size) {
+            return new THREE.CylinderGeometry(size/2, size/2, 0.1, 16);
+        }
+
+        function createClassicShip() {
+            const shipGroup = new THREE.Group();
+            const scale = parseFloat(document.getElementById('scale').value);
+            
+            const bodyWidth = parseFloat(document.getElementById('bodyWidth').value);
+            const bodyHeight = parseFloat(document.getElementById('bodyHeight').value);
+            const bodyLength = parseFloat(document.getElementById('bodyLength').value);
+            const hasWings = document.getElementById('hasWings').checked;
+            const wingSpan = parseFloat(document.getElementById('wingSpan').value);
+            const wingThickness = parseFloat(document.getElementById('wingThickness').value);
+            const wingPosition = parseFloat(document.getElementById('wingPosition').value);
+            const engineCount = parseInt(document.getElementById('engineCount').value);
+            const engineSize = parseFloat(document.getElementById('engineSize').value);
+            const enginePosition = parseFloat(document.getElementById('enginePosition').value);
+            const hasCockpit = document.getElementById('hasCockpit').checked;
+            const cockpitSize = parseFloat(document.getElementById('cockpitSize').value);
+            const cockpitPosY = parseFloat(document.getElementById('cockpitPosY').value);
+            const cockpitPosZ = parseFloat(document.getElementById('cockpitPosZ').value);
+            
+            const primaryColor = hexToNumber(document.getElementById('primaryColor').value);
+            const secondaryColor = hexToNumber(document.getElementById('secondaryColor').value);
+            const accentColor = hexToNumber(document.getElementById('accentColor').value);
+            const cockpitColorHex = hexToNumber(document.getElementById('cockpitColor').value);
+            
+            // Create body
+            const bodyGeometry = new THREE.BoxGeometry(bodyWidth * scale, bodyHeight * scale, bodyLength * scale);
+            const bodyMaterial = new THREE.MeshLambertMaterial({ color: primaryColor });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            shipGroup.add(body);
+            
+            // Create wings
+            if (hasWings) {
+                const wingGeometry = new THREE.BoxGeometry(wingSpan * scale, wingThickness * scale, 1 * scale);
+                const wingMaterial = new THREE.MeshLambertMaterial({ color: secondaryColor });
+                const wings = new THREE.Mesh(wingGeometry, wingMaterial);
+                wings.position.set(0, -0.1 * scale, wingPosition * scale);
+                shipGroup.add(wings);
+            }
+            
+            // Create engines
+            for (let i = 0; i < engineCount; i++) {
+                const engineGeometry = new THREE.SphereGeometry(engineSize * scale, 8, 8);
+                const engineMaterial = new THREE.MeshBasicMaterial({ 
+                    color: accentColor, 
+                    transparent: true, 
+                    opacity: 0.8 
+                });
+                const engine = new THREE.Mesh(engineGeometry, engineMaterial);
+                
+                if (engineCount === 1) {
+                    engine.position.set(0, 0, enginePosition * scale);
+                } else if (engineCount === 2) {
+                    engine.position.set(i === 0 ? -1.5 * scale : 1.5 * scale, 0, enginePosition * scale);
+                } else if (engineCount === 3) {
+                    if (i === 0) engine.position.set(0, 0, enginePosition * scale);
+                    else engine.position.set(i === 1 ? -1.2 * scale : 1.2 * scale, 0, enginePosition * scale);
+                } else if (engineCount === 4) {
+                    const positions = [[-1.5, 0], [1.5, 0], [-1.5, 0.3], [1.5, 0.3]];
+                    engine.position.set(positions[i][0] * scale, positions[i][1] * scale, enginePosition * scale);
+                }
+                
+                shipGroup.add(engine);
+            }
+            
+            // Create cockpit
+            if (hasCockpit) {
+                const cockpitGeometry = new THREE.SphereGeometry(cockpitSize * scale, 8, 8);
+                const cockpitMaterial = new THREE.MeshLambertMaterial({ color: cockpitColorHex });
+                const cockpit = new THREE.Mesh(cockpitGeometry, cockpitMaterial);
+                cockpit.position.set(0, cockpitPosY * scale, cockpitPosZ * scale);
+                shipGroup.add(cockpit);
+            }
+            
+            return shipGroup;
+        }
+
+        function createTIEShip() {
+            const shipGroup = new THREE.Group();
+            const scale = parseFloat(document.getElementById('scale').value);
+            
+            const cockpitShape = document.getElementById('tieCockpitShape').value;
+            const cockpitSize = parseFloat(document.getElementById('tieCockpitSize').value);
+            const panelCount = parseInt(document.getElementById('panelCount').value);
+            const panelShape = document.getElementById('panelShape').value;
+            const panelSize = parseFloat(document.getElementById('panelSize').value);
+            const panelDistance = parseFloat(document.getElementById('panelDistance').value);
+            const panelThickness = parseFloat(document.getElementById('panelThickness').value);
+            const panelAngle = parseFloat(document.getElementById('panelAngle').value);
+            const hasStruts = document.getElementById('hasStruts').checked;
+            const strutThickness = parseFloat(document.getElementById('strutThickness').value);
+            
+            const primaryColor = hexToNumber(document.getElementById('primaryColor').value);
+            const secondaryColor = hexToNumber(document.getElementById('secondaryColor').value);
+            const accentColor = hexToNumber(document.getElementById('accentColor').value);
+            const cockpitColorHex = hexToNumber(document.getElementById('cockpitColor').value);
+            
+            // Create cockpit
+            let cockpitGeometry;
+            switch(cockpitShape) {
+                case 'sphere':
+                    cockpitGeometry = new THREE.SphereGeometry(cockpitSize * scale, 12, 12);
+                    break;
+                case 'box':
+                    cockpitGeometry = new THREE.BoxGeometry(cockpitSize * scale, cockpitSize * scale, cockpitSize * scale);
+                    break;
+                case 'octahedron':
+                    cockpitGeometry = new THREE.OctahedronGeometry(cockpitSize * scale);
+                    break;
+                case 'cylinder':
+                    cockpitGeometry = new THREE.CylinderGeometry(cockpitSize * scale, cockpitSize * scale, cockpitSize * scale, 8);
+                    break;
+            }
+            
+            const cockpitMaterial = new THREE.MeshLambertMaterial({ color: cockpitColorHex });
+            const cockpit = new THREE.Mesh(cockpitGeometry, cockpitMaterial);
+            shipGroup.add(cockpit);
+            
+            // Create panels
+            for (let i = 0; i < panelCount; i++) {
+                let panelGeometry;
+                switch(panelShape) {
+                    case 'hexagon':
+                        panelGeometry = createHexagonGeometry(panelSize * scale);
+                        break;
+                    case 'square':
+                        panelGeometry = createSquareGeometry(panelSize * scale);
+                        break;
+                    case 'diamond':
+                        panelGeometry = createDiamondGeometry(panelSize * scale);
+                        break;
+                    case 'circle':
+                        panelGeometry = createCircleGeometry(panelSize * scale);
+                        break;
+                }
+                
+                panelGeometry.scale(1, 1, panelThickness * scale * 10);
+                
+                const panelMaterial = new THREE.MeshLambertMaterial({ color: primaryColor });
+                const panel = new THREE.Mesh(panelGeometry, panelMaterial);
+                
+                const angle = (i * Math.PI * 2) / panelCount;
+                const x = Math.cos(angle) * panelDistance * scale;
+                const z = Math.sin(angle) * panelDistance * scale;
+                
+                panel.position.set(x, 0, z);
+                panel.rotation.y = angle + Math.PI / 2;
+                panel.rotation.z = (panelAngle * Math.PI) / 180;
+                
+                shipGroup.add(panel);
+                
+                // Create struts
+                if (hasStruts) {
+                    const strutLength = panelDistance * scale;
+                    const strutGeometry = new THREE.CylinderGeometry(strutThickness * scale, strutThickness * scale, strutLength, 8);
+                    const strutMaterial = new THREE.MeshLambertMaterial({ color: secondaryColor });
+                    const strut = new THREE.Mesh(strutGeometry, strutMaterial);
+                    
+                    strut.position.set(x/2, 0, z/2);
+                    strut.rotation.z = -angle;
+                    
+                    shipGroup.add(strut);
+                }
+            }
+            
+            return shipGroup;
+        }
+
+        function updateShip() {
+            // Remove existing ship
+            if (shipGroup) {
+                scene.remove(shipGroup);
+            }
+            
+            if (currentShipType === 'classic') {
+                shipGroup = createClassicShip();
+            } else {
+                shipGroup = createTIEShip();
+            }
+            
+            scene.add(shipGroup);
+            
+            // Update value displays
+            updateValueDisplays();
+            generateCode();
+        }
+
+        function updateValueDisplays() {
+            document.getElementById('scaleValue').textContent = document.getElementById('scale').value;
+            
+            if (currentShipType === 'classic') {
+                document.getElementById('bodyWidthValue').textContent = document.getElementById('bodyWidth').value;
+                document.getElementById('bodyHeightValue').textContent = document.getElementById('bodyHeight').value;
+                document.getElementById('bodyLengthValue').textContent = document.getElementById('bodyLength').value;
+                document.getElementById('wingSpanValue').textContent = document.getElementById('wingSpan').value;
+                document.getElementById('wingThicknessValue').textContent = document.getElementById('wingThickness').value;
+                document.getElementById('wingPositionValue').textContent = document.getElementById('wingPosition').value;
+                document.getElementById('engineSizeValue').textContent = document.getElementById('engineSize').value;
+                document.getElementById('enginePositionValue').textContent = document.getElementById('enginePosition').value;
+                document.getElementById('cockpitSizeValue').textContent = document.getElementById('cockpitSize').value;
+                document.getElementById('cockpitPosYValue').textContent = document.getElementById('cockpitPosY').value;
+                document.getElementById('cockpitPosZValue').textContent = document.getElementById('cockpitPosZ').value;
+            } else {
+                document.getElementById('tieCockpitSizeValue').textContent = document.getElementById('tieCockpitSize').value;
+                document.getElementById('panelSizeValue').textContent = document.getElementById('panelSize').value;
+                document.getElementById('panelDistanceValue').textContent = document.getElementById('panelDistance').value;
+                document.getElementById('panelThicknessValue').textContent = document.getElementById('panelThickness').value;
+                document.getElementById('panelAngleValue').textContent = document.getElementById('panelAngle').value + '°';
+                document.getElementById('strutThicknessValue').textContent = document.getElementById('strutThickness').value;
+            }
+        }
+
+        function generateCode() {
+            if (currentShipType === 'classic') {
+                generateClassicShipCode();
+            } else {
+                generateTIEShipCode();
+            }
+        }
+
+        function generateClassicShipCode() {
+    const config = {
+        scale: parseFloat(document.getElementById('scale').value),
+        bodyWidth: parseFloat(document.getElementById('bodyWidth').value),
+        bodyHeight: parseFloat(document.getElementById('bodyHeight').value),
+        bodyLength: parseFloat(document.getElementById('bodyLength').value),
+        hasWings: document.getElementById('hasWings').checked,
+        wingSpan: parseFloat(document.getElementById('wingSpan').value),
+        wingThickness: parseFloat(document.getElementById('wingThickness').value),
+        wingPosition: parseFloat(document.getElementById('wingPosition').value),
+        engineCount: parseInt(document.getElementById('engineCount').value),
+        engineSize: parseFloat(document.getElementById('engineSize').value),
+        enginePosition: parseFloat(document.getElementById('enginePosition').value),
+        hasCockpit: document.getElementById('hasCockpit').checked,
+        cockpitSize: parseFloat(document.getElementById('cockpitSize').value),
+        cockpitPosY: parseFloat(document.getElementById('cockpitPosY').value),
+        cockpitPosZ: parseFloat(document.getElementById('cockpitPosZ').value),
+        primaryColor: hexToNumber(document.getElementById('primaryColor').value),
+        secondaryColor: hexToNumber(document.getElementById('secondaryColor').value),
+        accentColor: hexToNumber(document.getElementById('accentColor').value),
+        cockpitColor: hexToNumber(document.getElementById('cockpitColor').value)
+    };
+
+    const configName = document.getElementById('configName').value || 'myCustomShip';
+    
+    const code = `// Classic Ship Configuration for Quantum Frontier
+// Copy this config object and use it in your game:
+
+const ${configName}Config = {
+    shipType: 'classic',
+    scale: ${config.scale},
+    bodyWidth: ${config.bodyWidth},
+    bodyHeight: ${config.bodyHeight},
+    bodyLength: ${config.bodyLength},
+    hasWings: ${config.hasWings},
+    wingSpan: ${config.wingSpan},
+    wingThickness: ${config.wingThickness},
+    wingPosition: ${config.wingPosition},
+    engineCount: ${config.engineCount},
+    engineSize: ${config.engineSize},
+    enginePosition: ${config.enginePosition},
+    hasCockpit: ${config.hasCockpit},
+    cockpitSize: ${config.cockpitSize},
+    cockpitPosY: ${config.cockpitPosY},
+    cockpitPosZ: ${config.cockpitPosZ},
+    primaryColor: 0x${config.primaryColor.toString(16).padStart(6, '0')},
+    secondaryColor: 0x${config.secondaryColor.toString(16).padStart(6, '0')},
+    accentColor: 0x${config.accentColor.toString(16).padStart(6, '0')},
+    cockpitColor: 0x${config.cockpitColor.toString(16).padStart(6, '0')}
+};
+
+// Usage in Quantum Frontier:
+// this.playerShip = this.createShip(${configName}Config);
+// OR
+// const enemyShip = this.createShip(${configName}Config);`;
+
+    document.getElementById('codeOutput').textContent = code;
+}
+
+        function generateTIEShipCode() {
+    const config = {
+        scale: parseFloat(document.getElementById('scale').value),
+        cockpitShape: document.getElementById('tieCockpitShape').value,
+        cockpitSize: parseFloat(document.getElementById('tieCockpitSize').value),
+        panelCount: parseInt(document.getElementById('panelCount').value),
+        panelShape: document.getElementById('panelShape').value,
+        panelSize: parseFloat(document.getElementById('panelSize').value),
+        panelDistance: parseFloat(document.getElementById('panelDistance').value),
+        panelThickness: parseFloat(document.getElementById('panelThickness').value),
+        panelAngle: parseFloat(document.getElementById('panelAngle').value),
+        hasStruts: document.getElementById('hasStruts').checked,
+        strutThickness: parseFloat(document.getElementById('strutThickness').value),
+        primaryColor: hexToNumber(document.getElementById('primaryColor').value),
+        secondaryColor: hexToNumber(document.getElementById('secondaryColor').value),
+        accentColor: hexToNumber(document.getElementById('accentColor').value),
+        cockpitColor: hexToNumber(document.getElementById('cockpitColor').value)
+    };
+
+    const configName = document.getElementById('configName').value || 'myCustomShip';
+    
+    const code = `// TIE Fighter Style Ship Configuration for Quantum Frontier
+// Copy this config object and use it in your game:
+
+const ${configName}Config = {
+    shipType: 'tie',
+    scale: ${config.scale},
+    cockpitShape: '${config.cockpitShape}',
+    cockpitSize: ${config.cockpitSize},
+    panelCount: ${config.panelCount},
+    panelShape: '${config.panelShape}',
+    panelSize: ${config.panelSize},
+    panelDistance: ${config.panelDistance},
+    panelThickness: ${config.panelThickness},
+    panelAngle: ${config.panelAngle},
+    hasStruts: ${config.hasStruts},
+    strutThickness: ${config.strutThickness},
+    primaryColor: 0x${config.primaryColor.toString(16).padStart(6, '0')},
+    secondaryColor: 0x${config.secondaryColor.toString(16).padStart(6, '0')},
+    accentColor: 0x${config.accentColor.toString(16).padStart(6, '0')},
+    cockpitColor: 0x${config.cockpitColor.toString(16).padStart(6, '0')}
+};
+
+// Usage in Quantum Frontier:
+// this.playerShip = this.createShip(${configName}Config);
+// OR
+// const enemyShip = this.createShip(${configName}Config);`;
+
+    document.getElementById('codeOutput').textContent = code;
+}
+
+        function generateEngineCode(config) {
+            let code = '';
+            for (let i = 0; i < config.engineCount; i++) {
+                code += `    const engine${i} = new THREE.Mesh(
+        new THREE.SphereGeometry(${config.engineSize} * scale, 8, 8),
+        new THREE.MeshBasicMaterial({color: accentColor, transparent: true, opacity: 0.8})
+    );\n`;
+                
+                if (config.engineCount === 1) {
+                    code += `    engine${i}.position.set(0, 0, ${config.enginePosition} * scale);\n`;
+                } else if (config.engineCount === 2) {
+                    code += `    engine${i}.position.set(${i === 0 ? -1.5 : 1.5} * scale, 0, ${config.enginePosition} * scale);\n`;
+                } else if (config.engineCount === 3) {
+                    if (i === 0) {
+                        code += `    engine${i}.position.set(0, 0, ${config.enginePosition} * scale);\n`;
+                    } else {
+                        code += `    engine${i}.position.set(${i === 1 ? -1.2 : 1.2} * scale, 0, ${config.enginePosition} * scale);\n`;
+                    }
+                } else if (config.engineCount === 4) {
+                    const positions = [[-1.5, 0], [1.5, 0], [-1.5, 0.3], [1.5, 0.3]];
+                    code += `    engine${i}.position.set(${positions[i][0]} * scale, ${positions[i][1]} * scale, ${config.enginePosition} * scale);\n`;
+                }
+                
+                code += `    shipGroup.add(engine${i});\n\n`;
+            }
+            return code;
+        }
+
+        function loadPreset(presetName) {
+            const classicPresets = {
+                fighter: {
+                    scale: 1.0, bodyWidth: 2, bodyHeight: 0.3, bodyLength: 4,
+                    hasWings: true, wingSpan: 4, wingThickness: 0.2, wingPosition: -1,
+                    engineCount: 2, engineSize: 0.3, enginePosition: -2,
+                    hasCockpit: true, cockpitSize: 0.4, cockpitPosY: 0.3, cockpitPosZ: 0.5,
+                    primaryColor: '#4facfe', secondaryColor: '#667eea', accentColor: '#00f2fe', cockpitColor: '#764ba2'
+                },
+                interceptor: {
+                    scale: 0.8, bodyWidth: 1.5, bodyHeight: 0.2, bodyLength: 3,
+                    hasWings: true, wingSpan: 3, wingThickness: 0.15, wingPosition: 0,
+                    engineCount: 1, engineSize: 0.4, enginePosition: -1.5,
+                    hasCockpit: true, cockpitSize: 0.3, cockpitPosY: 0.2, cockpitPosZ: 1,
+                    primaryColor: '#3742fa', secondaryColor: '#2f3542', accentColor: '#70a1ff', cockpitColor: '#ff4757'
+                },
+                heavy: {
+                    scale: 1.3, bodyWidth: 3, bodyHeight: 0.5, bodyLength: 5,
+                    hasWings: true, wingSpan: 6, wingThickness: 0.3, wingPosition: -1.5,
+                    engineCount: 4, engineSize: 0.4, enginePosition: -2.5,
+                    hasCockpit: true, cockpitSize: 0.5, cockpitPosY: 0.4, cockpitPosZ: 1,
+                    primaryColor: '#2ed573', secondaryColor: '#1e90ff', accentColor: '#7bed9f', cockpitColor: '#ff5252'
+                },
+                scout: {
+                    scale: 0.7, bodyWidth: 1.2, bodyHeight: 0.2, bodyLength: 2.5,
+                    hasWings: true, wingSpan: 2.5, wingThickness: 0.1, wingPosition: 0,
+                    engineCount: 1, engineSize: 0.2, enginePosition: -1.2,
+                    hasCockpit: false, cockpitSize: 0.3, cockpitPosY: 0.2, cockpitPosZ: 0.8,
+                    primaryColor: '#ff6b6b', secondaryColor: '#ff8e53', accentColor: '#ff4757', cockpitColor: '#2f3542'
+                },
+                bomber: {
+                    scale: 1.5, bodyWidth: 2.5, bodyHeight: 0.6, bodyLength: 6,
+                    hasWings: true, wingSpan: 5, wingThickness: 0.3, wingPosition: -2,
+                    engineCount: 3, engineSize: 0.5, enginePosition: -3,
+                    hasCockpit: true, cockpitSize: 0.5, cockpitPosY: 0.5, cockpitPosZ: 2,
+                    primaryColor: '#5f27cd', secondaryColor: '#341f97', accentColor: '#8c7ae6', cockpitColor: '#ff9ff3'
+                },
+                advanced: {
+                    scale: 1.1, bodyWidth: 2.2, bodyHeight: 0.4, bodyLength: 4.5,
+                    hasWings: true, wingSpan: 4.5, wingThickness: 0.25, wingPosition: -0.5,
+                    engineCount: 3, engineSize: 0.35, enginePosition: -2.2,
+                    hasCockpit: true, cockpitSize: 0.45, cockpitPosY: 0.35, cockpitPosZ: 1.2,
+                    primaryColor: '#ff9ff3', secondaryColor: '#54a0ff', accentColor: '#5f27cd', cockpitColor: '#00d2d3'
+                }
+            };
+
+            const tiePresets = {
+                fighter: {
+                    scale: 1.0, tieCockpitShape: 'sphere', tieCockpitSize: 1.2,
+                    panelCount: 2, panelShape: 'hexagon', panelSize: 2, panelDistance: 2.5, panelThickness: 0.1, panelAngle: 0,
+                    hasStruts: true, strutThickness: 0.1,
+                    primaryColor: '#2c2c54', secondaryColor: '#40407a', accentColor: '#706fd3', cockpitColor: '#f8b500'
+                },
+                interceptor: {
+                    scale: 0.9, tieCockpitShape: 'octahedron', tieCockpitSize: 1,
+                    panelCount: 2, panelShape: 'diamond', panelSize: 1.8, panelDistance: 2.2, panelThickness: 0.08, panelAngle: 15,
+                    hasStruts: true, strutThickness: 0.08,
+                    primaryColor: '#3742fa', secondaryColor: '#2f3542', accentColor: '#70a1ff', cockpitColor: '#ff4757'
+                },
+                heavy: {
+                    scale: 1.4, tieCockpitShape: 'cylinder', tieCockpitSize: 1.5,
+                    panelCount: 4, panelShape: 'square', panelSize: 2.5, panelDistance: 3, panelThickness: 0.15, panelAngle: 0,
+                    hasStruts: true, strutThickness: 0.15,
+                    primaryColor: '#2ed573', secondaryColor: '#1e90ff', accentColor: '#7bed9f', cockpitColor: '#ff5252'
+                },
+                scout: {
+                    scale: 0.8, tieCockpitShape: 'sphere', tieCockpitSize: 0.8,
+                    panelCount: 3, panelShape: 'circle', panelSize: 1.5, panelDistance: 2, panelThickness: 0.06, panelAngle: -10,
+                    hasStruts: false, strutThickness: 0.05,
+                    primaryColor: '#ff6b6b', secondaryColor: '#ff8e53', accentColor: '#ff4757', cockpitColor: '#2f3542'
+                },
+                bomber: {
+                    scale: 1.6, tieCockpitShape: 'box', tieCockpitSize: 1.8,
+                    panelCount: 6, panelShape: 'hexagon', panelSize: 2.2, panelDistance: 3.5, panelThickness: 0.2, panelAngle: 0,
+                    hasStruts: true, strutThickness: 0.2,
+                    primaryColor: '#5f27cd', secondaryColor: '#341f97', accentColor: '#8c7ae6', cockpitColor: '#ff9ff3'
+                },
+                advanced: {
+                    scale: 1.2, tieCockpitShape: 'octahedron', tieCockpitSize: 1.3,
+                    panelCount: 4, panelShape: 'diamond', panelSize: 2.3, panelDistance: 2.8, panelThickness: 0.12, panelAngle: 25,
+                    hasStruts: true, strutThickness: 0.12,
+                    primaryColor: '#ff9ff3', secondaryColor: '#54a0ff', accentColor: '#5f27cd', cockpitColor: '#00d2d3'
+                }
+            };
+
+            const presets = currentShipType === 'classic' ? classicPresets : tiePresets;
+            const preset = presets[presetName];
+            if (!preset) return;
+
+            // Apply preset values
+            Object.keys(preset).forEach(key => {
+                const element = document.getElementById(key);
+                if (element) {
+                    if (element.type === 'checkbox') {
+                        element.checked = preset[key];
+                    } else {
+                        element.value = preset[key];
+                    }
+                }
+            });
+
+            updateShip();
+        }
+
+        function randomizeShip() {
+            if (currentShipType === 'classic') {
+                randomizeClassicShip();
+            } else {
+                randomizeTIEShip();
+            }
+        }
+
+        function randomizeClassicShip() {
+            const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff', '#5f27cd', '#00d2d3', '#ff9f43'];
+            
+            document.getElementById('scale').value = (0.6 + Math.random() * 1.8).toFixed(1);
+            document.getElementById('bodyWidth').value = (1 + Math.random() * 2.5).toFixed(1);
+            document.getElementById('bodyHeight').value = (0.2 + Math.random() * 1).toFixed(1);
+            document.getElementById('bodyLength').value = (2 + Math.random() * 4).toFixed(1);
+            
+            document.getElementById('hasWings').checked = Math.random() > 0.2;
+            document.getElementById('wingSpan').value = (2.5 + Math.random() * 4).toFixed(1);
+            document.getElementById('wingThickness').value = (0.1 + Math.random() * 0.4).toFixed(2);
+            document.getElementById('wingPosition').value = (-2 + Math.random() * 3).toFixed(1);
+            
+            document.getElementById('engineCount').value = Math.floor(1 + Math.random() * 4);
+            document.getElementById('engineSize').value = (0.2 + Math.random() * 0.8).toFixed(1);
+            document.getElementById('enginePosition').value = (-3 + Math.random() * 2).toFixed(1);
+            
+            document.getElementById('hasCockpit').checked = Math.random() > 0.3;
+            document.getElementById('cockpitSize').value = (0.2 + Math.random() * 0.6).toFixed(1);
+            document.getElementById('cockpitPosY').value = (-0.2 + Math.random() * 0.8).toFixed(1);
+            document.getElementById('cockpitPosZ').value = (-1 + Math.random() * 3).toFixed(1);
+            
+            document.getElementById('primaryColor').value = colors[Math.floor(Math.random() * colors.length)];
+            document.getElementById('secondaryColor').value = colors[Math.floor(Math.random() * colors.length)];
+            document.getElementById('accentColor').value = colors[Math.floor(Math.random() * colors.length)];
+            document.getElementById('cockpitColor').value = colors[Math.floor(Math.random() * colors.length)];
+            
+            updateShip();
+        }
+
+        function randomizeTIEShip() {
+            const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff', '#5f27cd', '#00d2d3', '#ff9f43'];
+            const shapes = ['sphere', 'box', 'octahedron', 'cylinder'];
+            const panelShapes = ['hexagon', 'square', 'diamond', 'circle'];
+            const panelCounts = [2, 3, 4, 6];
+            
+            document.getElementById('scale').value = (0.6 + Math.random() * 1.8).toFixed(1);
+            document.getElementById('tieCockpitShape').value = shapes[Math.floor(Math.random() * shapes.length)];
+            document.getElementById('tieCockpitSize').value = (0.8 + Math.random() * 1.5).toFixed(1);
+            
+            document.getElementById('panelCount').value = panelCounts[Math.floor(Math.random() * panelCounts.length)];
+            document.getElementById('panelShape').value = panelShapes[Math.floor(Math.random() * panelShapes.length)];
+            document.getElementById('panelSize').value = (1.2 + Math.random() * 2).toFixed(1);
+            document.getElementById('panelDistance').value = (2 + Math.random() * 2.5).toFixed(1);
+            document.getElementById('panelThickness').value = (0.05 + Math.random() * 0.3).toFixed(2);
+            document.getElementById('panelAngle').value = Math.floor(-30 + Math.random() * 60);
+            
+            document.getElementById('hasStruts').checked = Math.random() > 0.3;
+            document.getElementById('strutThickness').value = (0.05 + Math.random() * 0.2).toFixed(2);
+            
+            document.getElementById('primaryColor').value = colors[Math.floor(Math.random() * colors.length)];
+            document.getElementById('secondaryColor').value = colors[Math.floor(Math.random() * colors.length)];
+            document.getElementById('accentColor').value = colors[Math.floor(Math.random() * colors.length)];
+            document.getElementById('cockpitColor').value = colors[Math.floor(Math.random() * colors.length)];
+            
+            updateShip();
+        }
+
+        function resetShip() {
+            if (currentShipType === 'classic') {
+                loadPreset('fighter');
+            } else {
+                loadPreset('fighter');
+            }
+        }
+
+        function copyCode() {
+            const codeOutput = document.getElementById('codeOutput');
+            
+            // Create a temporary textarea to copy the text
+            const textarea = document.createElement('textarea');
+            textarea.value = codeOutput.textContent;
+            document.body.appendChild(textarea);
+            textarea.select();
+            
+            try {
+                document.execCommand('copy');
+                
+                // Show feedback
+                const originalText = 'Copy Code';
+                const button = event.target;
+                button.textContent = 'Copied!';
+                button.style.background = 'linear-gradient(45deg, #2ed573, #7bed9f)';
+                
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.style.background = 'linear-gradient(45deg, #00f2fe, #4facfe)';
+                }, 2000);
+                
+            } catch (err) {
+                console.error('Failed to copy: ', err);
+                alert('Failed to copy code. Please manually select and copy the code below.');
+            }
+            
+            document.body.removeChild(textarea);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            const canvas = document.getElementById('preview');
+            camera.aspect = canvas.width / canvas.height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(canvas.width, canvas.height);
+        });
+
+        // Initialize when page loads
+        window.addEventListener('load', () => {
+            initPreview();
+        });
+    </script>
+</body>
+</html>

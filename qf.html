@@ -361,11 +361,14 @@
         // ===== SCALABLE PLANET SYSTEM =====
         class PlanetFactory {
             static configs = [
-                { radius: 18, color: 0xff6b6b, distance: 60, enemyCount: 9, enemyType: 'f', health: 200 },
-                { radius: 25, color: 0x00ff88, distance: 120, enemyCount: 6, enemyType: 'd', health: 300 },
-                { radius: 25, color: 0x00ff88, distance: 120, enemyCount: 6, enemyType: 'p', health: 300 },
-                { radius: 3, color: 0x4ecdc4, distance: 80, enemyCount: 3, enemyType: 'i', health: 50 },
-                { radius: 50, color: 0xfeca57, distance: 100, enemyCount: 4, enemyType: 's', health: 500 }
+                { radius: 18, color: 0xff6b6b, distance: 100, enemyCount: 9, enemyType: 'f', health: 200 },
+{ radius: 25, color: 0x00ff88, distance: 160, enemyCount: 6, enemyType: 'd', health: 300 },
+{ radius: 25, color: 0x00ff88, distance: 200, enemyCount: 6, enemyType: 'p', health: 300 },
+{ radius: 3, color: 0x4ecdc4, distance: 120, enemyCount: 3, enemyType: 'i', health: 50 },
+{ radius: 50, color: 0xfeca57, distance: 140, enemyCount: 4, enemyType: 's', health: 500 },
+{ radius: 30, color: 0x8e44ad, distance: 220, enemyCount: 8, enemyType: 'h', health: 400 },
+{ radius: 15, color: 0x74b9ff, distance: 180, enemyCount: 5, enemyType: 'f', health: 250 },
+{ radius: 40, color: 0xe17055, distance: 260, enemyCount: 7, enemyType: 'i', health: 550 }
             ];
 
             static createPlanetTexture(color, radius, type) {

@@ -361,7 +361,7 @@
         // ===== SCALABLE PLANET SYSTEM =====
         class PlanetFactory {
             static configs = [
-                { radius: 18, color: 0xff6b6b, distance: 100, enemyCount: 9, enemyType: 'f', health: 200 },
+{ radius: 18, color: 0xff6b6b, distance: 100, enemyCount: 9, enemyType: 'f', health: 200 },
 { radius: 25, color: 0x00ff88, distance: 160, enemyCount: 6, enemyType: 'd', health: 300 },
 { radius: 25, color: 0x00ff88, distance: 200, enemyCount: 6, enemyType: 'p', health: 300 },
 { radius: 3, color: 0x4ecdc4, distance: 120, enemyCount: 3, enemyType: 'i', health: 50 },
@@ -591,7 +591,7 @@
                 
                 const texture = new THREE.CanvasTexture(canvas);
                 texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-                texture.repeat.set(2, 2);
+                texture.repeat.set(1, 1);
                 texture.needsUpdate = true;
                 
                 const geometry = new THREE.PlaneGeometry(3000, 3000);

@@ -1463,6 +1463,9 @@
           this.playerShip = null;
           this.playerVelocity = new THREE.Vector3();
           this.laserBeam = null;
+        this.landingGlow=null; // Initialize landing glow
+        this.originalPlayerMaterials=null; // Store original materials
+
           this.touchControls = {
             moveX: 0,
             moveY: 0,
@@ -1477,6 +1480,7 @@
     this.landingProgress = 0;
     this.landingDuration = 5000; // 5 seconds in milliseconds
     this.landingStartTime = 0;
+
     this.wasPlayerVisible = true;
         }
         initializeScene() {
@@ -1682,112 +1686,90 @@ startLanding() {
     this.audioManager.playPowerUp();
 }
 
-// 4. REPLACE THE updateLanding() METHOD:
-updateLanding() {
-    if (this.landingState === 'none') return;
+
+updateLanding(){
+    if(this.landingState==='none')return;
+    const currentTime=Date.now();
+    const elapsedTime=currentTime-this.landingStartTime;
+    this.landingProgress=Math.min(elapsedTime/this.landingDuration,1);
     
-    const currentTime = Date.now();
-    const elapsedTime = currentTime - this.landingStartTime;
-    this.landingProgress = Math.min(elapsedTime / this.landingDuration, 1);
-    
-    if (this.landingState === 'landing') {
-        if (this.landingProgress >= 1) {
-            // Landing complete - NOW make ship invisible
-            this.playerShip.visible = false;
-            this.landingState = 'landed';
+    if(this.landingState==='landing'){
+        if(this.landingProgress>=1){
+            this.removeLandingGlow();
+            this.restorePlayerDepth(); // Restore normal rendering
+            this.landingState='landed';
             this.showDialogue();
             return;
         }
         
-        // KEEP PLAYER VISIBLE during landing animation
-        this.playerShip.visible = true;
+        this.playerShip.visible=!0;
+        const planetCenter=this.landingTarget.center.clone();
+        // Land in the center of the planet (can go "inside")
+        const targetPos=planetCenter.clone();
         
-        // Target position - center of planet surface
-        const planetCenter = this.landingTarget.center.clone();
-        const targetPos = planetCenter.clone();
-        targetPos.y = this.landingTarget.config.radius + 2; // On planet surface
-        
-        // Animate ship position from start to planet center
-        const currentPos = this.landingStartPos.clone().lerp(
-            targetPos, 
-            this.easeInOutCubic(this.landingProgress)
-        );
+        const currentPos=this.landingStartPos.clone().lerp(targetPos,this.easeInOutCubic(this.landingProgress));
         this.playerShip.position.copy(currentPos);
         
-        // Scale ship down as it lands (1.0 to 0.1)
-        const scale = 1.0 - (this.landingProgress * 0.9);
-        this.playerShip.scale.setScalar(Math.max(0.1, scale));
+        // Make player always visible (closer layer trick)
+        this.makePlayerAlwaysVisible();
         
-        // Position camera to watch the landing from a cinematic angle
-        const planetRadius = this.landingTarget.config.radius;
-        const cameraDistance = planetRadius * 2.5; // Scale camera distance with planet
-        const cameraHeight = planetRadius * 1.5;
+        // Create glow effect during landing
+        this.createLandingGlow();
         
-        // Camera orbits slightly around the planet for better view
-        const cameraAngle = this.landingProgress * 0.3; // Slight rotation during landing
-        const cameraPos = new THREE.Vector3(
-            planetCenter.x + Math.cos(cameraAngle) * cameraDistance,
-            planetCenter.y + cameraHeight,
-            planetCenter.z + Math.sin(cameraAngle) * cameraDistance
+        const scale=1.0-(this.landingProgress*0.95);
+        this.playerShip.scale.setScalar(Math.max(0.05,scale));
+        
+        const planetRadius=this.landingTarget.config.radius;
+        const cameraDistance=planetRadius*2.2;
+        const cameraHeight=planetRadius*1.2;
+        const cameraAngle=this.landingProgress*0.3;
+        const cameraPos=new THREE.Vector3(
+            planetCenter.x+Math.cos(cameraAngle)*cameraDistance,
+            planetCenter.y+cameraHeight,
+            planetCenter.z+Math.sin(cameraAngle)*cameraDistance
         );
-        
         this.camera.position.copy(cameraPos);
-        this.camera.lookAt(currentPos); // Always look at the ship
+        this.camera.lookAt(currentPos);
         
-        // Disable player velocity
-        this.playerVelocity.set(0, 0, 0);
-        
-    } else if (this.landingState === 'taking_off') {
-        if (this.landingProgress >= 1) {
-            // Takeoff complete - restore normal scale
+        this.playerVelocity.set(0,0,0);
+    }else if(this.landingState==='taking_off'){
+        if(this.landingProgress>=1){
             this.playerShip.scale.setScalar(1.0);
-            this.landingState = 'none';
-            this.landingTarget = null;
-            this.playerShip.visible = this.wasPlayerVisible;
+            this.removeLandingGlow();
+            this.restorePlayerDepth(); // Restore normal rendering
+            this.landingState='none';
+            this.landingTarget=null;
+            this.playerShip.visible=this.wasPlayerVisible;
             return;
         }
         
-        // Takeoff animation - reverse of landing
-        const planetPos = this.landingTarget.center.clone();
-        planetPos.y = this.landingTarget.config.radius + 15;
+        const planetCenter=this.landingTarget.center.clone();
+        const direction=new THREE.Vector3(Math.random()-0.5,0,Math.random()-0.5).normalize().multiplyScalar(40);
+        const endPos=planetCenter.clone().add(direction);
+        endPos.y=5;
         
-        // End position should be away from planet
-        const direction = new THREE.Vector3(
-            Math.random() - 0.5,
-            0,
-            Math.random() - 0.5
-        ).normalize().multiplyScalar(40);
+        // Make player always visible during takeoff too
+        this.makePlayerAlwaysVisible();
         
-        const endPos = planetPos.clone().add(direction);
-        endPos.y = 5;
+        // Create takeoff glow effect
+        this.createLandingGlow();
         
-        // Animate camera from planet to end position
-        const startCameraPos = new THREE.Vector3(
-            planetPos.x,
-            planetPos.y + 20,
-            planetPos.z + 30
-        );
-        const endCameraPos = new THREE.Vector3(
-            endPos.x,
-            60,
-            endPos.z + 60
-        );
+        const startCameraPos=new THREE.Vector3(planetCenter.x,planetCenter.y+20,planetCenter.z+30);
+        const endCameraPos=new THREE.Vector3(endPos.x,60,endPos.z+60);
         
-        const progress = this.easeInOutCubic(this.landingProgress);
-        const currentCameraPos = startCameraPos.clone().lerp(endCameraPos, progress);
-        
+        const progress=this.easeInOutCubic(this.landingProgress);
+        const currentCameraPos=startCameraPos.clone().lerp(endCameraPos,progress);
         this.camera.position.copy(currentCameraPos);
         
-        // Update player position
-        const currentPlayerPos = planetPos.clone().lerp(endPos, progress);
+        const currentPlayerPos=planetCenter.clone().lerp(endPos,progress);
         this.playerShip.position.copy(currentPlayerPos);
         
-        // Make player visible again near the end
-        if (this.landingProgress > 0.8) {
-            this.playerShip.visible = this.wasPlayerVisible;
-        }
+        // Scale up gradually from small
+        const scale=0.05+(this.landingProgress*0.95);
+        this.playerShip.scale.setScalar(scale);
         
-        // Look at player position
+        this.playerShip.visible=this.wasPlayerVisible;
+        
         this.camera.lookAt(this.playerShip.position);
     }
 }
@@ -1982,10 +1964,109 @@ getPlanetName(planet) {
           const projection = lineStart.clone().add(lineDir.multiplyScalar(t));
           return point.distanceTo(projection)
         }
+
+makePlayerAlwaysVisible(){
+    if(!this.originalPlayerMaterials){
+        // Store original materials first time
+        this.originalPlayerMaterials = [];
+        this.playerShip.traverse((child) => {
+            if(child.isMesh){
+                this.originalPlayerMaterials.push({
+                    mesh: child,
+                    material: child.material.clone()
+                });
+            }
+        });
+    }
+    
+    // Make player render on top of everything
+    this.playerShip.traverse((child) => {
+        if(child.isMesh){
+            child.material.depthTest = false; // Ignore depth testing
+            child.material.depthWrite = false; // Don't write to depth buffer
+            child.renderOrder = 999; // High render order = renders last (on top)
+        }
+    });
+    
+    this.playerShip.renderOrder = 999;
+}
+
+restorePlayerDepth(){
+    if(this.originalPlayerMaterials){
+        // Restore original materials and depth settings
+        this.originalPlayerMaterials.forEach(({mesh, material}) => {
+            mesh.material.depthTest = true;
+            mesh.material.depthWrite = true;
+            mesh.renderOrder = 0;
+        });
+        this.playerShip.renderOrder = 0;
+    }
+}
+
+
+createLandingGlow(){
+    // Remove existing glow if any
+    this.removeLandingGlow();
+    
+    // Create a glowing copy of the ship
+    this.landingGlow = this.playerShip.clone();
+    
+    // Make it slightly larger and give it a bright glow material
+    this.landingGlow.scale.multiplyScalar(1.3);
+    
+    // Apply glow material to all meshes in the ship
+    this.landingGlow.traverse((child) => {
+        if(child.isMesh){
+            child.material = new THREE.MeshBasicMaterial({
+                color: 0x00ffff,
+                transparent: true,
+                opacity: 0.4,
+                side: THREE.DoubleSide,
+                depthTest: false, // Glow also always visible
+                depthWrite: false
+            });
+            child.renderOrder = 998; // Just behind player
+        }
+    });
+    
+    this.landingGlow.renderOrder = 998;
+    this.scene.add(this.landingGlow);
+}
+
+removeLandingGlow(){
+    if(this.landingGlow){
+        this.scene.remove(this.landingGlow);
+        this.landingGlow = null;
+    }
+}
+
+updateLandingGlowEffect(){
+    if(this.landingGlow && this.playerShip){
+        // Update position to match ship exactly
+        this.landingGlow.position.copy(this.playerShip.position);
+        this.landingGlow.rotation.copy(this.playerShip.rotation);
+        
+        // Scale to be slightly larger than ship
+        const baseScale = this.playerShip.scale.x * 1.3;
+        this.landingGlow.scale.setScalar(baseScale);
+        
+        // Pulsing glow effect
+        const pulseIntensity = 0.2 + 0.8 * Math.sin(Date.now() * 0.008);
+        this.landingGlow.traverse((child) => {
+            if(child.isMesh && child.material){
+                child.material.opacity = 0.2 + pulseIntensity * 0.4;
+                // Color shift for extra effect
+                const hue = (Date.now() * 0.001) % 1;
+                child.material.color.setHSL(0.5 + hue * 0.2, 1, 0.6);
+            }
+        });
+    }
+}
         update() {
           if (!this.gameStarted) return;
            // ADD THESE TWO LINES:
     this.updateLanding();
+    this.updateLandingGlowEffect(); // Add glow effect update
     this.renderLandingPrompts();
       // Only update normal game logic if not in landing sequence
     if (this.landingState === 'none' || this.landingState === 'landed') {

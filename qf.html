@@ -1433,6 +1433,8 @@
         }
         initializeGameState() {
           this.gameStarted = !1;
+          this.trails = [];
+          this.trailStyle = 'nebula'; 
           this.player = {
             health: CONFIG.player.health,
             score: 0,
@@ -1662,6 +1664,7 @@
         update() {
           if (!this.gameStarted) return;
           this.updatePlayer();
+          this.updateTrails();
           this.updatePlanets();
           this.updateEnemies();
           this.updateBullets();
@@ -1674,7 +1677,63 @@
           this.updateMinimap();
           this.updateExplosions()
         }
+createTrail() {
+    if (Math.random() > 0.3) return; // Sparse trail creation
+    
+    const trailCount = 3;
+    const coneAngle = Math.PI / 4; // 45 degree cone
+    const behindDistance = 3;
+    
+    for (let i = 0; i < trailCount; i++) {
+        const spreadAngle = (Math.random() - 0.5) * coneAngle;
+        const playerAngle = this.playerShip.rotation.y + Math.PI; // Behind player
+        const finalAngle = playerAngle + spreadAngle;
         
+        const distance = behindDistance + Math.random() * 2;
+        const x = this.playerShip.position.x + Math.sin(finalAngle) * distance;
+        const z = this.playerShip.position.z + Math.cos(finalAngle) * distance;
+        
+        // Use existing PerlinNoise for pattern
+        const noiseValue = new PerlinNoise().noise(x * 0.1, z * 0.1, Date.now() * 0.001);
+        const intensity = Math.abs(noiseValue);
+        
+        const trailGeom = new THREE.SphereGeometry(0.3 + intensity * 0.5, 6, 6);
+        const hue = (intensity * 360 + 200) % 360; // Color based on noise
+        const trailMat = new THREE.MeshBasicMaterial({
+            color: new THREE.Color().setHSL(hue / 360, 0.8, 0.6),
+            transparent: true,
+            opacity: 0.7
+        });
+        
+        const trail = new THREE.Mesh(trailGeom, trailMat);
+        trail.position.set(x, 4 + Math.random(), z);
+        
+        this.trails.push({
+            mesh: trail,
+            life: 60 + Math.random() * 40,
+            maxLife: 60 + Math.random() * 40
+        });
+        
+        this.scene.add(trail);
+    }
+}
+
+updateTrails() {
+    this.trails = this.trails.filter(trail => {
+        trail.life--;
+        
+        // Fade and shrink
+        const fadeRatio = trail.life / trail.maxLife;
+        trail.mesh.material.opacity = fadeRatio * 0.7;
+        trail.mesh.scale.setScalar(fadeRatio);
+        
+        if (trail.life <= 0) {
+            this.scene.remove(trail.mesh);
+            return false;
+        }
+        return true;
+    });
+}
         updatePlayer() {
           let moveX = 0,
             moveZ = 0;
@@ -1700,6 +1759,10 @@
             this.playerShip.position.copy(newPosition);
             this.playerShip.position.y = 5
           }
+
+          if (this.playerVelocity.length() > 0.1) {
+    this.createTrail();
+}
           if (this.playerVelocity.length() > 0.1) {
             const angle = Math.atan2(this.playerVelocity.x, this.playerVelocity.z);
             this.playerShip.rotation.y = angle
@@ -2261,6 +2324,8 @@
               planet.health = planet.maxHealth
             }
           });
+          this.trails.forEach(trail => this.scene.remove(trail.mesh));
+this.trails = [];
           this.bullets.forEach(bullet => this.scene.remove(bullet.mesh));
           this.bullets = [];
           this.enemyBullets.forEach(bullet => this.scene.remove(bullet.mesh));
@@ -2292,6 +2357,7 @@
           document.getElementById('startBtn').addEventListener('click', () => {
             this.startGame()
           });
+          
           this.setupMobileControls();
           window.addEventListener('resize', () => {
             const aspectRatio = window.innerWidth / window.innerHeight;

@@ -1626,8 +1626,24 @@ renderLandingPrompts() {
                 border: 2px solid rgba(0, 255, 136, 0.6);
                 animation: landingPulse 2s infinite;
                 backdrop-filter: blur(3px);
+                pointer-events: auto;
+                cursor: pointer;
+                user-select: none;
             `;
             prompt.textContent = 'Press [E] to Land';
+            prompt.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    this.startLanding();
+});
+
+// ADD CLICK EVENT for desktop (optional backup)
+prompt.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    this.startLanding();
+});
+
             promptsContainer.appendChild(prompt);
         }
     });

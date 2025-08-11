@@ -666,7 +666,7 @@
         static create(index, config = null) {
   const cfg = config || this.configs[index % this.configs.length];
   
-  const planetTypes = ['rocky', 'gas', 'rocky', 'rocky', 'gas'];
+  const planetTypes = ['rocky', 'ice', 'rocky', 'rocky', 'gas'];
   // Calcular posición inicial usando centro de órbita y ángulo inicial
   const initialAngle = cfg.startAngle || ((Math.PI * 2 / this.configs.length) * index);
   const planetGeom = new THREE.SphereGeometry(cfg.radius, 32, 32);
@@ -1434,6 +1434,7 @@
         initializeGameState() {
           this.gameStarted = !1;
           this.trails = [];
+          this.collisionEnabled = true;
           this.trailStyle = 'nebula'; 
           this.player = {
             health: CONFIG.player.health,
@@ -1496,18 +1497,40 @@
           this.createPlanets();
           this.createEnemies()
         }
-        createPlayer() {
-          this.playerShip = ShipFactory.create('player');
-          this.playerShip.position.y = 5;
-          this.scene.add(this.playerShip)
-        }
-        createPlanets() {
-          for (let i = 0; i < PlanetFactory.configs.length; i++) {
-            const planet = PlanetFactory.create(i);
-            this.planets.push(planet);
-            this.scene.add(planet.mesh)
-          }
-        }
+        // MODIFIED: Player spawn position away from central sun
+createPlayer(){
+    this.playerShip=ShipFactory.create('player');
+    this.playerShip.position.set(50, 5, 50); // Spawn away from sun at 0,0
+    this.scene.add(this.playerShip);
+}
+        // MODIFIED: Enhanced planet creation with central sun
+createPlanets(){
+    // Create central sun at 0,0
+    const sunConfig = {
+        radius: 30,
+        color: 0xffff00, // Bright yellow
+        distance: 0, // At center
+        enemyCount: 0, // No enemies on the sun
+        enemyType: 'f',
+        health: 1000,
+        orbitCenter: {x: 0, z: 0},
+        orbitSpeed: 0, // Sun doesn't move
+        startAngle: 0
+    };
+    
+    const sun = PlanetFactory.create(0, sunConfig);
+    sun.mesh.material.emissive = new THREE.Color(0x444400); // Make it glow
+    sun.mesh.material.emissiveIntensity = 0.3;
+    this.planets.push(sun);
+    this.scene.add(sun.mesh);
+    
+    // Create other planets with original configs
+    for(let i=0;i<PlanetFactory.configs.length;i++){
+        const planet=PlanetFactory.create(i);
+        this.planets.push(planet);
+        this.scene.add(planet.mesh);
+    }
+}
         createEnemies() {
           this.planets.forEach((planet, planetIndex) => {
             const config = planet.config;
@@ -1694,6 +1717,8 @@ updateLanding(){
     this.landingProgress=Math.min(elapsedTime/this.landingDuration,1);
     
     if(this.landingState==='landing'){
+        this.collisionEnabled = false;
+
         if(this.landingProgress>=1){
             this.removeLandingGlow();
             this.restorePlayerDepth(); // Restore normal rendering
@@ -1732,48 +1757,125 @@ updateLanding(){
         this.camera.lookAt(currentPos);
         
         this.playerVelocity.set(0,0,0);
-    }else if(this.landingState==='taking_off'){
-        if(this.landingProgress>=1){
-            this.playerShip.scale.setScalar(1.0);
-            this.removeLandingGlow();
-            this.restorePlayerDepth(); // Restore normal rendering
-            this.landingState='none';
-            this.landingTarget=null;
-            this.playerShip.visible=this.wasPlayerVisible;
+    }else if(this.landingState==='taking_off'){this.collisionEnabled = false;
+    
+    if (this.landingProgress >= 1) {
+        // Smooth transition - don't reset scale and position abruptly
+        this.landingState = 'none';
+        this.removeLandingGlow();
+        this.restorePlayerDepth();
+        this.playerShip.visible = this.wasPlayerVisible;
+        
+        // Keep the final calculated position instead of resetting
+        // The position is already set correctly from the lerp calculation below
+        
+        this.scheduleCollisionReactivation();
+        return;
+    }
+    
+    const planetCenter = this.landingTarget.center.clone();
+    const safeDistance = this.landingTarget.config.radius + 20;
+    
+    // Calculate takeoff direction to avoid other planets
+    let bestDirection = this.findSafeTakeoffDirection(planetCenter);
+    const endPos = planetCenter.clone().add(bestDirection.multiplyScalar(safeDistance));
+    endPos.y = 5;
+    
+    this.makePlayerAlwaysVisible();
+    this.createLandingGlow();
+    
+    const startCameraPos = new THREE.Vector3(planetCenter.x, planetCenter.y + 20, planetCenter.z + 30);
+    const endCameraPos = new THREE.Vector3(endPos.x, 60, endPos.z + 60);
+    const progress = this.easeInOutCubic(this.landingProgress);
+    const currentCameraPos = startCameraPos.clone().lerp(endCameraPos, progress);
+    
+    this.camera.position.copy(currentCameraPos);
+    
+    const currentPlayerPos = planetCenter.clone().lerp(endPos, progress);
+    this.playerShip.position.copy(currentPlayerPos);
+    
+    // Smooth scale transition - ensure it ends at exactly 1.0
+    const scale = 0.05 + (this.landingProgress * 0.95);
+    this.playerShip.scale.setScalar(scale);
+    
+    // Ensure scale is exactly 1.0 when progress approaches 1
+    if (this.landingProgress > 0.98) {
+        this.playerShip.scale.setScalar(1.0);
+    }
+    
+    this.playerShip.visible = this.wasPlayerVisible;
+    this.camera.lookAt(this.playerShip.position);
+}
+}
+findSafeTakeoffDirection(planetCenter) {
+    const testDirections = [
+        new THREE.Vector3(1, 0, 0),
+        new THREE.Vector3(-1, 0, 0),
+        new THREE.Vector3(0, 0, 1),
+        new THREE.Vector3(0, 0, -1),
+        new THREE.Vector3(0.707, 0, 0.707),
+        new THREE.Vector3(-0.707, 0, 0.707),
+        new THREE.Vector3(0.707, 0, -0.707),
+        new THREE.Vector3(-0.707, 0, -0.707)
+    ];
+    
+    let bestDirection = testDirections[0];
+    let maxMinDistance = 0;
+    
+    for (let direction of testDirections) {
+        const testPoint = planetCenter.clone().add(direction.clone().multiplyScalar(this.landingTarget.config.radius + 25));
+        
+        // Find minimum distance to any other planet
+        let minDistance = Infinity;
+        for (let planet of this.planets) {
+            if (planet === this.landingTarget || planet.destroyed) continue;
+            const distance = testPoint.distanceTo(planet.center) - planet.config.radius;
+            minDistance = Math.min(minDistance, distance);
+        }
+        
+        // Choose direction with maximum minimum distance (safest)
+        if (minDistance > maxMinDistance) {
+            maxMinDistance = minDistance;
+            bestDirection = direction;
+        }
+    }
+    
+    return bestDirection.normalize();
+}
+// NEW: Safe collision reactivation system
+scheduleCollisionReactivation() {
+    let consecutiveFramesAtSafeDistance = 0;
+    const requiredFrames = 10; // Require multiple frames at safe distance
+    
+    const checkDistance = () => {
+        if (!this.landingTarget) {
+            this.collisionEnabled = true;
             return;
         }
         
-        const planetCenter=this.landingTarget.center.clone();
-        const direction=new THREE.Vector3(Math.random()-0.5,0,Math.random()-0.5).normalize().multiplyScalar(40);
-        const endPos=planetCenter.clone().add(direction);
-        endPos.y=5;
+        const distanceFromPlanet = this.playerShip.position.distanceTo(this.landingTarget.center);
+        const safeDistance = this.landingTarget.config.radius + 15;
         
-        // Make player always visible during takeoff too
-        this.makePlayerAlwaysVisible();
+        // Check if player is moving away from planet (additional safety)
+        const playerToPlanet = new THREE.Vector3().subVectors(this.landingTarget.center, this.playerShip.position);
+        const isMovingAway = this.playerVelocity.dot(playerToPlanet) < 0;
         
-        // Create takeoff glow effect
-        this.createLandingGlow();
+        if (distanceFromPlanet > safeDistance && (isMovingAway || this.playerVelocity.length() < 0.1)) {
+            consecutiveFramesAtSafeDistance++;
+            if (consecutiveFramesAtSafeDistance >= requiredFrames) {
+                this.collisionEnabled = true;
+                this.landingTarget = null;
+                return;
+            }
+        } else {
+            consecutiveFramesAtSafeDistance = 0;
+        }
         
-        const startCameraPos=new THREE.Vector3(planetCenter.x,planetCenter.y+20,planetCenter.z+30);
-        const endCameraPos=new THREE.Vector3(endPos.x,60,endPos.z+60);
-        
-        const progress=this.easeInOutCubic(this.landingProgress);
-        const currentCameraPos=startCameraPos.clone().lerp(endCameraPos,progress);
-        this.camera.position.copy(currentCameraPos);
-        
-        const currentPlayerPos=planetCenter.clone().lerp(endPos,progress);
-        this.playerShip.position.copy(currentPlayerPos);
-        
-        // Scale up gradually from small
-        const scale=0.05+(this.landingProgress*0.95);
-        this.playerShip.scale.setScalar(scale);
-        
-        this.playerShip.visible=this.wasPlayerVisible;
-        
-        this.camera.lookAt(this.playerShip.position);
-    }
+        requestAnimationFrame(checkDistance);
+    };
+    
+    requestAnimationFrame(checkDistance);
 }
-
 // 5. ADD THIS NEW EASING FUNCTION (smoother than quad):
 easeInOutCubic(t) {
     return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -2529,13 +2631,39 @@ updateTrails() {
             return !0
           })
         }
-        checkPlanetCollision(newPosition, isPlayer = !1) {
-          for (let planet of this.planets) {
-            if (planet.destroyed) continue;
+checkPlanetCollision(newPosition, isPlayer = false) {
+    // During takeoff, only check collisions with planets other than landing target
+    if (isPlayer && this.landingState === 'taking_off' && this.landingTarget) {
+        for (let planet of this.planets) {
+            if (planet.destroyed || planet === this.landingTarget) continue;
+            
             const distance = newPosition.distanceTo(planet.center);
-            const collisionDistance = planet.config.radius + (isPlayer ? 3 : 2);
+            const collisionDistance = planet.config.radius + 3;
+            
             if (distance < collisionDistance) {
-              if (isPlayer) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    // Regular collision checking (existing logic)
+    if (!this.collisionEnabled && isPlayer) {
+        return false;
+    }
+    
+    for (let planet of this.planets) {
+        if (planet.destroyed) continue;
+        
+        if (isPlayer && this.landingTarget && planet === this.landingTarget) {
+            continue;
+        }
+        
+        const distance = newPosition.distanceTo(planet.center);
+        const collisionDistance = planet.config.radius + (isPlayer ? 3 : 2);
+        
+        if (distance < collisionDistance) {
+            if (isPlayer) {
                 const bounceDirection = new THREE.Vector3().subVectors(newPosition, planet.center).normalize();
                 this.playerVelocity.copy(bounceDirection.multiplyScalar(0.5));
                 this.player.health -= 10;
@@ -2543,14 +2671,14 @@ updateTrails() {
                 this.audioManager.playDamage();
                 this.updateHUD();
                 if (this.player.health <= 0) {
-                  this.gameOver()
+                    this.gameOver();
                 }
-              }
-              return !0
             }
-          }
-          return !1
+            return true;
         }
+    }
+    return false;
+}
         checkCameraCollision(cameraPosition) {
           for (let planet of this.planets) {
             if (planet.destroyed) continue;
@@ -2745,6 +2873,9 @@ updateTrails() {
           });
           this.trails.forEach(trail => this.scene.remove(trail.mesh));
 this.trails = [];
+
+this.collisionEnabled = true; // Re-enable collisions on reset
+this.landingTarget = null; // Clear any landing target
           this.bullets.forEach(bullet => this.scene.remove(bullet.mesh));
           this.bullets = [];
           this.enemyBullets.forEach(bullet => this.scene.remove(bullet.mesh));

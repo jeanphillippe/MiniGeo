@@ -1470,7 +1470,14 @@
           };
           this.audioManager = new AudioManager();
           this.minimapManager = new MinimapManager();
-          this.explosions = []
+          this.explosions = [];
+            this.landingState = 'none'; // 'none', 'landing', 'landed', 'taking_off'
+    this.landingTarget = null;
+    this.landingStartPos = null;
+    this.landingProgress = 0;
+    this.landingDuration = 5000; // 5 seconds in milliseconds
+    this.landingStartTime = 0;
+    this.wasPlayerVisible = true;
         }
         initializeScene() {
           this.camera.position.set(0, 60, 60);
@@ -1535,6 +1542,304 @@
           const nextWeapon = this.player.currentWeapon % 5 + 1;
           this.switchWeapon(nextWeapon)
         }
+        isPlanetLandable(planet) {
+    if (planet.destroyed) return false;
+    
+    // Count living enemies for this planet
+    const livingEnemies = this.enemies.filter(enemy => 
+        enemy.planet === planet && enemy.health > 0
+    ).length;
+    
+    return livingEnemies === 0;
+}
+
+// 3. ADD THIS NEW METHOD TO RENDER LANDING PROMPTS
+renderLandingPrompts() {
+    const promptsContainer = document.getElementById('landingPrompts');
+    if (!promptsContainer) {
+        const container = document.createElement('div');
+        container.id = 'landingPrompts';
+        container.style.cssText = `
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            pointer-events: none; 
+            z-index: 150;
+        `;
+        document.getElementById('gameContainer').appendChild(container);
+    }
+    
+    promptsContainer.innerHTML = '';
+    
+    if (this.landingState !== 'none') return;
+    
+    this.planets.forEach(planet => {
+        if (!this.isPlanetLandable(planet)) return;
+        
+        const distanceToPlayer = planet.center.distanceTo(this.playerShip.position);
+        // INCREASED RANGE - show prompt from much further away
+        if (distanceToPlayer > 80) return;
+        
+        // Convert 3D position to screen coordinates
+        const vector = planet.center.clone();
+        vector.project(this.camera);
+        
+        const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+        const y = (vector.y * -0.5 + 0.5) * window.innerHeight;
+        
+        // Check if planet is in view
+        if (x >= -100 && x <= window.innerWidth + 100 && y >= -100 && y <= window.innerHeight + 100) {
+            // Planet name
+            const planetName = document.createElement('div');
+            planetName.style.cssText = `
+                position: absolute;
+                left: ${x}px;
+                top: ${y - 70}px;
+                transform: translateX(-50%);
+                color: #4facfe;
+                font-family: 'Courier New', monospace;
+                font-size: 18px;
+                font-weight: bold;
+                text-shadow: 0 0 15px rgba(79, 172, 254, 0.9);
+                text-align: center;
+            `;
+            planetName.textContent = this.getPlanetName(planet);
+            promptsContainer.appendChild(planetName);
+            
+            // Landing prompt - ALWAYS show "Press [E] to Land" (no "approach" message)
+            const prompt = document.createElement('div');
+            prompt.style.cssText = `
+                position: absolute;
+                left: ${x}px;
+                top: ${y - 45}px;
+                transform: translateX(-50%);
+                color: #00ff88;
+                font-family: 'Courier New', monospace;
+                font-size: 14px;
+                font-weight: bold;
+                text-shadow: 0 0 10px rgba(0, 255, 136, 0.8);
+                background: rgba(0, 0, 0, 0.8);
+                padding: 6px 14px;
+                border-radius: 15px;
+                border: 2px solid rgba(0, 255, 136, 0.6);
+                animation: landingPulse 2s infinite;
+                backdrop-filter: blur(3px);
+            `;
+            prompt.textContent = 'Press [E] to Land';
+            promptsContainer.appendChild(prompt);
+        }
+    });
+}
+startLanding() {
+    if (this.landingState !== 'none') return;
+    
+    // Find the nearest landable planet
+    let nearestPlanet = null;
+    let nearestDistance = Infinity;
+    
+    this.planets.forEach(planet => {
+        if (!this.isPlanetLandable(planet)) return;
+        
+        const distance = planet.center.distanceTo(this.playerShip.position);
+        if (distance < 80 && distance < nearestDistance) { // Increased range
+            nearestDistance = distance;
+            nearestPlanet = planet;
+        }
+    });
+    
+    if (!nearestPlanet) return;
+    
+    // Start landing sequence
+    this.landingState = 'landing';
+    this.landingTarget = nearestPlanet;
+    this.landingStartPos = this.playerShip.position.clone();
+    this.landingStartTime = Date.now();
+    this.landingProgress = 0;
+    
+    // Make player invisible and invulnerable
+    this.wasPlayerVisible = this.playerShip.visible;
+    //this.playerShip.visible = false;
+    
+    // Play landing sound
+    this.audioManager.playPowerUp();
+}
+
+// 4. REPLACE THE updateLanding() METHOD:
+updateLanding() {
+    if (this.landingState === 'none') return;
+    
+    const currentTime = Date.now();
+    const elapsedTime = currentTime - this.landingStartTime;
+    this.landingProgress = Math.min(elapsedTime / this.landingDuration, 1);
+    
+    if (this.landingState === 'landing') {
+        if (this.landingProgress >= 1) {
+            // Landing complete - NOW make ship invisible
+            this.playerShip.visible = false;
+            this.landingState = 'landed';
+            this.showDialogue();
+            return;
+        }
+        
+        // KEEP PLAYER VISIBLE during landing animation
+        this.playerShip.visible = true;
+        
+        // Target position - center of planet surface
+        const planetCenter = this.landingTarget.center.clone();
+        const targetPos = planetCenter.clone();
+        targetPos.y = this.landingTarget.config.radius + 2; // On planet surface
+        
+        // Animate ship position from start to planet center
+        const currentPos = this.landingStartPos.clone().lerp(
+            targetPos, 
+            this.easeInOutCubic(this.landingProgress)
+        );
+        this.playerShip.position.copy(currentPos);
+        
+        // Scale ship down as it lands (1.0 to 0.1)
+        const scale = 1.0 - (this.landingProgress * 0.9);
+        this.playerShip.scale.setScalar(Math.max(0.1, scale));
+        
+        // Position camera to watch the landing from a cinematic angle
+        const planetRadius = this.landingTarget.config.radius;
+        const cameraDistance = planetRadius * 2.5; // Scale camera distance with planet
+        const cameraHeight = planetRadius * 1.5;
+        
+        // Camera orbits slightly around the planet for better view
+        const cameraAngle = this.landingProgress * 0.3; // Slight rotation during landing
+        const cameraPos = new THREE.Vector3(
+            planetCenter.x + Math.cos(cameraAngle) * cameraDistance,
+            planetCenter.y + cameraHeight,
+            planetCenter.z + Math.sin(cameraAngle) * cameraDistance
+        );
+        
+        this.camera.position.copy(cameraPos);
+        this.camera.lookAt(currentPos); // Always look at the ship
+        
+        // Disable player velocity
+        this.playerVelocity.set(0, 0, 0);
+        
+    } else if (this.landingState === 'taking_off') {
+        if (this.landingProgress >= 1) {
+            // Takeoff complete - restore normal scale
+            this.playerShip.scale.setScalar(1.0);
+            this.landingState = 'none';
+            this.landingTarget = null;
+            this.playerShip.visible = this.wasPlayerVisible;
+            return;
+        }
+        
+        // Takeoff animation - reverse of landing
+        const planetPos = this.landingTarget.center.clone();
+        planetPos.y = this.landingTarget.config.radius + 15;
+        
+        // End position should be away from planet
+        const direction = new THREE.Vector3(
+            Math.random() - 0.5,
+            0,
+            Math.random() - 0.5
+        ).normalize().multiplyScalar(40);
+        
+        const endPos = planetPos.clone().add(direction);
+        endPos.y = 5;
+        
+        // Animate camera from planet to end position
+        const startCameraPos = new THREE.Vector3(
+            planetPos.x,
+            planetPos.y + 20,
+            planetPos.z + 30
+        );
+        const endCameraPos = new THREE.Vector3(
+            endPos.x,
+            60,
+            endPos.z + 60
+        );
+        
+        const progress = this.easeInOutCubic(this.landingProgress);
+        const currentCameraPos = startCameraPos.clone().lerp(endCameraPos, progress);
+        
+        this.camera.position.copy(currentCameraPos);
+        
+        // Update player position
+        const currentPlayerPos = planetPos.clone().lerp(endPos, progress);
+        this.playerShip.position.copy(currentPlayerPos);
+        
+        // Make player visible again near the end
+        if (this.landingProgress > 0.8) {
+            this.playerShip.visible = this.wasPlayerVisible;
+        }
+        
+        // Look at player position
+        this.camera.lookAt(this.playerShip.position);
+    }
+}
+
+// 5. ADD THIS NEW EASING FUNCTION (smoother than quad):
+easeInOutCubic(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+// 6. ADD THIS EASING FUNCTION
+easeInOutQuad(t) {
+    return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+}
+
+// 7. ADD THIS NEW METHOD TO SHOW DIALOGUE
+showDialogue() {
+    const dialogueSystem = document.getElementById('dialogueSystem');
+    if (!dialogueSystem) {
+        // Create dialogue system if it doesn't exist
+        const dialogue = document.createElement('div');
+        dialogue.id = 'dialogueSystem';
+        dialogue.className = 'hidden';
+        dialogue.innerHTML = `
+            <div id="dialogueBox">
+                <div id="dialogueContent">
+                    <h3 id="dialogueTitle">Planet Surface</h3>
+                    <p id="dialogueText">You have successfully landed on the planet surface.</p>
+                    <div id="dialogueOptions">
+                        <button class="dialogue-btn" onclick="game.closeDialogue()">Take Off</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.getElementById('gameContainer').appendChild(dialogue);
+    }
+    
+    // Show dialogue
+    document.getElementById('dialogueSystem').classList.remove('hidden');
+    
+    // Update dialogue content based on planet
+    const planetName = this.getPlanetName(this.landingTarget);
+    document.getElementById('dialogueTitle').textContent = `${planetName} Surface`;
+    document.getElementById('dialogueText').textContent = 
+        `You have successfully landed on ${planetName}. The planet appears to be secure.`;
+}
+
+// 6. REPLACE THE closeDialogue() METHOD:
+closeDialogue() {
+    document.getElementById('dialogueSystem').classList.add('hidden');
+    
+    // Start takeoff sequence instead of immediately returning to normal
+    this.landingState = 'taking_off';
+    this.landingStartTime = Date.now();
+    this.landingProgress = 0;
+    
+    // Make sure player is still invisible during takeoff
+    this.playerShip.visible = false;
+    
+    // Play takeoff sound
+    this.audioManager.playPowerUp();
+}
+
+
+// 9. ADD THIS HELPER METHOD
+getPlanetName(planet) {
+    const planetIndex = this.planets.indexOf(planet);
+    const names = ['Kepler-442b', 'Proxima Centauri b', 'TRAPPIST-1e', 'Wolf 1061c', 'Gliese 667Cc'];
+    return names[planetIndex] || `Planet ${planetIndex + 1}`;
+}
         fireWeapon() {
           switch (this.player.currentWeapon) {
             case 1:
@@ -1663,19 +1968,27 @@
         }
         update() {
           if (!this.gameStarted) return;
-          this.updatePlayer();
-          this.updateTrails();
-          this.updatePlanets();
-          this.updateEnemies();
-          this.updateBullets();
-          this.updateEnemyBullets();
-          this.updateArtifacts();
-          this.updateMines();
-          this.updateCollisions();
-          this.updateBackground();
-          this.updateEffects();
-          this.updateMinimap();
-          this.updateExplosions()
+           // ADD THESE TWO LINES:
+    this.updateLanding();
+    this.renderLandingPrompts();
+      // Only update normal game logic if not in landing sequence
+    if (this.landingState === 'none' || this.landingState === 'landed') {
+        this.updatePlayer();
+        this.updateTrails();
+    }
+    
+    // Always update these systems
+    this.updatePlanets();
+    this.updateEnemies();
+    this.updateBullets();
+    this.updateEnemyBullets();
+    this.updateArtifacts();
+    this.updateMines();
+    this.updateCollisions();
+    this.updateBackground();
+    this.updateEffects();
+    this.updateMinimap();
+    this.updateExplosions();
         }
 createTrail() {
     if (Math.random() > 0.3) return; // Sparse trail creation
@@ -1979,29 +2292,34 @@ updateTrails() {
             return !0
           })
         }
-        updateEnemyBullets() {
-          this.enemyBullets = this.enemyBullets.filter(bullet => {
-            bullet.mesh.position.add(bullet.velocity);
-            bullet.life--;
+        updateEnemyBullets(){
+    this.enemyBullets = this.enemyBullets.filter(bullet => {
+        bullet.mesh.position.add(bullet.velocity);
+        bullet.life--;
+        
+        // ADD THIS CHECK - no damage during landing/takeoff
+        if (this.landingState === 'none') {
             const distance = bullet.mesh.position.distanceTo(this.playerShip.position);
             if (distance < 3) {
-              this.player.health -= CONFIG.bullet.enemyDamage;
-              this.audioManager.playDamage();
-              this.createDamageEffect(this.playerShip.position);
-              this.updateHUD();
-              if (this.player.health <= 0) {
-                this.gameOver()
-              }
-              this.scene.remove(bullet.mesh);
-              return !1
+                this.player.health -= CONFIG.bullet.enemyDamage;
+                this.audioManager.playDamage();
+                this.createDamageEffect(this.playerShip.position);
+                this.updateHUD();
+                if (this.player.health <= 0) {
+                    this.gameOver();
+                }
+                this.scene.remove(bullet.mesh);
+                return false;
             }
-            if (bullet.life <= 0) {
-              this.scene.remove(bullet.mesh);
-              return !1
-            }
-            return !0
-          })
         }
+        
+        if (bullet.life <= 0) {
+            this.scene.remove(bullet.mesh);
+            return false;
+        }
+        return true;
+    });
+}
         updateArtifacts() {
           this.artifacts = this.artifacts.filter(artifact => {
             artifact.life--;
@@ -2042,23 +2360,27 @@ updateTrails() {
             return !mine.exploded
           })
         }
-        updateCollisions() {
-          if (this.collisionCooldown > 0) {
-            this.collisionCooldown--;
-            return
-          }
-          this.enemies.forEach(enemy => {
-            if (enemy.health > 0 && enemy.mesh.position.distanceTo(this.playerShip.position) < 4) {
-              this.player.health -= 5;
-              this.collisionCooldown = 60;
-              this.audioManager.playCollision();
-              this.updateHUD();
-              if (this.player.health <= 0) {
-                this.gameOver()
-              }
+        updateCollisions(){
+    if (this.collisionCooldown > 0) {
+        this.collisionCooldown--;
+        return;
+    }
+    
+    // ADD THIS CHECK - no collisions during landing/takeoff
+    if (this.landingState !== 'none') return;
+    
+    this.enemies.forEach(enemy => {
+        if (enemy.health > 0 && enemy.mesh.position.distanceTo(this.playerShip.position) < 4) {
+            this.player.health -= 5;
+            this.collisionCooldown = 60;
+            this.audioManager.playCollision();
+            this.updateHUD();
+            if (this.player.health <= 0) {
+                this.gameOver();
             }
-          })
         }
+    });
+}
         updateBackground() {
           if (this.backgroundManager) {
             this.backgroundManager.update(this.playerShip.position.x, this.playerShip.position.z)
@@ -2346,6 +2668,10 @@ this.trails = [];
         setupEventListeners() {
           document.addEventListener('keydown', (e) => {
             this.keys[e.code] = !0;
+              if (e.code === 'KeyE') {
+            this.startLanding();
+        }
+        
             if (e.code.startsWith('Digit')) {
               const weaponNumber = parseInt(e.code.charAt(5));
               this.switchWeapon(weaponNumber)
@@ -2357,7 +2683,7 @@ this.trails = [];
           document.getElementById('startBtn').addEventListener('click', () => {
             this.startGame()
           });
-          
+
           this.setupMobileControls();
           window.addEventListener('resize', () => {
             const aspectRatio = window.innerWidth / window.innerHeight;
@@ -2444,7 +2770,7 @@ this.trails = [];
           this.renderer.render(this.scene, this.camera)
         }
       }
-      new SpaceShooter();
+      const game = new SpaceShooter();
     </script>
     <style>
       body {
@@ -2858,6 +3184,116 @@ this.trails = [];
         image-rendering: -webkit-optimize-contrast;
         image-rendering: optimize-contrast
       }
+#landingPrompts {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 150;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; transform: translateX(-50%) scale(1); }
+    50% { opacity: 0.7; transform: translateX(-50%) scale(1.1); }
+}
+
+#dialogueSystem {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    backdrop-filter: blur(5px);
+}
+
+#dialogueBox {
+    background: linear-gradient(135deg, #0a0a2e, #16213e);
+    border: 2px solid #4facfe;
+    border-radius: 15px;
+    padding: 30px;
+    max-width: 500px;
+    text-align: center;
+    box-shadow: 0 0 30px rgba(79, 172, 254, 0.5);
+}
+
+#dialogueContent h3 {
+    color: #4facfe;
+    margin-top: 0;
+    font-size: 1.5rem;
+    text-shadow: 0 0 10px rgba(79, 172, 254, 0.8);
+}
+
+#dialogueContent p {
+    color: #ffffff;
+    margin: 20px 0;
+    line-height: 1.6;
+}
+
+.dialogue-btn {
+    background: linear-gradient(45deg, #667eea, #764ba2);
+    border: none;
+    color: white;
+    padding: 12px 24px;
+    font-size: 1rem;
+    border-radius: 25px;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin: 10px;
+}
+
+.dialogue-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+#landBtn {
+    position: absolute;
+    bottom: 20px;
+    right: 100px;
+    width: 60px;
+    height: 60px;
+    border: 3px solid rgba(0, 255, 136, 0.6);
+    border-radius: 50%;
+    background: rgba(0, 255, 136, 0.3);
+    color: #fff;
+    font-size: 12px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    backdrop-filter: blur(5px);
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
+    font-weight: bold;
+}
+@keyframes landingPulse {
+    0%, 100% { 
+        opacity: 1; 
+        transform: translateX(-50%) scale(1);
+        box-shadow: 0 0 10px rgba(0, 255, 136, 0.6);
+    }
+    50% { 
+        opacity: 0.8; 
+        transform: translateX(-50%) scale(1.05);
+        box-shadow: 0 0 20px rgba(0, 255, 136, 0.8);
+    }
+}
+
+#landingPrompts div {
+    white-space: nowrap;
+}
+@media(max-width:768px) {
+    #mobileControls #landBtn {
+        display: flex;
+    }
+}
+
     </style>
   </body>
 </html>

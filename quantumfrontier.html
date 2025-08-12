@@ -1165,22 +1165,7 @@
         }
         setup() {
           try {
-            const spriteMap = {
-              blaster: [0, 150],
-              enemyShot: [159, 330],
-              scatter: [336, 550],
-              shotgun: [580, 1237],
-              laser: [1260, 1650],
-              explosion: [1660, 2126],
-              collision: [2131, 2515],
-              damage: [2533, 2899],
-              enemyHit: [2905, 3000],
-              weaponSwitch: [3330, 3427],
-              powerUp: [3430, 3950],
-              mine: [3968, 4170],
-              landing: [4175, 5050],
-              takeoff: [5054, 6270]
-            };
+            const spriteMap={blaster:[0,170],enemyShot:[166,362],scatter:[397,584],shotgun:[594,1274],laser:[1279,1682],explosion:[1687,2125],collision:[2136,2564],damage:[2569,2927],enemyHit:[2932,3345],weaponSwitch:[3995,4186],powerUp:[3365,3455],mine:[2534,2927],landing:[4211,6347],takeoff:[4211,6347]};
             this.sfxSprite = new Howl({
               src: ['sfx-sprite.mp3'],
               sprite: spriteMap,

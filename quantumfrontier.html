@@ -2992,8 +2992,7 @@
         }
       }
       const game = new SpaceShooter();
-    </script>
-    <style>
+    </script> <style>
       body {
         margin: 0;
         padding: 0;
@@ -3468,8 +3467,10 @@
         height: 100%;
         background: rgba(0, 0, 0, 0.8);
         display: flex;
-        justify-content: center;
-        align-items: center;
+    padding-top: 1em;
+    vertical-align: top;
+    justify-content: center;
+    align-items: flex-start;
         z-index: 1000;
         backdrop-filter: blur(5px)
       }
@@ -3527,7 +3528,7 @@
 
       @media(max-width:768px) {
         #dialogueBox {
-          padding: 20px;
+          padding: 0px;
           width: 95vw;
           max-width: none
         }
@@ -3547,7 +3548,7 @@
       }
 
       .dialogue-btn {
-        background: linear-gradient(45deg, #667eea, #764ba2);
+        background: linear-gradient(45deg, #e91e1e, #2196F3);
         border: none;
         color: white;
         padding: 12px 24px;

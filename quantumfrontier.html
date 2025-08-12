@@ -576,7 +576,7 @@
           startAngle: 0,
           dialogue: {
             name: 'Astoria',
-            image: '/quantumfrontier/assets/images/planets.jpeg',
+            image: './quantumfrontier/assets/images/planets.jpeg',
             baseText: '(abandoned mining world) Orbit: Rogue mining drones.Surface: Dust storms sweep through empty, rusted mining towns. Evidence of secret smuggling by miners leads to the next planet.  Hook: Cargo was sent to a remote mercenary camp on Helion IV.',
             flagTexts: {
               visited_proxima: 'Energy readings from Proxima Centauri b indicate this planet was part of an interconnected network.',
@@ -1820,7 +1820,54 @@
           document.getElementById('dialogueSystem').classList.remove('hidden');
           const planetConfig = this.landingTarget.config;
           const dialogue = planetConfig.dialogue;
-          document.getElementById('planetImage').textContent = dialogue.image || '🪐';
+          //document.getElementById('planetImage').textContent = dialogue.image || '🪐';
+          function setPlanetImage(dialogue) {
+  const planetImageElement = document.getElementById('planetImage');
+  
+  if (!planetImageElement) {
+    console.error('Element with id "planetImage" not found');
+    return;
+  }
+  
+  const imageContent = dialogue.image || '🪐';
+  
+  // Limpiar el contenido actual
+  planetImageElement.innerHTML = '';
+  
+  // Verificar si es una ruta de imagen (más flexible)
+  const isImagePath = imageContent.includes('/') || /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(imageContent);
+  
+  if (isImagePath) {
+    // Crear elemento img para rutas de imagen
+    const imgElement = document.createElement('img');
+    imgElement.src = imageContent;
+    imgElement.alt = dialogue.name || 'Planet';
+    imgElement.style.cssText = `
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      display: block;
+    `;
+    
+    // Manejar error de carga - fallback al emoji por defecto
+    imgElement.onerror = () => {
+      console.warn(`Failed to load image: ${imageContent}`);
+      planetImageElement.innerHTML = '';
+      planetImageElement.textContent = '🪐';
+    };
+    
+    // Confirmar que la imagen se está cargando
+    imgElement.onload = () => {
+      console.log(`Image loaded successfully: ${imageContent}`);
+    };
+    
+    planetImageElement.appendChild(imgElement);
+  } else {
+    // Si no es una ruta de imagen, usar como emoji/texto
+    planetImageElement.textContent = imageContent;
+  }
+}
+ setPlanetImage(dialogue);
           document.getElementById('dialogueTitle').textContent = `${dialogue.name} Surface`;
           let dialogueText = dialogue.baseText;
           if (dialogue.flagTexts) {

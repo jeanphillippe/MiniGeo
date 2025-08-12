@@ -1516,7 +1516,7 @@
           this.landingStartTime = 0;
           this.wasPlayerVisible = !0;
           this.visitedPlanets = new Set();
-          this.typewriterSpeed = 50
+          this.typewriterSpeed = 60;
         }
         initializeScene() {
           this.camera.position.set(0, 60, 60);
@@ -1883,13 +1883,18 @@
           this.visitedPlanets.add(planetKey)
         }
         typeWriter(text, elementId, index = 0) {
-          const element = document.getElementById(elementId);
-          if (index === 0) element.textContent = '';
-          if (index < text.length) {
-            element.textContent += text.charAt(index);
-            setTimeout(() => this.typeWriter(text, elementId, index + 1), this.typewriterSpeed)
-          }
-        }
+  const element = document.getElementById(elementId);
+  if (index === 0) element.textContent = '';
+  
+  if (index < text.length) {
+    element.textContent += text.charAt(index);
+    
+    // Auto-scroll to bottom to show newly typed content
+    element.scrollTop = element.scrollHeight;
+    
+    setTimeout(() => this.typeWriter(text, elementId, index + 1), this.typewriterSpeed);
+  }
+}
         closeDialogue() {
           document.getElementById('dialogueSystem').classList.add('hidden');
           this.landingState = 'taking_off';
@@ -3476,7 +3481,7 @@
       }
 
       #dialogueBox {
-        background: linear-gradient(45deg, #245d92, #2196F3);
+        background: linear-gradient(135deg, #0a0a2e, #16213e);
         border: 0px solid #104840;
         border-radius: 15px;
         padding: 0px;
@@ -3552,7 +3557,7 @@
       }
 
       .dialogue-btn {
-        background: linear-gradient(45deg, #e91e1e, #2196F3);
+        background: linear-gradient(45deg, #1e32e9, #2196F3);
         border: none;
         color: white;
         padding: 12px 24px;

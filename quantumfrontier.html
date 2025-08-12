@@ -1165,7 +1165,22 @@
         }
         setup() {
           try {
-            const spriteMap={blaster:[0,170],enemyShot:[166,362],scatter:[397,584],shotgun:[594,1274],laser:[1279,1682],explosion:[1687,2125],collision:[2136,2564],damage:[2569,2927],enemyHit:[2932,3345],weaponSwitch:[3995,4186],powerUp:[3365,3455],mine:[2534,2927],landing:[4211,6347],takeoff:[4211,6347]};
+            const spriteMap = {
+              blaster: [0, 170],
+              enemyShot: [166, 362],
+              scatter: [397, 584],
+              shotgun: [594, 1274],
+              laser: [1279, 1682],
+              explosion: [1687, 2125],
+              collision: [2136, 2564],
+              damage: [2569, 2927],
+              enemyHit: [2932, 3345],
+              weaponSwitch: [3995, 4186],
+              powerUp: [3365, 3455],
+              mine: [2534, 2927],
+              landing: [4211, 6347],
+              takeoff: [4211, 6347]
+            };
             this.sfxSprite = new Howl({
               src: ['sfx-sprite.mp3'],
               sprite: spriteMap,
@@ -1571,7 +1586,8 @@
             const weaponNames = ['Blaster', 'Scatter', 'Shotgun', 'Mines', 'Laser'];
             document.getElementById('currentWeapon').textContent = `${weaponNumber}-${weaponNames[weaponNumber-1]}`;
             document.getElementById('weaponBtn').innerHTML = `W
-                                                                  <br>${weaponNumber}`;
+                                                                  
+            <br>${weaponNumber}`;
             if (this.laserBeam) {
               this.scene.remove(this.laserBeam);
               this.laserBeam = null;
@@ -1650,108 +1666,84 @@
           this.wasPlayerVisible = this.playerShip.visible;
           this.audioManager.playLanding()
         }
-updateLanding() {
-    if (this.landingState === 'none') return;
-    
-    // Safety check - if landing target is null, reset landing state
-    if (!this.landingTarget || !this.landingTarget.center) {
-        console.warn('Landing target is null, resetting landing state');
-        this.landingState = 'none';
-        this.landingTarget = null;
-        this.removeLandingGlow();
-        this.collisionEnabled = true;
-        // Ensure player is visible and properly positioned
-        if (this.playerShip) {
-            this.playerShip.visible = true;
-            this.playerShip.scale.setScalar(1.0);
-        }
-        return;
-    }
-
-    const currentTime = Date.now();
-    const elapsedTime = currentTime - this.landingStartTime;
-    this.landingProgress = Math.min(elapsedTime / this.landingDuration, 1);
-
-    if (this.landingState === 'landing') {
-        this.collisionEnabled = false;
-        
-        if (this.landingProgress >= 1) {
-            this.removeLandingGlow();
-            this.restorePlayerDepth();
-            this.landingState = 'landed';
-            this.showDialogue();
-            return;
-        }
-
-        this.playerShip.visible = true;
-        const planetCenter = this.landingTarget.center.clone();
-        const targetPos = planetCenter.clone();
-        const currentPos = this.landingStartPos.clone().lerp(targetPos, this.easeInOutCubic(this.landingProgress));
-        
-        this.playerShip.position.copy(currentPos);
-        this.makePlayerAlwaysVisible();
-        this.createLandingGlow();
-        
-        const scale = 1.0 - (this.landingProgress * 0.95);
-        this.playerShip.scale.setScalar(Math.max(0.05, scale));
-        
-        const planetRadius = this.landingTarget.config.radius;
-        const cameraDistance = planetRadius * 2.2;
-        const cameraHeight = planetRadius * 1.2;
-        const cameraAngle = this.landingProgress * 0.3;
-        
-        const cameraPos = new THREE.Vector3(
-            planetCenter.x + Math.cos(cameraAngle) * cameraDistance,
-            planetCenter.y + cameraHeight,
-            planetCenter.z + Math.sin(cameraAngle) * cameraDistance
-        );
-        
-        this.camera.position.copy(cameraPos);
-        this.camera.lookAt(currentPos);
-        this.playerVelocity.set(0, 0, 0);
-        
-    } else if (this.landingState === 'taking_off') {
-        this.collisionEnabled = false;
-        
-        if (this.landingProgress >= 1) {
+        updateLanding() {
+          if (this.landingState === 'none') return;
+          // Safety check - if landing target is null, reset landing state
+          if (!this.landingTarget || !this.landingTarget.center) {
+            console.warn('Landing target is null, resetting landing state');
             this.landingState = 'none';
+            this.landingTarget = null;
             this.removeLandingGlow();
-            this.restorePlayerDepth();
-            this.playerShip.visible = this.wasPlayerVisible;
-            this.scheduleCollisionReactivation();
+            this.collisionEnabled = true;
+            // Ensure player is visible and properly positioned
+            if (this.playerShip) {
+              this.playerShip.visible = true;
+              this.playerShip.scale.setScalar(1.0);
+            }
             return;
+          }
+          const currentTime = Date.now();
+          const elapsedTime = currentTime - this.landingStartTime;
+          this.landingProgress = Math.min(elapsedTime / this.landingDuration, 1);
+          if (this.landingState === 'landing') {
+            this.collisionEnabled = false;
+            if (this.landingProgress >= 1) {
+              this.removeLandingGlow();
+              this.restorePlayerDepth();
+              this.landingState = 'landed';
+              this.showDialogue();
+              return;
+            }
+            this.playerShip.visible = true;
+            const planetCenter = this.landingTarget.center.clone();
+            const targetPos = planetCenter.clone();
+            const currentPos = this.landingStartPos.clone().lerp(targetPos, this.easeInOutCubic(this.landingProgress));
+            this.playerShip.position.copy(currentPos);
+            this.makePlayerAlwaysVisible();
+            this.createLandingGlow();
+            const scale = 1.0 - (this.landingProgress * 0.95);
+            this.playerShip.scale.setScalar(Math.max(0.05, scale));
+            const planetRadius = this.landingTarget.config.radius;
+            const cameraDistance = planetRadius * 2.2;
+            const cameraHeight = planetRadius * 1.2;
+            const cameraAngle = this.landingProgress * 0.3;
+            const cameraPos = new THREE.Vector3(planetCenter.x + Math.cos(cameraAngle) * cameraDistance, planetCenter.y + cameraHeight, planetCenter.z + Math.sin(cameraAngle) * cameraDistance);
+            this.camera.position.copy(cameraPos);
+            this.camera.lookAt(currentPos);
+            this.playerVelocity.set(0, 0, 0);
+          } else if (this.landingState === 'taking_off') {
+            this.collisionEnabled = false;
+            if (this.landingProgress >= 1) {
+              this.landingState = 'none';
+              this.removeLandingGlow();
+              this.restorePlayerDepth();
+              this.playerShip.visible = this.wasPlayerVisible;
+              this.scheduleCollisionReactivation();
+              return;
+            }
+            const planetCenter = this.landingTarget.center.clone();
+            const safeDistance = this.landingTarget.config.radius + 20;
+            let bestDirection = this.findSafeTakeoffDirection(planetCenter);
+            const endPos = planetCenter.clone().add(bestDirection.multiplyScalar(safeDistance));
+            endPos.y = 5;
+            this.makePlayerAlwaysVisible();
+            this.createLandingGlow();
+            const startCameraPos = new THREE.Vector3(planetCenter.x, planetCenter.y + 20, planetCenter.z + 30);
+            const endCameraPos = new THREE.Vector3(endPos.x, 60, endPos.z + 60);
+            const progress = this.easeInOutCubic(this.landingProgress);
+            const currentCameraPos = startCameraPos.clone().lerp(endCameraPos, progress);
+            this.camera.position.copy(currentCameraPos);
+            const currentPlayerPos = planetCenter.clone().lerp(endPos, progress);
+            this.playerShip.position.copy(currentPlayerPos);
+            const scale = 0.05 + (this.landingProgress * 0.95);
+            this.playerShip.scale.setScalar(scale);
+            if (this.landingProgress > 0.98) {
+              this.playerShip.scale.setScalar(1.0);
+            }
+            this.playerShip.visible = this.wasPlayerVisible;
+            this.camera.lookAt(this.playerShip.position);
+          }
         }
-
-        const planetCenter = this.landingTarget.center.clone();
-        const safeDistance = this.landingTarget.config.radius + 20;
-        let bestDirection = this.findSafeTakeoffDirection(planetCenter);
-        const endPos = planetCenter.clone().add(bestDirection.multiplyScalar(safeDistance));
-        endPos.y = 5;
-        
-        this.makePlayerAlwaysVisible();
-        this.createLandingGlow();
-        
-        const startCameraPos = new THREE.Vector3(planetCenter.x, planetCenter.y + 20, planetCenter.z + 30);
-        const endCameraPos = new THREE.Vector3(endPos.x, 60, endPos.z + 60);
-        const progress = this.easeInOutCubic(this.landingProgress);
-        const currentCameraPos = startCameraPos.clone().lerp(endCameraPos, progress);
-        
-        this.camera.position.copy(currentCameraPos);
-        
-        const currentPlayerPos = planetCenter.clone().lerp(endPos, progress);
-        this.playerShip.position.copy(currentPlayerPos);
-        
-        const scale = 0.05 + (this.landingProgress * 0.95);
-        this.playerShip.scale.setScalar(scale);
-        
-        if (this.landingProgress > 0.98) {
-            this.playerShip.scale.setScalar(1.0);
-        }
-        
-        this.playerShip.visible = this.wasPlayerVisible;
-        this.camera.lookAt(this.playerShip.position);
-    }
-}
         findSafeTakeoffDirection(planetCenter) {
           const testDirections = [new THREE.Vector3(1, 0, 0), new THREE.Vector3(-1, 0, 0), new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1), new THREE.Vector3(0.707, 0, 0.707), new THREE.Vector3(-0.707, 0, 0.707), new THREE.Vector3(0.707, 0, -0.707), new THREE.Vector3(-0.707, 0, -0.707)];
           let bestDirection = testDirections[0];
@@ -1772,38 +1764,33 @@ updateLanding() {
           return bestDirection.normalize()
         }
         scheduleCollisionReactivation() {
-    let consecutiveFramesAtSafeDistance = 0;
-    const requiredFrames = 10;
-    
-    const checkDistance = () => {
-        // Safety check
-        if (!this.landingTarget || !this.landingTarget.center) {
-            this.collisionEnabled = true;
-            this.landingTarget = null;
-            return;
-        }
-        
-        const distanceFromPlanet = this.playerShip.position.distanceTo(this.landingTarget.center);
-        const safeDistance = this.landingTarget.config.radius + 15;
-        const playerToPlanet = new THREE.Vector3().subVectors(this.landingTarget.center, this.playerShip.position);
-        const isMovingAway = this.playerVelocity.dot(playerToPlanet) < 0;
-        
-        if (distanceFromPlanet > safeDistance && (isMovingAway || this.playerVelocity.length() < 0.1)) {
-            consecutiveFramesAtSafeDistance++;
-            if (consecutiveFramesAtSafeDistance >= requiredFrames) {
+          let consecutiveFramesAtSafeDistance = 0;
+          const requiredFrames = 10;
+          const checkDistance = () => {
+            // Safety check
+            if (!this.landingTarget || !this.landingTarget.center) {
+              this.collisionEnabled = true;
+              this.landingTarget = null;
+              return;
+            }
+            const distanceFromPlanet = this.playerShip.position.distanceTo(this.landingTarget.center);
+            const safeDistance = this.landingTarget.config.radius + 15;
+            const playerToPlanet = new THREE.Vector3().subVectors(this.landingTarget.center, this.playerShip.position);
+            const isMovingAway = this.playerVelocity.dot(playerToPlanet) < 0;
+            if (distanceFromPlanet > safeDistance && (isMovingAway || this.playerVelocity.length() < 0.1)) {
+              consecutiveFramesAtSafeDistance++;
+              if (consecutiveFramesAtSafeDistance >= requiredFrames) {
                 this.collisionEnabled = true;
                 this.landingTarget = null;
                 return;
+              }
+            } else {
+              consecutiveFramesAtSafeDistance = 0;
             }
-        } else {
-            consecutiveFramesAtSafeDistance = 0;
+            requestAnimationFrame(checkDistance);
+          };
+          requestAnimationFrame(checkDistance);
         }
-        
-        requestAnimationFrame(checkDistance);
-    };
-    
-    requestAnimationFrame(checkDistance);
-}
         easeInOutCubic(t) {
           return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
         }
@@ -1817,16 +1804,17 @@ updateLanding() {
             dialogue.id = 'dialogueSystem';
             dialogue.className = 'hidden';
             dialogue.innerHTML = `
-                                                                                <div id="dialogueBox">
-                                                                                  <div id="dialogueContent">
-                                                                                    <div id="planetImage"></div>
-                                                                                    <h3 id="dialogueTitle">Planet Surface</h3>
-                                                                                    <p id="dialogueText"></p>
-                                                                                    <div id="dialogueOptions">
-                                                                                      <button class="dialogue-btn" onclick="game.closeDialogue()">Take Off</button>
-                                                                                    </div>
-                                                                                  </div>
-                                                                                </div>`;
+                                                                                
+              <div id="dialogueBox">
+                <div id="dialogueContent">
+                  <div id="planetImage"></div>
+                  <h3 id="dialogueTitle">Planet Surface</h3>
+                  <p id="dialogueText"></p>
+                  <div id="dialogueOptions">
+                    <button class="dialogue-btn" onclick="game.closeDialogue()">Take Off</button>
+                  </div>
+                </div>
+              </div>`;
             document.getElementById('gameContainer').appendChild(dialogue)
           }
           document.getElementById('dialogueSystem').classList.remove('hidden');
@@ -1901,38 +1889,31 @@ updateLanding() {
           }
         }
         createBullet(angleOffset = 0) {
-    try {
-        const bulletGeom = new THREE.SphereGeometry(0.2, 8, 8);
-        const bulletMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe });
-        const bullet = new THREE.Mesh(bulletGeom, bulletMat);
-        
-        if (!this.playerShip || !this.playerShip.position) {
-            console.warn('Player ship not available for bullet creation');
-            return;
+          try {
+            const bulletGeom = new THREE.SphereGeometry(0.2, 8, 8);
+            const bulletMat = new THREE.MeshBasicMaterial({
+              color: 0x00f2fe
+            });
+            const bullet = new THREE.Mesh(bulletGeom, bulletMat);
+            if (!this.playerShip || !this.playerShip.position) {
+              console.warn('Player ship not available for bullet creation');
+              return;
+            }
+            bullet.position.copy(this.playerShip.position);
+            bullet.position.y += 0.5;
+            const direction = new THREE.Vector3(Math.sin(this.playerShip.rotation.y + angleOffset), 0, Math.cos(this.playerShip.rotation.y + angleOffset));
+            const bulletVelocity = direction.clone().multiplyScalar(CONFIG.bullet.speed);
+            const bulletObject = {
+              mesh: bullet,
+              velocity: bulletVelocity,
+              life: CONFIG.bullet.life
+            };
+            this.bullets.push(bulletObject);
+            this.scene.add(bullet);
+          } catch (e) {
+            console.error('Failed to create bullet:', e);
+          }
         }
-        
-        bullet.position.copy(this.playerShip.position);
-        bullet.position.y += 0.5;
-        
-        const direction = new THREE.Vector3(
-            Math.sin(this.playerShip.rotation.y + angleOffset),
-            0,
-            Math.cos(this.playerShip.rotation.y + angleOffset)
-        );
-        const bulletVelocity = direction.clone().multiplyScalar(CONFIG.bullet.speed);
-        
-        const bulletObject = {
-            mesh: bullet,
-            velocity: bulletVelocity,
-            life: CONFIG.bullet.life
-        };
-        
-        this.bullets.push(bulletObject);
-        this.scene.add(bullet);
-    } catch (e) {
-        console.error('Failed to create bullet:', e);
-    }
-}
         fireMine() {
           const mineGeom = new THREE.SphereGeometry(0.5, 8, 8);
           const mineMat = new THREE.MeshBasicMaterial({
@@ -2353,140 +2334,120 @@ updateLanding() {
           return cooldowns[weaponType] || 120
         }
         updateBullets() {
-    this.bullets = this.bullets.filter(bullet => {
-        // Safety check
-        if (!bullet || !bullet.mesh || !bullet.velocity) {
-            return false;
-        }
-
-        bullet.mesh.position.add(bullet.velocity);
-        bullet.life--;
-
-        const damage = this.player.effects.damage.active ? 
-            CONFIG.bullet.damage * CONFIG.audio.damage.mult : CONFIG.bullet.damage;
-
-        // Check enemy collisions
-        for (let enemy of this.enemies) {
-            if (!enemy || !enemy.mesh || !enemy.mesh.position || enemy.health <= 0) continue;
-            
-            try {
+          this.bullets = this.bullets.filter(bullet => {
+            // Safety check
+            if (!bullet || !bullet.mesh || !bullet.velocity) {
+              return false;
+            }
+            bullet.mesh.position.add(bullet.velocity);
+            bullet.life--;
+            const damage = this.player.effects.damage.active ? CONFIG.bullet.damage * CONFIG.audio.damage.mult : CONFIG.bullet.damage;
+            // Check enemy collisions
+            for (let enemy of this.enemies) {
+              if (!enemy || !enemy.mesh || !enemy.mesh.position || enemy.health <= 0) continue;
+              try {
                 if (bullet.mesh.position.distanceTo(enemy.mesh.position) < 3) {
-                    enemy.health -= damage;
-                    enemy.attacking = true;
-                    enemy.retreating = false;
-                    this.audioManager.playEnemyHit();
-                    
-                    if (enemy.health <= 0) {
-                        this.createExplosion(enemy.mesh.position);
-                        this.audioManager.playExplosion();
-                        enemy.mesh.visible = false;
-                        this.player.score += enemy.score;
-                        this.dropArtifact(enemy.mesh.position);
-                        this.updateHUD();
-                    }
-                    
-                    try {
-                        this.scene.remove(bullet.mesh);
-                    } catch (e) {
-                        console.warn('Failed to remove bullet from scene:', e);
-                    }
-                    return false;
+                  enemy.health -= damage;
+                  enemy.attacking = true;
+                  enemy.retreating = false;
+                  this.audioManager.playEnemyHit();
+                  if (enemy.health <= 0) {
+                    this.createExplosion(enemy.mesh.position);
+                    this.audioManager.playExplosion();
+                    enemy.mesh.visible = false;
+                    this.player.score += enemy.score;
+                    this.dropArtifact(enemy.mesh.position);
+                    this.updateHUD();
+                  }
+                  try {
+                    this.scene.remove(bullet.mesh);
+                  } catch (e) {
+                    console.warn('Failed to remove bullet from scene:', e);
+                  }
+                  return false;
                 }
-            } catch (e) {
+              } catch (e) {
                 console.warn('Error in bullet-enemy collision:', e);
                 continue;
+              }
             }
-        }
-
-        // Check planet collisions
-        for (let planet of this.planets) {
-            if (!planet || !planet.center || planet.destroyed) continue;
-            
-            try {
+            // Check planet collisions
+            for (let planet of this.planets) {
+              if (!planet || !planet.center || planet.destroyed) continue;
+              try {
                 if (bullet.mesh.position.distanceTo(planet.center) < planet.config.radius) {
-                    planet.health -= damage;
-                    if (planet.health <= 0) {
-                        this.destroyPlanet(planet);
-                    }
-                    
-                    try {
-                        this.scene.remove(bullet.mesh);
-                    } catch (e) {
-                        console.warn('Failed to remove bullet from scene:', e);
-                    }
-                    return false;
+                  planet.health -= damage;
+                  if (planet.health <= 0) {
+                    this.destroyPlanet(planet);
+                  }
+                  try {
+                    this.scene.remove(bullet.mesh);
+                  } catch (e) {
+                    console.warn('Failed to remove bullet from scene:', e);
+                  }
+                  return false;
                 }
-            } catch (e) {
+              } catch (e) {
                 console.warn('Error in bullet-planet collision:', e);
                 continue;
+              }
             }
-        }
-
-        // Check bullet lifetime
-        if (bullet.life <= 0) {
-            try {
+            // Check bullet lifetime
+            if (bullet.life <= 0) {
+              try {
                 this.scene.remove(bullet.mesh);
-            } catch (e) {
+              } catch (e) {
                 console.warn('Failed to remove expired bullet:', e);
+              }
+              return false;
             }
-            return false;
+            return true;
+          });
         }
-
-        return true;
-    });
-}
-
-// Fix 2: Replace the updateEnemyBullets() method (around line 1200)
-updateEnemyBullets() {
-    this.enemyBullets = this.enemyBullets.filter(bullet => {
-        // Safety check
-        if (!bullet || !bullet.mesh || !bullet.velocity) {
-            return false;
-        }
-
-        bullet.mesh.position.add(bullet.velocity);
-        bullet.life--;
-
-        // Check player collision only if not landing
-        if (this.landingState === 'none' && this.playerShip && this.playerShip.position) {
-            try {
+        // Fix 2: Replace the updateEnemyBullets() method (around line 1200)
+        updateEnemyBullets() {
+          this.enemyBullets = this.enemyBullets.filter(bullet => {
+            // Safety check
+            if (!bullet || !bullet.mesh || !bullet.velocity) {
+              return false;
+            }
+            bullet.mesh.position.add(bullet.velocity);
+            bullet.life--;
+            // Check player collision only if not landing
+            if (this.landingState === 'none' && this.playerShip && this.playerShip.position) {
+              try {
                 const distance = bullet.mesh.position.distanceTo(this.playerShip.position);
                 if (distance < 3) {
-                    this.player.health -= CONFIG.bullet.enemyDamage;
-                    this.audioManager.playDamage();
-                    this.createDamageEffect(this.playerShip.position);
-                    this.updateHUD();
-                    
-                    if (this.player.health <= 0) {
-                        this.gameOver();
-                    }
-                    
-                    try {
-                        this.scene.remove(bullet.mesh);
-                    } catch (e) {
-                        console.warn('Failed to remove enemy bullet from scene:', e);
-                    }
-                    return false;
+                  this.player.health -= CONFIG.bullet.enemyDamage;
+                  this.audioManager.playDamage();
+                  this.createDamageEffect(this.playerShip.position);
+                  this.updateHUD();
+                  if (this.player.health <= 0) {
+                    this.gameOver();
+                  }
+                  try {
+                    this.scene.remove(bullet.mesh);
+                  } catch (e) {
+                    console.warn('Failed to remove enemy bullet from scene:', e);
+                  }
+                  return false;
                 }
-            } catch (e) {
+              } catch (e) {
                 console.warn('Error in enemy bullet-player collision:', e);
+              }
             }
-        }
-
-        // Check bullet lifetime
-        if (bullet.life <= 0) {
-            try {
+            // Check bullet lifetime
+            if (bullet.life <= 0) {
+              try {
                 this.scene.remove(bullet.mesh);
-            } catch (e) {
+              } catch (e) {
                 console.warn('Failed to remove expired enemy bullet:', e);
+              }
+              return false;
             }
-            return false;
+            return true;
+          });
         }
-
-        return true;
-    });
-}
-
         updateArtifacts() {
           this.artifacts = this.artifacts.filter(artifact => {
             artifact.life--;
@@ -2568,7 +2529,8 @@ updateEnemyBullets() {
             } else {
               const remaining = Math.ceil((this.player.effects.speed.endTime - currentTime) / 1000);
               effectsText += `SPEED BOOST: ${remaining}s
-                                                                                                                  <br>`
+                                                                                                                  
+              <br>`
             }
           }
           if (this.player.effects.damage.active) {
@@ -2577,7 +2539,8 @@ updateEnemyBullets() {
             } else {
               const remaining = Math.ceil((this.player.effects.damage.endTime - currentTime) / 1000);
               effectsText += `DAMAGE BOOST: ${remaining}s
-                                                                                                                    <br>`
+                                                                                                                    
+                <br>`
             }
           }
           document.getElementById('effects').innerHTML = effectsText
@@ -2795,13 +2758,14 @@ updateEnemyBullets() {
           const introContent = intro.innerHTML;
           intro.innerHTML = `
         
-                                                                                                                                  <h1>Game Over</h1>
-                                                                                                                                  <div style="font-size: 2rem; color: #feca57; margin: 20px 0; text-shadow: 0 0 15px rgba(254,202,87,0.8);">
+                                                                                                                                  
+                  <h1>Game Over</h1>
+                  <div style="font-size: 2rem; color: #feca57; margin: 20px 0; text-shadow: 0 0 15px rgba(254,202,87,0.8);">
             Final Score: ${this.player.score}
         </div>
-                                                                                                                                  <p>Your mission has ended. The galaxy remembers your courage.</p>
-                                                                                                                                  <button id="playAgainBtn">Play Again</button>
-                                                                                                                                  <button id="backToMenuBtn">Main Menu</button>
+                  <p>Your mission has ended. The galaxy remembers your courage.</p>
+                  <button id="playAgainBtn">Play Again</button>
+                  <button id="backToMenuBtn">Main Menu</button>
     `;
           intro.classList.remove('hidden');
           document.getElementById('playAgainBtn').addEventListener('click', () => {

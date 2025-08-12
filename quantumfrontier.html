@@ -3476,38 +3476,40 @@
       }
 
       #dialogueBox {
-        background: linear-gradient(135deg, #0a0a2e, #16213e);
-        border: 2px solid #464646;
+        background: linear-gradient(45deg, #245d92, #2196F3);
+        border: 0px solid #104840;
         border-radius: 15px;
         padding: 0px;
         max-width: 90vw;
         width: 500px;
         text-align: center;
-        box-shadow: 0 0 30px rgba(79, 172, 254, 0.5)
+        box-shadow: 0 0 30px rgb(0 60 113);
       }
 
-      #planetImage {
-        font-size: 4rem;
-        margin-bottom: 15px;
-
+  #planetImage {
+    font-size: 4rem;
+    margin-bottom: 15px;
     border-radius: 14px 14px 0 0;
     overflow: hidden;
-        text-shadow: 0 0 20px rgba(79, 172, 254, 0.6);
-        ani mation: planetFloat 3s ease-in-out infinite
-      }
+    text-shadow: 0 0 20px rgba(79, 172, 254, 0.6);
+}
 
-      @keyframes planetFloat {
+#planetImage img {
+    width: 100%;
+    height: auto;
+    display: block;
+    animation: planetZoom 18s ease-in-out infinite;
+}
 
-        0%,
-        100% {
-          transform: translateY(0px)
-        }
-
-        50% {
-          transform: translateY(-10px)
-        }
-      }
-
+@keyframes planetZoom {
+    0%,
+    100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.07);
+    }
+}
       #dialogueContent h3 {
         color: #4facfe;
         margin-top: 0;
@@ -3520,10 +3522,12 @@
       #dialogueContent p {
         color: #ffffff;
         margin: 20px 0;
-        padding: 30px;
-        line-height: 1.6;
-        min-height: 60px;
-        text-align: left
+    padding: 0 30px;
+    line-height: 1.6em;
+    min-height: 60px;
+    max-height: 6em;
+    text-align: left;
+    overflow-y: scroll;
       }
 
       @media(max-width:768px) {

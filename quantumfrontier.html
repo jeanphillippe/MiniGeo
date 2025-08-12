@@ -3476,9 +3476,9 @@
 
       #dialogueBox {
         background: linear-gradient(135deg, #0a0a2e, #16213e);
-        border: 2px solid #4facfe;
+        border: 2px solid #464646;
         border-radius: 15px;
-        padding: 30px;
+        padding: 0px;
         max-width: 90vw;
         width: 500px;
         text-align: center;
@@ -3488,8 +3488,11 @@
       #planetImage {
         font-size: 4rem;
         margin-bottom: 15px;
+
+    border-radius: 14px 14px 0 0;
+    overflow: hidden;
         text-shadow: 0 0 20px rgba(79, 172, 254, 0.6);
-        animation: planetFloat 3s ease-in-out infinite
+        ani mation: planetFloat 3s ease-in-out infinite
       }
 
       @keyframes planetFloat {
@@ -3510,10 +3513,13 @@
         font-size: 1.5rem;
         text-shadow: 0 0 10px rgba(79, 172, 254, 0.8)
       }
-
+#dialogueOptions {
+    margin-bottom: 1em;
+}
       #dialogueContent p {
         color: #ffffff;
         margin: 20px 0;
+        padding: 30px;
         line-height: 1.6;
         min-height: 60px;
         text-align: left

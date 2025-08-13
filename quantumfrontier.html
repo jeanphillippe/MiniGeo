@@ -564,8 +564,6 @@
         static configs = [{
           radius: 18,
           color: 0xff6b6b,
-            emissive:0xffffff,
-             emissiveIntensity: .8,
           distance: 100,
           enemyCount: 9,
           enemyType: 'f',
@@ -786,78 +784,72 @@ static createIrregularPlanet(radius, irregularity = 0, style = 'highdetail') {
   
   return geometry;
 }
-          static create(index, config = null) {
-          const cfg = config || this.configs[index % this.configs.length];
-          const planetTypes = ['rocky', 'ice', 'rocky', 'rocky', 'gas'];
-          const initialAngle = cfg.startAngle || ((Math.PI * 2 / this.configs.length) * index);
-          
-          // 🔧 Performance optimization: use regular sphere if irregularity is 0
-          let planetGeom;
-          const irregularity = cfg.irregularity !== undefined ? cfg.irregularity : 0.3;
-          
-          if (irregularity === 0) {
-            // 🔧 Create regular sphere to save resources
-            planetGeom = new THREE.SphereGeometry(cfg.radius, 32, 24);
-          } else {
-            // 🔧 Create irregular planet with noise
-            planetGeom = this.createIrregularPlanet(
-              cfg.radius, 
-              irregularity,
-              cfg.style || 'medium'
-            );
-          }
-
-          const texture = this.createPlanetTexture(cfg.color, cfg.radius, planetTypes[index % planetTypes.length]);
-          
-          // 🔧 Create material with optional emissive properties
-          const materialProps = {
-            map: texture,
-            color: cfg.color
-          };
-          
-          // Add emissive glow if specified
-          if (cfg.emissive !== undefined) {
-            materialProps.emissive = new THREE.Color(cfg.emissive);
-            materialProps.emissiveIntensity = cfg.emissiveIntensity || 0.3;
-          }
-          
-          // 🔧 Use different material for sun-like objects (high emissive intensity)
-          let planetMat;
-          if (cfg.emissiveIntensity && cfg.emissiveIntensity > 0.5) {
-            // Use MeshBasicMaterial for bright emissive objects (suns, etc.)
-            planetMat = new THREE.MeshBasicMaterial({
-              map: texture,
-              color: cfg.color,
-              emissive: materialProps.emissive || new THREE.Color(cfg.color),
-              emissiveIntensity: cfg.emissiveIntensity || 1.0
-            });
-          } else {
-            // Use MeshLambertMaterial for regular planets
-            planetMat = new THREE.MeshLambertMaterial(materialProps);
-          }
-          const planet = new THREE.Mesh(planetGeom, planetMat);
-          const x = (cfg.orbitCenter?.x || 0) + Math.cos(initialAngle) * cfg.distance;
-          const z = (cfg.orbitCenter?.z || 0) + Math.sin(initialAngle) * cfg.distance;
-          planet.position.set(x, 0, z);
-          planet.rotation.y = Math.random() * Math.PI * 2;
-          const orbitRadius = cfg.radius + CONFIG.enemy.orbitMod;
-          return {
-            mesh: planet,
-            radius: orbitRadius,
-            center: planet.position.clone(),
-            config: cfg,
-            health: cfg.health,
-            maxHealth: cfg.health,
-            destroyed: false,
-            orbitCenter: {
-              x: cfg.orbitCenter?.x || 0,
-              z: cfg.orbitCenter?.z || 0
-            },
-            orbitDistance: cfg.distance,
-            orbitSpeed: cfg.orbitSpeed || 0.001,
-            currentAngle: initialAngle
-          }
-        }
+ static create(index,config=null){
+    const cfg=config||this.configs[index%this.configs.length];
+    const planetTypes=['rocky','ice','rocky','rocky','gas'];
+    const initialAngle=cfg.startAngle||((Math.PI*2/this.configs.length)*index);
+    let planetGeom;
+    const irregularity=cfg.irregularity!==undefined?cfg.irregularity:0.3;
+    if(irregularity===0){
+        planetGeom=new THREE.SphereGeometry(cfg.radius,32,24)
+    }else{
+        planetGeom=this.createIrregularPlanet(cfg.radius,irregularity,cfg.style||'medium')
+    }
+    
+    // Don't use complex textures for highly emissive objects (like suns)
+    const isHighlyEmissive = cfg.emissiveIntensity && cfg.emissiveIntensity > 0.5;
+    const texture = isHighlyEmissive ? null : this.createPlanetTexture(cfg.color,cfg.radius,planetTypes[index%planetTypes.length]);
+    const materialProps = texture ? {map:texture,color:cfg.color} : {color:cfg.color};
+    
+    if(cfg.emissive!==undefined){
+        materialProps.emissive=new THREE.Color(cfg.emissive);
+        materialProps.emissiveIntensity=cfg.emissiveIntensity||0.3
+    }
+    
+    let planetMat;
+    if(cfg.emissiveIntensity&&cfg.emissiveIntensity>0.5){
+        // Fix: MeshBasicMaterial doesn't support emissiveIntensity, so we multiply the color
+        const emissiveColor = materialProps.emissive || new THREE.Color(cfg.color);
+        const intensity = cfg.emissiveIntensity || 1.0;
+        emissiveColor.multiplyScalar(intensity);
+        
+        const basicMaterialProps = {
+            color:cfg.color,
+            emissive:emissiveColor
+        };
+        if(texture) basicMaterialProps.map = texture;
+        
+        planetMat=new THREE.MeshBasicMaterial(basicMaterialProps)
+    }else{
+        const lambertMaterialProps = {color: cfg.color};
+        if(texture) lambertMaterialProps.map = texture;
+        if(materialProps.emissive) lambertMaterialProps.emissive = materialProps.emissive;
+        if(materialProps.emissiveIntensity) lambertMaterialProps.emissiveIntensity = materialProps.emissiveIntensity;
+        
+        planetMat=new THREE.MeshLambertMaterial(lambertMaterialProps)
+    }
+    
+    const planet=new THREE.Mesh(planetGeom,planetMat);
+    const x=(cfg.orbitCenter?.x||0)+Math.cos(initialAngle)*cfg.distance;
+    const z=(cfg.orbitCenter?.z||0)+Math.sin(initialAngle)*cfg.distance;
+    planet.position.set(x,0,z);
+    planet.rotation.y=Math.random()*Math.PI*2;
+    const orbitRadius=cfg.radius+CONFIG.enemy.orbitMod;
+    
+    return{
+        mesh:planet,
+        radius:orbitRadius,
+        center:planet.position.clone(),
+        config:cfg,
+        health:cfg.health,
+        maxHealth:cfg.health,
+        destroyed:!1,
+        orbitCenter:{x:cfg.orbitCenter?.x||0,z:cfg.orbitCenter?.z||0},
+        orbitDistance:cfg.distance,
+        orbitSpeed:cfg.orbitSpeed||0.001,
+        currentAngle:initialAngle
+    }
+}
 
       }
       class PerlinNoise {
@@ -1681,7 +1673,7 @@ nebula.position.set(
             distance: 0,
             enemyCount: 0,
             irregularity:0,
-               emissive: 0xfffff,        // 🔧 Orange-yellow glow
+               emissive: 0xffffff,        // 🔧 Orange-yellow glow
     emissiveIntensity: 0.8,    // 🔧 Triggers MeshBasicMaterial
     style: 'smooth',           // 🔧 Smooth for sun
     enemyType: 'f',
@@ -1747,11 +1739,18 @@ nebula.position.set(
           const nextWeapon = this.player.currentWeapon % 5 + 1;
           this.switchWeapon(nextWeapon)
         }
-        isPlanetLandable(planet) {
-          if (planet.destroyed) return !1;
-          const livingEnemies = this.enemies.filter(enemy => enemy.planet === planet && enemy.health > 0).length;
-          return livingEnemies === 0
-        }
+        isPlanetLandable(planet){
+    if(planet.destroyed) return false;
+    
+    // Don't allow landing on emissive planets (like the sun)
+    if(planet.config.emissiveIntensity && planet.config.emissiveIntensity > 0.5) return false;
+    
+    const livingEnemies = this.enemies.filter(enemy => 
+        enemy.planet === planet && enemy.health > 0
+    ).length;
+    
+    return livingEnemies === 0;
+}
         renderLandingPrompts() {
           const promptsContainer = document.getElementById('landingPrompts');
           if (!promptsContainer) {

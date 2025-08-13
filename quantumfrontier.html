@@ -2192,7 +2192,7 @@
             );
             
             moveDirection.subVectors(target.mesh.position, ally.mesh.position).normalize();
-            ally.mesh.position.add(moveDirection.multiplyScalar(0.5));
+            ally.mesh.position.add(moveDirection.multiplyScalar(0.9));
             
             // Shoot at enemy
             ally.shootCooldown--;
@@ -2205,21 +2205,32 @@
             if (distanceToPlayer > followDistance) {
                 // Follow player directly when too far
                 moveDirection.subVectors(this.playerShip.position, ally.mesh.position).normalize();
-                ally.mesh.position.add(moveDirection.multiplyScalar(0.4));
+                ally.mesh.position.add(moveDirection.multiplyScalar(0.8));
             } else {
-                // Stay in formation behind and to side
-                const behindOffset = new THREE.Vector3(
-                    Math.sin(this.playerShip.rotation.y + (ally.followSide * Math.PI/3)) * 15,
-                    0,
-                    Math.cos(this.playerShip.rotation.y + (ally.followSide * Math.PI/3)) * 15
-                );
-                ally.targetPosition.copy(this.playerShip.position).add(behindOffset);
-                
-                const distanceToTarget = ally.mesh.position.distanceTo(ally.targetPosition);
-                if (distanceToTarget > 3) {
-                    moveDirection.subVectors(ally.targetPosition, ally.mesh.position).normalize();
-                    ally.mesh.position.add(moveDirection.multiplyScalar(Math.min(0.2, distanceToTarget * 0.1)));
-                }
+               // Stay in formation behind and to side with improved positioning
+const baseDistance = 15 + (ally.followSide * 2); // Vary distance per ally
+const sideAngle = ally.followSide * Math.PI/3 + (Math.sin(Date.now() * 0.001 + ally.followSide) * 0.1); // Slight dynamic movement
+
+const behindOffset = new THREE.Vector3(
+    Math.sin(this.playerShip.rotation.y + sideAngle) * baseDistance,
+    Math.sin(Date.now() * 0.002 + ally.followSide * 2) * 0.5, // Subtle vertical bobbing
+    Math.cos(this.playerShip.rotation.y + sideAngle) * baseDistance
+);
+
+ally.targetPosition.copy(this.playerShip.position).add(behindOffset);
+
+const distanceToTarget = ally.mesh.position.distanceTo(ally.targetPosition);
+if (distanceToTarget > 2) {
+    moveDirection.subVectors(ally.targetPosition, ally.mesh.position).normalize();
+    
+    // Improved movement with better speed scaling and smoothing
+    const moveSpeed = Math.min(0.4, distanceToTarget * 0.15) * (0.8 + Math.random() * 0.4);
+    ally.mesh.position.add(moveDirection.multiplyScalar(moveSpeed));
+    
+    // Smooth rotation towards movement direction
+    const targetRotation = Math.atan2(moveDirection.x, moveDirection.z);
+    ally.mesh.rotation.y += (targetRotation - ally.mesh.rotation.y) * 0.1;
+}
             }
             
             // Heal player with visual effect
@@ -2242,7 +2253,7 @@
             // Face same direction as player when in formation
             ally.mesh.rotation.y = this.playerShip.rotation.y;
         }
-        const avoidanceRadius = 8;
+        const avoidanceRadius = 90;
 this.allies.forEach(otherAlly => {
     if (otherAlly === ally) return;
     const distance = ally.mesh.position.distanceTo(otherAlly.mesh.position);

@@ -564,9 +564,13 @@
         static configs = [{
           radius: 18,
           color: 0xff6b6b,
+            emissive:0xffffff,
+             emissiveIntensity: .8,
           distance: 100,
           enemyCount: 9,
           enemyType: 'f',
+           style: 'sharp',          // 🔧 Angular mining/industrial surface
+          irregularity: 0,   
           health: 200,
           orbitCenter: {
             x: 0,
@@ -585,7 +589,7 @@
           }
         }, {
           radius: 25,
-          color: 0x00ff88,
+          color: 0xff0000,
           distance: 180,
           enemyCount: 6,
           enemyType: 'd',
@@ -610,6 +614,7 @@
           color: 0x00ff88,
           distance: 220,
           enemyCount: 6,
+          irregularity: 0.4,   
           enemyType: 'p',
           health: 300,
           orbitCenter: {
@@ -697,16 +702,139 @@
           }
           return new THREE.CanvasTexture(canvas)
         }
-        static create(index, config = null) {
+static createIrregularPlanet(radius, irregularity = 0, style = 'highdetail') {
+  // Configurar subdivisiones según el estilo
+   
+  let subdivisions;
+  switch(style) {
+    case 'lowpoly':     subdivisions = [8, 6];   break;  // 🔧 Muy angular
+    case 'sharp':       subdivisions = [16, 12]; break;  // 🔧 Angular pero con más detalle
+    case 'medium':      subdivisions = [32, 24]; break;  // 🔧 Balance
+    case 'smooth':      subdivisions = [64, 64]; break;  // 🔧 Suave (original)
+    case 'highdetail':  subdivisions = [128, 96]; break; // 🔧 Muy detallado
+    default:            subdivisions = [32, 24];
+  }
+  
+  const geometry = new THREE.SphereGeometry(radius, subdivisions[0], subdivisions[1]);
+  const positions = geometry.attributes.position.array;
+  const noise = new PerlinNoise(Math.random());
+  
+  for (let i = 0; i < positions.length; i += 3) {
+    const x = positions[i];
+    const y = positions[i + 1];
+    const z = positions[i + 2];
+    const distance = Math.sqrt(x*x + y*y + z*z);
+    
+    const nx = x / radius;
+    const ny = y / radius;
+    const nz = z / radius;
+    
+    // Aplicar ruido según el estilo
+    let heightVariation = 0;
+    
+    if (style === 'lowpoly') {
+      // 🔧 ESTILO LOW POLY - Pocos detalles, cambios dramáticos
+      heightVariation += noise.noise(nx * 2, ny * 2, nz * 2) * 0.8;
+      heightVariation += noise.noise(nx * 4, ny * 4, nz * 4) * 0.4;
+      
+      // Cuantizar para crear "steps" más marcados
+      heightVariation = Math.floor(heightVariation * 4) / 4;
+      
+    } else if (style === 'sharp') {
+      // 🔧 ESTILO SHARP - Detalles medios con bordes definidos
+      heightVariation += noise.noise(nx * 3, ny * 3, nz * 3) * 0.7;
+      heightVariation += noise.noise(nx * 6, ny * 6, nz * 6) * 0.3;
+      heightVariation += noise.noise(nx * 12, ny * 12, nz * 12) * 0.1;
+      
+      // Aplicar función que acentúa los contrastes
+      heightVariation = Math.sign(heightVariation) * Math.pow(Math.abs(heightVariation), 0.7);
+      
+    } else if (style === 'terraced') {
+      // 🔧 ESTILO TERRAZAS - Como mesas/escalones
+      heightVariation += noise.noise(nx * 4, ny * 4, nz * 4) * 0.6;
+      heightVariation += noise.noise(nx * 8, ny * 8, nz * 8) * 0.3;
+      
+      // Crear terrazas/escalones
+      const steps = 6;
+      heightVariation = Math.floor(heightVariation * steps) / steps;
+      
+    } else {
+      // 🔧 ESTILO SMOOTH (original)
+      heightVariation += noise.noise(nx * 4, ny * 4, nz * 4) * 0.6;
+      heightVariation += noise.noise(nx * 8, ny * 8, nz * 8) * 0.3;
+      heightVariation += noise.noise(nx * 16, ny * 16, nz * 16) * 0.1;
+    }
+    
+    const newDistance = radius + (heightVariation * irregularity * radius);
+    const factor = newDistance / distance;
+    
+    positions[i] = x * factor;
+    positions[i + 1] = y * factor;
+    positions[i + 2] = z * factor;
+  }
+  
+  geometry.attributes.position.needsUpdate = true;
+  
+  // 🔧 CONTROL DE SUAVIZADO
+  if (style === 'lowpoly' || style === 'sharp' || style === 'terraced') {
+    // NO computar normales suaves = mantener bordes sharp
+    geometry.computeFaceNormals();
+  } else {
+    // Computar normales suaves para apariencia "blobby"
+    geometry.computeVertexNormals();
+  }
+  
+  return geometry;
+}
+          static create(index, config = null) {
           const cfg = config || this.configs[index % this.configs.length];
           const planetTypes = ['rocky', 'ice', 'rocky', 'rocky', 'gas'];
           const initialAngle = cfg.startAngle || ((Math.PI * 2 / this.configs.length) * index);
-          const planetGeom = new THREE.SphereGeometry(cfg.radius, 32, 32);
+          
+          // 🔧 Performance optimization: use regular sphere if irregularity is 0
+          let planetGeom;
+          const irregularity = cfg.irregularity !== undefined ? cfg.irregularity : 0.3;
+          
+          if (irregularity === 0) {
+            // 🔧 Create regular sphere to save resources
+            planetGeom = new THREE.SphereGeometry(cfg.radius, 32, 24);
+          } else {
+            // 🔧 Create irregular planet with noise
+            planetGeom = this.createIrregularPlanet(
+              cfg.radius, 
+              irregularity,
+              cfg.style || 'medium'
+            );
+          }
+
           const texture = this.createPlanetTexture(cfg.color, cfg.radius, planetTypes[index % planetTypes.length]);
-          const planetMat = new THREE.MeshLambertMaterial({
+          
+          // 🔧 Create material with optional emissive properties
+          const materialProps = {
             map: texture,
             color: cfg.color
-          });
+          };
+          
+          // Add emissive glow if specified
+          if (cfg.emissive !== undefined) {
+            materialProps.emissive = new THREE.Color(cfg.emissive);
+            materialProps.emissiveIntensity = cfg.emissiveIntensity || 0.3;
+          }
+          
+          // 🔧 Use different material for sun-like objects (high emissive intensity)
+          let planetMat;
+          if (cfg.emissiveIntensity && cfg.emissiveIntensity > 0.5) {
+            // Use MeshBasicMaterial for bright emissive objects (suns, etc.)
+            planetMat = new THREE.MeshBasicMaterial({
+              map: texture,
+              color: cfg.color,
+              emissive: materialProps.emissive || new THREE.Color(cfg.color),
+              emissiveIntensity: cfg.emissiveIntensity || 1.0
+            });
+          } else {
+            // Use MeshLambertMaterial for regular planets
+            planetMat = new THREE.MeshLambertMaterial(materialProps);
+          }
           const planet = new THREE.Mesh(planetGeom, planetMat);
           const x = (cfg.orbitCenter?.x || 0) + Math.cos(initialAngle) * cfg.distance;
           const z = (cfg.orbitCenter?.z || 0) + Math.sin(initialAngle) * cfg.distance;
@@ -720,7 +848,7 @@
             config: cfg,
             health: cfg.health,
             maxHealth: cfg.health,
-            destroyed: !1,
+            destroyed: false,
             orbitCenter: {
               x: cfg.orbitCenter?.x || 0,
               z: cfg.orbitCenter?.z || 0
@@ -730,6 +858,7 @@
             currentAngle: initialAngle
           }
         }
+
       }
       class PerlinNoise {
         constructor(seed = Math.random()) {
@@ -904,49 +1033,31 @@
         }
         createNebulas() {
           const nebulaColors = [
-            [
-              [0, 0, 0],
-              [0, 30, 80],
-              [20, 100, 200],
-              [80, 150, 255]
-            ],
-            [
-              [0, 0, 0],
-              [60, 0, 30],
-              [150, 40, 80],
-              [255, 100, 150]
-            ],
-            [
-              [0, 0, 0],
-              [0, 40, 30],
-              [50, 150, 100],
-              [100, 255, 180]
-            ],
-            [
-              [0, 0, 0],
-              [40, 0, 60],
-              [120, 50, 150],
-              [200, 100, 255]
-            ],
-            [
-              [0, 0, 0],
-              [60, 20, 0],
-              [200, 100, 50],
-              [255, 150, 80]
-            ]
-          ];
-          for (let layer = 0; layer < 5; layer++) {
+  [[0,0,0],[30,60,120],[60,150,255],[120,200,255]],     // Brighter blue
+  [[0,0,0],[120,30,60],[255,80,150],[255,150,200]],     // Brighter pink
+  [[0,0,0],[30,80,60],[100,255,150],[150,255,200]],     // Brighter green
+  [[0,0,0],[80,30,120],[180,100,255],[220,150,255]],    // Brighter purple
+  [[0,0,0],[120,60,30],[255,150,100],[255,200,150]]     // Brighter orange
+];
+
+          for (let layer = 0; layer < 1; layer++) {
             const nebulaTexture = this.createNebulaTexture(layer, nebulaColors[layer]);
             const size = 800 + layer * 200;
             const geometry = new THREE.PlaneGeometry(size, size);
             const material = new THREE.MeshBasicMaterial({
               map: nebulaTexture,
               transparent: !0,
-              opacity: 0.3 - layer * 0.04,
+              opacity: 0.33 - layer * 0.03,
               blending: THREE.AdditiveBlending
             });
             const nebula = new THREE.Mesh(geometry, material);
-            nebula.position.set((Math.random() - 0.5) * 1000, (Math.random() - 0.5) * 1000, -300 - layer * 150);
+  //          nebula.position.set((Math.random() - 0.5) * 1000, (Math.random() - 0.5) * 1000, -300 - layer * 150);
+            // Change Z position:
+nebula.position.set(
+  (Math.random() - 0.5) * 1000,
+  (Math.random() - 0.5) * 1000,
+  -100 - layer * 50    // Closer to camera
+);
             nebula.rotation.z = Math.random() * Math.PI * 2;
             this.group.add(nebula)
           }
@@ -993,7 +1104,7 @@
         }
         update(playerX, playerZ) {
           this.group.children.forEach((nebula, index) => {
-            const parallax = 0.05 + index * 0.02;
+            const parallax = 0.005 + index * 0.02;
             const targetX = playerX * parallax + (index - 2) * 200;
             const targetY = playerZ * parallax + (index - 2) * 150;
             nebula.position.x += (targetX - nebula.position.x) * 0.01;
@@ -1565,11 +1676,15 @@
         }
         createPlanets() {
           const sunConfig = {
-            radius: 30,
-            color: 0xffff00,
+            radius: 10,
+            color: 0xffdf22,
             distance: 0,
             enemyCount: 0,
-            enemyType: 'f',
+            irregularity:0,
+               emissive: 0xfffff,        // 🔧 Orange-yellow glow
+    emissiveIntensity: 0.8,    // 🔧 Triggers MeshBasicMaterial
+    style: 'smooth',           // 🔧 Smooth for sun
+    enemyType: 'f',
             health: 1000,
             orbitCenter: {
               x: 0,
@@ -1579,10 +1694,15 @@
             startAngle: 0
           };
           const sun = PlanetFactory.create(0, sunConfig);
-          sun.mesh.material.emissive = new THREE.Color(0x444400);
-          sun.mesh.material.emissiveIntensity = 0.3;
+          
           this.planets.push(sun);
           this.scene.add(sun.mesh);
+           // Add point light at sun position for realistic lighting
+  const sunLight = new THREE.PointLight(0xffaa00, 1, 1000);
+  sunLight.position.copy(sun.mesh.position);
+  this.scene.add(sunLight);
+
+
           for (let i = 0; i < PlanetFactory.configs.length; i++) {
             const planet = PlanetFactory.create(i);
             this.planets.push(planet);
@@ -2253,7 +2373,7 @@ if (distanceToTarget > 2) {
             // Face same direction as player when in formation
             ally.mesh.rotation.y = this.playerShip.rotation.y;
         }
-        const avoidanceRadius = 90;
+        const avoidanceRadius = 30;
 this.allies.forEach(otherAlly => {
     if (otherAlly === ally) return;
     const distance = ally.mesh.position.distanceTo(otherAlly.mesh.position);
@@ -2261,7 +2381,7 @@ this.allies.forEach(otherAlly => {
         const avoidDirection = new THREE.Vector3()
             .subVectors(ally.mesh.position, otherAlly.mesh.position)
             .normalize()
-            .multiplyScalar((avoidanceRadius - distance) * 0.1);
+            .multiplyScalar((avoidanceRadius - distance) * 1);
         ally.mesh.position.add(avoidDirection);
     }
 });

@@ -1785,7 +1785,7 @@ createWaypointIndicator() {
     // Create a bigger arrow indicator
     const arrowGeometry = new THREE.ConeGeometry(1.2, 4, 8); // CHANGED: bigger size (was 0.5, 2)
     const arrowMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xfeca57, 
+        color: 0x6EFFEE, 
         transparent: true, 
         opacity: 0.8 
     });
@@ -1855,6 +1855,13 @@ this.waypointIndicator.rotateX(Math.PI / 2); // ADDED: Adjust for cone orientati
     // Add subtle pulsing animation
     const pulse = 0.8 + 0.2 * Math.sin(Date.now() * 0.005);
     this.waypointIndicator.scale.setScalar(pulse);
+    // Animate rings
+this.waypointIndicator.children.forEach(child => {
+    if (child.userData.ringIndex !== undefined) {
+        child.rotation.z += 0.02 * (child.userData.ringIndex + 1);
+        child.material.opacity = (0.4 - child.userData.ringIndex * 0.1) * pulse;
+    }
+});
 }
 
 showWaypointReachedNotification(waypoint) {

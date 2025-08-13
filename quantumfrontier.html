@@ -579,6 +579,7 @@
           dialogue: {
             name: 'Asteria Prime',
             image: './quantumfrontier/assets/images/planets.jpeg',
+             setStoryWaypoint:'Helion IV',
             baseText: 'Asteria Prime fue una vez el mayor exportador de minerales raros del sector, con flotas de cargueros despegando diariamente hacia los mundos centrales. Ahora solo quedan torres de perforación oxidadas y pueblos fantasma barridos por tormentas de polvo./n Entre los datos fragmentados de las últimas semanas antes del abandono, algo no encaja. Transferencias nocturnas, códigos de embarque alterados, y un patrón que solo alguien con tu experiencia podría reconocer: contrabando a gran escala./nEl rastro apunta hacia los cañones rocosos de Helion IV, donde los mercenarios no hacen preguntas.',
             flagTexts: {
               visited_proxima: 'Energy readings from Proxima Centauri b indicate this planet was part of an interconnected network.',
@@ -600,6 +601,7 @@
           startAngle: Math.PI / 4,
           dialogue: {
             name: 'Pyrrhos',
+             setStoryWaypoint:'Helion IV',
             image: './quantumfrontier/assets/images/planets44.jpeg',
             baseText: 'Pyrrhos es un infierno de lava y roca fundida donde los ríos de magma serpentean entre picos de basalto negro. El calor es tan intenso que incluso los drones más resistentes fallan después de pocas horas de exposición. Aquí, la supervivencia se mide en minutos./n Enterrada en las profundidades rocosas, una forja milenaria late con el resplandor de cristales semi-formados. Los grabados en las paredes hablan de una civilización que dominaba energías capaces de abrir puertas entre mundos. Pero también advierten sobre el precio de tal poder./n Las inscripciones apuntan hacia "los guardianes del mundo verde" en Viridara, donde el conocimiento ancestral aguarda entre las ruinas envueltas en vegetación.',
             flagTexts: {
@@ -631,6 +633,7 @@
             }
           }
         }];
+
         static createPlanetTexture(color, radius, type) {
           const canvas = document.createElement('canvas');
           canvas.width = 512;
@@ -1733,6 +1736,48 @@ clearWaypoint() {
           this.setupEventListeners();
           this.animate()
         }
+
+        
+// 2. Add helper method to find planet by name (add to SpaceShooter class)
+findPlanetByName(planetName){
+    return this.planets.find(planet => 
+        planet.config.dialogue && 
+        planet.config.dialogue.name === planetName
+    );
+}
+
+// 3. Add method to show navigation notification (add to SpaceShooter class)
+showNavigationNotification(targetName){
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 120px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: #00ff88;
+        font-family: 'Courier New', monospace;
+        font-size: 18px;
+        font-weight: bold;
+        text-shadow: 0 0 15px rgba(0, 255, 136, 0.9);
+        background: rgba(0, 0, 0, 0.8);
+        padding: 15px 25px;
+        border-radius: 10px;
+        border: 2px solid rgba(0, 255, 136, 0.6);
+        z-index: 1000;
+        animation: waypointFadeTop 3s ease-out forwards;
+        pointer-events: none;
+        backdrop-filter: blur(5px);
+    `;
+    notification.textContent = `Navigate to: ${targetName}`;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        if (document.body.contains(notification)) {
+            document.body.removeChild(notification);
+        }
+    }, 3000);
+}
+
         updatePlanets() {
           this.planets.forEach(planet => {
             if (planet.destroyed) return;
@@ -2425,13 +2470,56 @@ showWaypointSetFeedback(x, y) {
     setTimeout(() => this.typeWriter(text, elementId, index + 1), this.typewriterSpeed);
   }
 }
-        closeDialogue() {
-          document.getElementById('dialogueSystem').classList.add('hidden');
-          this.landingState = 'taking_off';
-          this.landingStartTime = Date.now();
-          this.landingProgress = 0;
-          this.playerShip.visible = !1;
+        closeDialogue(){
+    const currentPlanet = this.landingTarget;
+    const storyWaypoint = currentPlanet.config.dialogue?.setStoryWaypoint;
+    
+    document.getElementById('dialogueSystem').classList.add('hidden');
+    this.landingState = 'taking_off';
+    this.landingStartTime = Date.now();
+    this.landingProgress = 0;
+    this.playerShip.visible = false;
+    
+    // Set story waypoint based on type (coordinates or planet name)
+    if (storyWaypoint) {
+        let waypointData = null;
+        let displayName = '';
+        
+        // Check if it's coordinates (object with x, z properties)
+        if (typeof storyWaypoint === 'object' && storyWaypoint.x !== undefined && storyWaypoint.z !== undefined) {
+            waypointData = {
+                x: storyWaypoint.x,
+                z: storyWaypoint.z,
+                type: 'static'
+            };
+            displayName = `Coordinates (${storyWaypoint.x}, ${storyWaypoint.z})`;
         }
+        // Otherwise treat as planet name
+        else if (typeof storyWaypoint === 'string') {
+            const targetPlanet = this.findPlanetByName(storyWaypoint);
+            if (targetPlanet) {
+                waypointData = {
+                    x: targetPlanet.center.x,
+                    z: targetPlanet.center.z,
+                    planet: targetPlanet,
+                    type: 'planet'
+                };
+                displayName = storyWaypoint;
+            }
+        }
+        
+        // Set the waypoint and show notification
+        if (waypointData) {
+            this.minimapManager.waypoint = waypointData;
+            
+            // Show navigation notification after a short delay
+            setTimeout(() => {
+                this.showNavigationNotification(displayName);
+                this.audioManager.playPowerUp(); // Reuse power-up sound
+            }, 1000);
+        }
+    }
+}
         getPlanetName(planet) {
           return planet.config.dialogue?.name || `Planet ${this.planets.indexOf(planet) + 1}`
         }
@@ -3689,615 +3777,7 @@ this.allies = [];
         }
       }
       const game = new SpaceShooter();
-    </script> <style>
-      body {
-        margin: 0;
-        padding: 0;
-        background: #000;
-        font-family: 'Courier New', monospace;
-        overflow: hidden
-      }
-
-      #gameContainer {
-        position: relative;
-        width: 100vw;
-        height: 100vh
-      }
-
-      canvas {
-        display: block
-      }
-
-      #intro {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(135deg, #0a0a2e, #16213e, #0f3460);
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        color: #fff;
-        z-index: 1000;
-        transition: opacity 0.5s
-      }
-
-      #intro h1 {
-        font-size: 4rem;
-        margin: 0;
-        text-shadow: 0 0 20px #4facfe;
-        background: linear-gradient(45deg, #4facfe, #00f2fe);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        animation: glow 2s infinite alternate
-      }
-
-      #intro p {
-        font-size: 1.2rem;
-        margin: 20px 0;
-        text-align: center;
-        max-width: 600px;
-        line-height: 1.6
-      }
-
-      #startBtn {
-        padding: 15px 30px;
-        font-size: 1.5rem;
-        background: linear-gradient(45deg, #667eea, #764ba2);
-        border: none;
-        color: white;
-        cursor: pointer;
-        border-radius: 50px;
-        transition: all 0.3s;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3)
-      }
-
-      #startBtn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4)
-      }
-
-      #playAgainBtn,
-      #backToMenuBtn {
-        padding: 12px 25px;
-        font-size: 1.2rem;
-        background: linear-gradient(45deg, #667eea, #764ba2);
-        border: none;
-        color: white;
-        cursor: pointer;
-        border-radius: 40px;
-        transition: all 0.3s;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-        margin: 10px
-      }
-
-      #playAgainBtn:hover,
-      #backToMenuBtn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4)
-      }
-
-      #playAgainBtn {
-        background: linear-gradient(45deg, #00ff88, #00d4aa)
-      }
-
-      #backToMenuBtn {
-        background: linear-gradient(45deg, #ff6b6b, #ff5252)
-      }
-
-      @keyframes glow {
-        0% {
-          text-shadow: 0 0 20px #4facfe
-        }
-
-        100% {
-          text-shadow: 0 0 30px #4facfe, 0 0 40px #00f2fe
-        }
-      }
-
-      #hud {
-        position: absolute;
-        top: 20px;
-        left: 20px;
-        color: #4facfe;
-        font-size: 1rem;
-        z-index: 100;
-        text-shadow: 0 0 10px rgba(79, 172, 254, 0.8);
-        display: flex;
-        flex-direction: column;
-        gap: 8px
-      }
-
-      #healthHud {
-        color: #00ff88;
-        font-weight: bold
-      }
-
-      #scoreHud {
-        color: #feca57;
-        font-weight: bold
-      }
-
-      #weaponHud {
-        color: #ff6b6b;
-        font-weight: bold
-      }
-
-      #coordinates {
-        color: rgba(79, 172, 254, 0.7);
-        font-size: 0.9rem
-      }
-
-      #minimap {
-        position: absolute;
-        top: 20px;
-        right: 20px;
-        width: 120px;
-        height: 120px;
-        border: 2px solid rgba(79, 172, 254, 0.4);
-        border-radius: 8px;
-        background: rgba(0, 0, 0, 0.8);
-        backdrop-filter: blur(5px);
-        z-index: 100;
-        transition: all 0.3s ease;
-        cursor: pointer
-      }
-
-      #minimap.expanded {
-        width: 300px;
-        height: 300px;
-        right: 50%;
-        top: 50%;
-        transform: translate(50%, -50%);
-        z-index: 1001
-      }
-
-      #minimapCanvas {
-        width: 100%;
-        height: 100%;
-        border-radius: 6px
-      }
-
-      #minimapToggle {
-        position: absolute;
-        top: -8px;
-        right: -8px;
-        width: 20px;
-        height: 20px;
-        background: rgba(79, 172, 254, 0.8);
-        color: #fff;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 12px;
-        cursor: pointer;
-        border: 1px solid rgba(79, 172, 254, 0.6)
-      }
-
-      #minimapToggle:hover {
-        background: rgba(79, 172, 254, 1)
-      }
-
-      .hidden {
-        opacity: 0;
-        pointer-events: none
-      }
-
-      #controls {
-        position: absolute;
-        bottom: 20px;
-        right: 20px;
-        color: rgba(255, 255, 255, 0.7);
-        font-size: 0.9rem;
-        text-align: right;
-        z-index: 100
-      }
-
-      #effects {
-        position: absolute;
-        top: 160px;
-        left: 20px;
-        color: #feca57;
-        font-size: .8rem;
-        z-index: 100;
-        text-shadow: 0 0 10px rgba(254, 202, 87, 0.8)
-      }
-
-      #mobileControls {
-        position: absolute;
-        bottom: 80px;
-        left: 20px;
-        right: 20px;
-        display: none;
-        z-index: 200
-      }
-
-      #dpad {
-        position: absolute;
-        bottom: 80px;
-        left: 20px;
-        width: 120px;
-        height: 120px
-      }
-
-      #dpadOuter {
-        width: 120px;
-        height: 120px;
-        border: 3px solid rgba(79, 172, 254, 0.6);
-        border-radius: 50%;
-        position: absolute;
-        background: rgba(0, 0, 0, 0.3);
-        backdrop-filter: blur(5px)
-      }
-
-      #dpadInner {
-        width: 40px;
-        height: 40px;
-        background: rgba(79, 172, 254, 0.8);
-        border-radius: 50%;
-        position: absolute;
-        top: 40px;
-        left: 40px;
-        transition: all 0.1s ease;
-        box-shadow: 0 0 15px rgba(79, 172, 254, 0.6)
-      }
-
-      #fireBtn {
-        position: absolute;
-        bottom: 100px;
-        right: 20px;
-        width: 80px;
-        height: 80px;
-        border: 3px solid rgba(255, 75, 87, 0.6);
-        border-radius: 50%;
-        background: rgba(255, 75, 87, 0.3);
-        color: #fff;
-        font-size: 14px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        user-select: none;
-        backdrop-filter: blur(5px);
-        box-shadow: 0 0 20px rgba(255, 75, 87, 0.4);
-        font-weight: bold
-      }
-
-      #weaponBtn {
-        position: absolute;
-        bottom: 200px;
-        right: 20px;
-        width: 60px;
-        height: 60px;
-        border: 3px solid rgba(254, 202, 87, 0.6);
-        border-radius: 50%;
-        background: rgba(254, 202, 87, 0.3);
-        color: #fff;
-        font-size: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        user-select: none;
-        backdrop-filter: blur(5px);
-        box-shadow: 0 0 20px rgba(254, 202, 87, 0.4);
-        font-weight: bold
-      }
-
-      #fireBtn:active,
-      #weaponBtn:active {
-        transform: scale(0.95)
-      }
-
-      @media(max-width:768px) {
-        #mobileControls {
-          display: block
-        }
-
-        #controls {
-          display: none
-        }
-
-        #intro h1 {
-          font-size: 2.5rem
-        }
-
-        #intro p {
-          font-size: 1rem;
-          padding: 0 20px
-        }
-
-        #hud {
-          font-size: 0.9rem
-        }
-
-        #minimap {
-          width: 100px;
-          height: 100px
-        }
-
-        #minimap.expanded {
-          width: 250px;
-          height: 250px
-        }
-      }
-
-      #hud div {
-        margin: 2px 0;
-        padding: 2px 0
-      }
-
-      #effects div {
-        animation: pulse 2s infinite
-      }
-
-      @keyframes pulse {
-
-        0%,
-        100% {
-          opacity: 1
-        }
-
-        50% {
-          opacity: 0.7
-        }
-      }
-
-      #dpadOuter:active {
-        background: rgba(79, 172, 254, 0.2)
-      }
-
-      #fireBtn:active {
-        background: rgba(255, 75, 87, 0.5);
-        box-shadow: 0 0 30px rgba(255, 75, 87, 0.6)
-      }
-
-      #weaponBtn:active {
-        background: rgba(254, 202, 87, 0.5);
-        box-shadow: 0 0 30px rgba(254, 202, 87, 0.6)
-      }
-
-      .fade-in {
-        animation: fadeIn 1s ease-in
-      }
-
-      @keyframes fadeIn {
-        from {
-          opacity: 0;
-          transform: translateY(20px)
-        }
-
-        to {
-          opacity: 1;
-          transform: translateY(0)
-        }
-      }
-
-      @media(max-width:480px) {
-        #intro h1 {
-          font-size: 2rem
-        }
-
-        #dpad {
-          width: 100px;
-          height: 100px
-        }
-
-        #dpadOuter {
-          width: 100px;
-          height: 100px
-        }
-
-        #dpadInner {
-          width: 35px;
-          height: 35px;
-          top: 32.5px;
-          left: 32.5px
-        }
-
-        #fireBtn {
-          width: 70px;
-          height: 70px;
-          font-size: 12px
-        }
-
-        #weaponBtn {
-          width: 50px;
-          height: 50px;
-          font-size: 10px
-        }
-
-        #minimap {
-          width: 80px;
-          height: 80px
-        }
-
-        #minimap.expanded {
-          width: 200px;
-          height: 200px
-        }
-      }
-
-      * {
-        box-sizing: border-box
-      }
-
-      canvas {
-        image-rendering: optimizeSpeed;
-        image-rendering: -moz-crisp-edges;
-        image-rendering: -webkit-optimize-contrast;
-        image-rendering: optimize-contrast
-      }
-
-      #landingPrompts {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-        z-index: 150
-      }
-
-      @keyframes landingPulse {
-
-        0%,
-        100% {
-          opacity: 1;
-          transform: translateX(-50%)scale(1);
-          box-shadow: 0 0 10px rgba(0, 255, 136, 0.6)
-        }
-
-        50% {
-          opacity: 0.8;
-          transform: translateX(-50%)scale(1.05);
-          box-shadow: 0 0 20px rgba(0, 255, 136, 0.8)
-        }
-      }
-
-      #dialogueSystem {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.8);
-        display: flex;
-    padding-top: 3em;
-    vertical-align: top;
-    justify-content: center;
-    align-items: flex-start;
-        z-index: 1000;
-        backdrop-filter: blur(5px)
-      }
-
-      #dialogueBox {
-        background: linear-gradient(135deg, #0a0a2e, #16213e);
-        border: 0px solid #104840;
-        border-radius: 15px;
-        padding: 0px;
-        max-width: 90vw;
-        width: 500px;
-        text-align: center;
-        box-shadow: 0 0 30px rgb(0 60 113);
-      }
-
-  #planetImage {
-    font-size: 4rem;
-    margin-bottom: 15px;
-    border-radius: 14px 14px 0 0;
-    overflow: hidden;
-    text-shadow: 0 0 20px rgba(79, 172, 254, 0.6);
-}
-
-#planetImage img {
-    width: 100%;
-    height: auto;
-    display: block;
-    animation: planetZoom 18s ease-in-out infinite;
-}
-
-@keyframes planetZoom {
-    0%,
-    100% {
-        transform: scale(1);
-    }
-    50% {
-        transform: scale(1.07);
-    }
-}
-      #dialogueContent h3 {
-        color: #4facfe;
-        margin-top: 0;
-        font-size: 1.5rem;
-        text-shadow: 0 0 10px rgba(79, 172, 254, 0.8)
-      }
-#dialogueOptions {
-    margin-bottom: 1em;
-}
-      #dialogueContent p {
-        color: #ffffff;
-        margin: 20px 0;
-    padding: 0 30px;
-    line-height: 1.6em;
-    min-height: 60px;
-    max-height: 12em;
-    text-align: left;
-    overflow-y: scroll;
-      }
-
-      @media(max-width:768px) {
-        #dialogueBox {
-          padding: 0px;
-          width: 95vw;
-          max-width: none
-        }
-        #dialogueSystem{
-
-    padding-top: 1em;
-        }
-
-        #planetImage {
-          font-size: 3rem
-        }
-
-        #dialogueContent h3 {
-          font-size: 1.2rem
-        }
-
-        #dialogueContent p {
-          font-size: 0.9rem;
-          min-height: 50px
-        }
-      }
-
-      .dialogue-btn {
-        background: linear-gradient(45deg, #1e32e9, #2196F3);
-        border: none;
-        color: white;
-        padding: 12px 24px;
-        font-size: 1rem;
-        border-radius: 25px;
-        cursor: pointer;
-        transition: all 0.3s;
-        margin: 10px
-      }
-
-      .dialogue-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3)
-      }
-
-      #landBtn {
-        position: absolute;
-        bottom: 20px;
-        right: 100px;
-        width: 60px;
-        height: 60px;
-        border: 3px solid rgba(0, 255, 136, 0.6);
-        border-radius: 50%;
-        background: rgba(0, 255, 136, 0.3);
-        color: #fff;
-        font-size: 12px;
-        display: none;
-        align-items: center;
-        justify-content: center;
-        user-select: none;
-        backdrop-filter: blur(5px);
-        box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
-        font-weight: bold
-      }
-
-      #landingPrompts div {
-        white-space: nowrap
-      }
-
-      @media(max-width:768px) {
-        #mobileControls #landBtn {
-          display: flex
-        }
-      }
-    </style>
+    </script> 
+    <style>body{margin:0;padding:0;background:#000;font-family:'Courier New',monospace;overflow:hidden}#gameContainer{position:relative;width:100vw;height:100vh}canvas{display:block}#intro{position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#0a0a2e,#16213e,#0f3460);display:flex;flex-direction:column;justify-content:center;align-items:center;color:#fff;z-index:1000;transition:opacity 0.5s}#intro h1{font-size:4rem;margin:0;text-shadow:0 0 20px #4facfe;background:linear-gradient(45deg,#4facfe,#00f2fe);-webkit-background-clip:text;-webkit-text-fill-color:#fff0;animation:glow 2s infinite alternate}#intro p{font-size:1.2rem;margin:20px 0;text-align:center;max-width:600px;line-height:1.6}#startBtn{padding:15px 30px;font-size:1.5rem;background:linear-gradient(45deg,#667eea,#764ba2);border:none;color:#fff;cursor:pointer;border-radius:50px;transition:all 0.3s;box-shadow:0 4px 15px rgb(0 0 0 / .3)}#startBtn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgb(0 0 0 / .4)}#playAgainBtn,#backToMenuBtn{padding:12px 25px;font-size:1.2rem;background:linear-gradient(45deg,#667eea,#764ba2);border:none;color:#fff;cursor:pointer;border-radius:40px;transition:all 0.3s;box-shadow:0 4px 15px rgb(0 0 0 / .3);margin:10px}#playAgainBtn:hover,#backToMenuBtn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgb(0 0 0 / .4)}#playAgainBtn{background:linear-gradient(45deg,#00ff88,#00d4aa)}#backToMenuBtn{background:linear-gradient(45deg,#ff6b6b,#ff5252)}@keyframes glow{0%{text-shadow:0 0 20px #4facfe}100%{text-shadow:0 0 30px #4facfe,0 0 40px #00f2fe}}#hud{position:absolute;top:20px;left:20px;color:#4facfe;font-size:1rem;z-index:100;text-shadow:0 0 10px rgb(79 172 254 / .8);display:flex;flex-direction:column;gap:8px}#healthHud{color:#0f8;font-weight:700}#scoreHud{color:#feca57;font-weight:700}#weaponHud{color:#ff6b6b;font-weight:700}#coordinates{color:rgb(79 172 254 / .7);font-size:.9rem}#minimap{position:absolute;top:20px;right:20px;width:120px;height:120px;border:2px solid rgb(79 172 254 / .4);border-radius:8px;background:rgb(0 0 0 / .8);backdrop-filter:blur(5px);z-index:100;transition:all 0.3s ease;cursor:pointer}#minimap.expanded{width:300px;height:300px;right:50%;top:50%;transform:translate(50%,-50%);z-index:1001}#minimapCanvas{width:100%;height:100%;border-radius:6px}#minimapToggle{position:absolute;top:-8px;right:-8px;width:20px;height:20px;background:rgb(79 172 254 / .8);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;border:1px solid rgb(79 172 254 / .6)}#minimapToggle:hover{background:rgb(79 172 254)}.hidden{opacity:0;pointer-events:none}#controls{position:absolute;bottom:20px;right:20px;color:rgb(255 255 255 / .7);font-size:.9rem;text-align:right;z-index:100}#effects{position:absolute;top:160px;left:20px;color:#feca57;font-size:.8rem;z-index:100;text-shadow:0 0 10px rgb(254 202 87 / .8)}#mobileControls{position:absolute;bottom:80px;left:20px;right:20px;display:none;z-index:200}#dpad{position:absolute;bottom:80px;left:20px;width:120px;height:120px}#dpadOuter{width:120px;height:120px;border:3px solid rgb(79 172 254 / .6);border-radius:50%;position:absolute;background:rgb(0 0 0 / .3);backdrop-filter:blur(5px)}#dpadInner{width:40px;height:40px;background:rgb(79 172 254 / .8);border-radius:50%;position:absolute;top:40px;left:40px;transition:all 0.1s ease;box-shadow:0 0 15px rgb(79 172 254 / .6)}#fireBtn{position:absolute;bottom:100px;right:20px;width:80px;height:80px;border:3px solid rgb(255 75 87 / .6);border-radius:50%;background:rgb(255 75 87 / .3);color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;user-select:none;backdrop-filter:blur(5px);box-shadow:0 0 20px rgb(255 75 87 / .4);font-weight:700}#weaponBtn{position:absolute;bottom:200px;right:20px;width:60px;height:60px;border:3px solid rgb(254 202 87 / .6);border-radius:50%;background:rgb(254 202 87 / .3);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;user-select:none;backdrop-filter:blur(5px);box-shadow:0 0 20px rgb(254 202 87 / .4);font-weight:700}#fireBtn:active,#weaponBtn:active{transform:scale(.95)}@media(max-width:768px){#mobileControls{display:block}#controls{display:none}#intro h1{font-size:2.5rem}#intro p{font-size:1rem;padding:0 20px}#hud{font-size:.9rem}#minimap{width:100px;height:100px}#minimap.expanded{width:250px;height:250px}}#hud div{margin:2px 0;padding:2px 0}#effects div{animation:pulse 2s infinite}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}#dpadOuter:active{background:rgb(79 172 254 / .2)}#fireBtn:active{background:rgb(255 75 87 / .5);box-shadow:0 0 30px rgb(255 75 87 / .6)}#weaponBtn:active{background:rgb(254 202 87 / .5);box-shadow:0 0 30px rgb(254 202 87 / .6)}.fade-in{animation:fadeIn 1s ease-in}@keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}@media(max-width:480px){#intro h1{font-size:2rem}#dpad{width:100px;height:100px}#dpadOuter{width:100px;height:100px}#dpadInner{width:35px;height:35px;top:32.5px;left:32.5px}#fireBtn{width:70px;height:70px;font-size:12px}#weaponBtn{width:50px;height:50px;font-size:10px}#minimap{width:80px;height:80px}#minimap.expanded{width:200px;height:200px}}*{box-sizing:border-box}canvas{image-rendering:optimizeSpeed;image-rendering:-moz-crisp-edges;image-rendering:-webkit-optimize-contrast;image-rendering:optimize-contrast}#landingPrompts{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:150}@keyframes landingPulse{0%,100%{opacity:1;transform:translateX(-50%)scale(1);box-shadow:0 0 10px rgb(0 255 136 / .6)}50%{opacity:.8;transform:translateX(-50%)scale(1.05);box-shadow:0 0 20px rgb(0 255 136 / .8)}}#dialogueSystem{position:absolute;top:0;left:0;width:100%;height:100%;background:rgb(0 0 0 / .8);display:flex;padding-top:3em;vertical-align:top;justify-content:center;align-items:flex-start;z-index:1000;backdrop-filter:blur(5px)}#dialogueBox{background:linear-gradient(135deg,#0a0a2e,#16213e);border:0 solid #104840;border-radius:15px;padding:0;max-width:90vw;width:500px;text-align:center;box-shadow:0 0 30px #003c71}#planetImage{font-size:4rem;margin-bottom:15px;border-radius:14px 14px 0 0;overflow:hidden;text-shadow:0 0 20px rgb(79 172 254 / .6)}#planetImage img{width:100%;height:auto;display:block;animation:planetZoom 18s ease-in-out infinite}@keyframes planetZoom{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}#dialogueContent h3{color:#4facfe;margin-top:0;font-size:1.5rem;text-shadow:0 0 10px rgb(79 172 254 / .8)}#dialogueOptions{margin-bottom:1em}#dialogueContent p{color:#fff;margin:20px 0;padding:0 30px;line-height:1.6em;min-height:60px;max-height:12em;text-align:left;overflow-y:scroll}@media(max-width:768px){#dialogueBox{padding:0;width:95vw;max-width:none}#dialogueSystem{padding-top:1em}#planetImage{font-size:3rem}#dialogueContent h3{font-size:1.2rem}#dialogueContent p{font-size:.9rem;min-height:50px}}.dialogue-btn{background:linear-gradient(45deg,#1e32e9,#2196F3);border:none;color:#fff;padding:12px 24px;font-size:1rem;border-radius:25px;cursor:pointer;transition:all 0.3s;margin:10px}.dialogue-btn:hover{transform:translateY(-2px);box-shadow:0 5px 15px rgb(0 0 0 / .3)}#landBtn{position:absolute;bottom:20px;right:100px;width:60px;height:60px;border:3px solid rgb(0 255 136 / .6);border-radius:50%;background:rgb(0 255 136 / .3);color:#fff;font-size:12px;display:none;align-items:center;justify-content:center;user-select:none;backdrop-filter:blur(5px);box-shadow:0 0 20px rgb(0 255 136 / .4);font-weight:700}#landingPrompts div{white-space:nowrap}@media(max-width:768px){#mobileControls #landBtn{display:flex}}</style>
   </body>
 </html>

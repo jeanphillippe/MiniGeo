@@ -1465,135 +1465,27 @@
           this.renderer.sortObjects = !0;
           document.getElementById('gameContainer').appendChild(this.renderer.domElement)
         }
-        createAlly(position) {
-    const ally = EnemyFactory.create('f', null, 0, 1); // Red fighter ship as requested
-    // Remove the color change - keep original red color
-    ally.mesh.position.copy(position);
+        spawnAlly() {
+    const ally = EnemyFactory.create('f', null, 0, 1); // Red fighter ship
+    if (!ally) return;
+    
+    // Position ally near player
+    const angle = Math.random() * Math.PI * 2;
+    const distance = 15 + Math.random() * 10;
+    ally.mesh.position.set(
+        this.playerShip.position.x + Math.cos(angle) * distance,
+        5,
+        this.playerShip.position.z + Math.sin(angle) * distance
+    );
+    
+    // Mark as ally and set properties
     ally.isAlly = true;
-    ally.followOffset = {
-        x: (Math.random() - 0.5) * 20,
-        z: (Math.random() - 0.5) * 20 + 15
-    };
+    ally.followSide = Math.random() < 0.5 ? -1 : 1; // Random side
     ally.healCooldown = 0;
+    ally.targetPosition = new THREE.Vector3();
+    
     this.allies.push(ally);
     this.scene.add(ally.mesh);
-    return ally;
-}
-updateAllies() {
-    this.allies.forEach(ally => {
-        if (ally.health <= 0) return;
-        
-        const playerPos = this.playerShip.position;
-        const targetPos = new THREE.Vector3(
-            playerPos.x + ally.followOffset.x,
-            5,
-            playerPos.z + ally.followOffset.z
-        );
-        
-        const distanceToTarget = ally.mesh.position.distanceTo(targetPos);
-        const distanceToPlayer = ally.mesh.position.distanceTo(playerPos);
-        
-        // Calculate avoidance force from other allies
-        const avoidanceForce = this.calculateAllyAvoidance(ally);
-        
-        // Follow player if too far
-        if (distanceToTarget > 3) {
-            const direction = new THREE.Vector3()
-                .subVectors(targetPos, ally.mesh.position)
-                .normalize();
-            
-            // Combine movement direction with avoidance
-            const combinedDirection = direction.add(avoidanceForce).normalize();
-            const moveDistance = Math.min(ally.chaseSpeed * 1.5, distanceToTarget);
-            const movement = combinedDirection.multiplyScalar(moveDistance);
-            
-            const newPos = ally.mesh.position.clone().add(movement);
-            if (!this.checkPlanetCollision(newPos)) {
-                ally.mesh.position.copy(newPos);
-                ally.mesh.position.y = 5;
-            }
-        }
-        
-        // Check for enemies in combat range around player
-        const enemiesInCombat = this.enemies.filter(enemy => 
-            enemy.health > 0 && 
-            enemy.mesh.position.distanceTo(playerPos) < 40
-        );
-        
-        // Attack nearest enemy
-        let nearestEnemy = null;
-        let nearestDistance = 30;
-        
-        enemiesInCombat.forEach(enemy => {
-            const distance = ally.mesh.position.distanceTo(enemy.mesh.position);
-            if (distance < nearestDistance) {
-                nearestDistance = distance;
-                nearestEnemy = enemy;
-            }
-        });
-        
-        if (nearestEnemy) {
-            ally.mesh.lookAt(nearestEnemy.mesh.position);
-            ally.shootCooldown--;
-            if (ally.shootCooldown <= 0) {
-                this.createAllyBullet(ally, nearestEnemy);
-                ally.shootCooldown = 60;
-            }
-        } else {
-            // Heal player ONLY if no combat anywhere near player and player needs healing
-            ally.healCooldown--;
-            if (ally.healCooldown <= 0 && 
-                enemiesInCombat.length === 0 && // No combat around player
-                distanceToPlayer < 15 && 
-                this.player.health < CONFIG.player.health) {
-                
-                this.player.health = Math.min(CONFIG.player.health, this.player.health + 5);
-                ally.healCooldown = 120;
-                this.updateHUD();
-                
-                // Visual healing effect
-                this.createHealEffect(this.playerShip.position);
-            }
-        }
-    });
-}
-calculateAllyAvoidance(currentAlly) {
-    const avoidanceForce = new THREE.Vector3();
-    let neighborCount = 0;
-    
-    this.allies.forEach(otherAlly => {
-        if (otherAlly === currentAlly || otherAlly.health <= 0) return;
-        
-        const distance = currentAlly.mesh.position.distanceTo(otherAlly.mesh.position);
-        const avoidanceRadius = 8; // Minimum distance between allies
-        
-        if (distance < avoidanceRadius && distance > 0) {
-            const repelDirection = new THREE.Vector3()
-                .subVectors(currentAlly.mesh.position, otherAlly.mesh.position);
-            const repelStrength = (avoidanceRadius - distance) / avoidanceRadius * 2;
-            repelDirection.normalize().multiplyScalar(repelStrength);
-            avoidanceForce.add(repelDirection);
-            neighborCount++;
-        }
-    });
-    
-    if (neighborCount > 0) {
-        avoidanceForce.divideScalar(neighborCount);
-    }
-    
-    return avoidanceForce;
-}
-createHealEffect(position) {
-    const healGeom = new THREE.SphereGeometry(2, 16, 16);
-    const healMat = new THREE.MeshBasicMaterial({
-        color: 0x00ff88, 
-        transparent: true, 
-        opacity: 0.6
-    });
-    const heal = new THREE.Mesh(healGeom, healMat);
-    heal.position.copy(position);
-    this.scene.add(heal);
-    this.explosions.push({mesh: heal, scale: 0});
 }
         initializeGameState() {
           this.gameStarted = !1;
@@ -2258,6 +2150,7 @@ createHealEffect(position) {
           this.updateTrails();
           this.updatePlanets();
           this.updateEnemies();
+          this.updateAllies();
           this.updateBullets();
           this.updateEnemyBullets();
           this.updateArtifacts();
@@ -2268,6 +2161,102 @@ createHealEffect(position) {
           this.updateMinimap();
           this.updateExplosions()
         }
+        updateAllies() {
+    this.allies = this.allies.filter(ally => {
+        if (ally.health <= 0) {
+            this.scene.remove(ally.mesh);
+            return false;
+        }
+        
+        const distanceToPlayer = ally.mesh.position.distanceTo(this.playerShip.position);
+        const combatRadius = 40;
+        const followDistance = 20;
+        
+        // Find nearby enemies
+        const nearbyEnemies = this.enemies.filter(enemy => 
+            enemy.health > 0 && 
+            enemy.mesh.position.distanceTo(this.playerShip.position) < combatRadius
+        );
+        
+        if (nearbyEnemies.length > 0) {
+            // Combat mode - attack nearest enemy
+            const target = nearbyEnemies.reduce((nearest, enemy) => 
+                enemy.mesh.position.distanceTo(ally.mesh.position) < 
+                nearest.mesh.position.distanceTo(ally.mesh.position) ? enemy : nearest
+            );
+            
+            const directionToTarget = new THREE.Vector3()
+                .subVectors(target.mesh.position, ally.mesh.position)
+                .normalize();
+            
+            ally.mesh.position.add(directionToTarget.multiplyScalar(0.3));
+            ally.mesh.lookAt(target.mesh.position);
+            
+            // Shoot at enemy
+            ally.shootCooldown--;
+            if (ally.shootCooldown <= 0) {
+                this.createAllyBullet(ally, target);
+                ally.shootCooldown = 90;
+            }
+        } else {
+            // Follow/heal mode
+            if (distanceToPlayer > followDistance) {
+                // Follow player
+                const directionToPlayer = new THREE.Vector3()
+                    .subVectors(this.playerShip.position, ally.mesh.position)
+                    .normalize();
+                ally.mesh.position.add(directionToPlayer.multiplyScalar(0.2));
+            } else {
+                // Stay behind and to side
+                const behindOffset = new THREE.Vector3(
+                    -Math.sin(this.playerShip.rotation.y) * ally.followSide * 8,
+                    0,
+                    -Math.cos(this.playerShip.rotation.y) * 12
+                );
+                ally.targetPosition.copy(this.playerShip.position).add(behindOffset);
+                
+                const directionToTarget = new THREE.Vector3()
+                    .subVectors(ally.targetPosition, ally.mesh.position)
+                    .normalize();
+                ally.mesh.position.add(directionToTarget.multiplyScalar(0.1));
+            }
+            
+            // Heal player
+            ally.healCooldown--;
+            if (ally.healCooldown <= 0 && this.player.health < CONFIG.player.health) {
+                this.player.health = Math.min(CONFIG.player.health, this.player.health + 5);
+                ally.healCooldown = 120;
+                this.updateHUD();
+            }
+        }
+        
+        ally.mesh.position.y = 5;
+        return true;
+    });
+}
+createAllyBullet(ally, target) {
+    const bulletGeom = new THREE.SphereGeometry(0.2, 8, 8);
+    const bulletMat = new THREE.MeshBasicMaterial({color: 0x00ff00});
+    const bullet = new THREE.Mesh(bulletGeom, bulletMat);
+    
+    bullet.position.copy(ally.mesh.position);
+    bullet.position.y += 0.5;
+    
+    const direction = new THREE.Vector3()
+        .subVectors(target.mesh.position, ally.mesh.position)
+        .normalize();
+    
+    const bulletVelocity = direction.multiplyScalar(CONFIG.bullet.speed);
+    
+    this.bullets.push({
+        mesh: bullet,
+        velocity: bulletVelocity,
+        life: CONFIG.bullet.life,
+        isAlly: true
+    });
+    
+    this.scene.add(bullet);
+}
         createTrail() {
           if (Math.random() > 0.3) return;
           const trailCount = 3;
@@ -2678,16 +2667,17 @@ createHealEffect(position) {
           }
           if (this.landingState !== 'none') return;
           this.enemies.forEach(enemy => {
-            if (enemy.health > 0 && enemy.mesh.position.distanceTo(this.playerShip.position) < 4) {
-              this.player.health -= 5;
-              this.collisionCooldown = 60;
-              this.audioManager.playCollision();
-              this.updateHUD();
-              if (this.player.health <= 0) {
-                this.gameOver()
-              }
-            }
-          })
+    if (enemy.health > 0 && !enemy.isAlly && 
+        enemy.mesh.position.distanceTo(this.playerShip.position) < 4) {
+        this.player.health -= 5;
+        this.collisionCooldown = 60;
+        this.audioManager.playCollision();
+        this.updateHUD();
+        if (this.player.health <= 0) {
+            this.gameOver();
+        }
+    }
+});
         }
         updateBackground() {
           if (this.backgroundManager) {
@@ -2977,6 +2967,9 @@ createHealEffect(position) {
           this.landingTarget = null;
           this.removeLandingGlow();
           this.restorePlayerDepth();
+          
+this.allies.forEach(ally => this.scene.remove(ally.mesh));
+this.allies = [];
           this.enemies.forEach(enemy => {
             const enemyConfig = EnemyFactory.types[enemy.type];
             enemy.health = enemyConfig.health;
@@ -3030,7 +3023,9 @@ createHealEffect(position) {
             if (e.code === 'KeyE') {
               this.startLanding()
             }
-
+            if (e.code === 'KeyF') {
+    this.spawnAlly();
+}
             if (e.code.startsWith('Digit')) {
               const weaponNumber = parseInt(e.code.charAt(5));
               this.switchWeapon(weaponNumber)
@@ -3120,9 +3115,7 @@ createHealEffect(position) {
         async startGame() {
           document.getElementById('intro').classList.add('hidden');
           await this.audioManager.start();
-          this.gameStarted = !0;
-          this.createAlly(this.playerShip.position.clone());
-
+          this.gameStarted = !0
         }
         animate() {
           requestAnimationFrame(() => this.animate());

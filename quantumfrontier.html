@@ -1447,287 +1447,272 @@ clearWaypoint() {
     this.waypoint = null;
 }
       }
-      class AudioManager {
-        constructor() {
-          this.initialized = !1;
-          this.lastCollisionTime = 0;
-          this.mineHum = !1;
-          this.engineRunning = !1;
-          this.backgroundMusic = null;
-          this.sfxSprite = null;
-          this.engineSound = null;
-          this.setup()
-        }
-        setup() {
-          try {
+
+class AudioManager {
+    constructor() {
+        this.initialized = false;
+        this.lastCollisionTime = 0;
+        this.lastBlasterTime = 0;
+        this.lastEnemyShotTime = 0;
+        this.mineHum = false;
+        this.engineRunning = false;
+        this.backgroundMusic = null;
+        this.sfxSprite = null;
+        this.engineSound = null;
+        
+        // Track playing sounds to prevent spam
+        this.activeSounds = new Map();
+        this.maxConcurrentSounds = {
+            blaster: 3,
+            enemyShot: 4,
+            explosion: 2,
+            collision: 1
+        };
+        
+        this.setup();
+    }
+
+    setup() {
+        try {
             const spriteMap = {
-              blaster: [0, 132],
-              enemyShot: [392, 628],
-              scatter: [630, 1372],
-              shotgun: [242, 553],
-              laser: [4252, 4425],
-              explosion: [1996, 2527],
-              damage: [3092, 3542],
-              collision: [6144, 6530],
-              enemyHit: [2538, 3034],
-              weaponSwitch: [5278, 5573],
-              powerUp: [4517, 5261],
-              mine: [5278, 5573],
-              landing: [5607, 7007],
-              takeoff: [7112, 8414]
+                blaster: [0, 132],
+                enemyShot: [392, 628],
+                scatter: [630, 1372],
+                shotgun: [242, 553],
+                laser: [4252, 4425],
+                explosion: [1996, 2527],
+                damage: [3092, 3542],
+                collision: [6144, 6530],
+                enemyHit: [2538, 3034],
+                weaponSwitch: [5278, 5573],
+                powerUp: [4517, 5261],
+                mine: [5278, 5573],
+                landing: [5607, 7007],
+                takeoff: [7112, 8414]
             };
+
             this.sfxSprite = new Howl({
-              src: ['sfx-sprite.mp3'],
-              sprite: spriteMap,
-              volume: 0.7,
-              preload: !0,
-              onloaderror: (id, error) => {
-                console.warn('Failed to load SFX sprite:', error)
-              }
+                src: ['sfx-sprite.mp3'],
+                sprite: spriteMap,
+                volume: 0.7,
+                preload: true,
+                onloaderror: (id, error) => {
+                    console.warn('Failed to load SFX sprite:', error);
+                }
             });
-            this.backgroundMusic = new Howl({
-              src: ['sfx-sprite.mp3'],
-              volume: 0,
-              loop: !0,
-              preload: !0,
-              onloaderror: (id, error) => {
-                console.warn('Failed to load background music:', error)
-              }
-            });
-            this.engineSound = new Howl({
-              src: ['sfx-sprite.mp3'],
-              volume: 0,
-              loop: !0,
-              preload: !0,
-              onloaderror: (id, error) => {
-                console.warn('Failed to load engine sound:', error)
-              }
-            });
-            this.laserActive = !1;
-            this.laserSoundId = null
-          } catch (error) {
-            console.warn('Audio setup failed:', error)
-          }
+
+            // Remove background music for now as requested
+            this.backgroundMusic = null;
+            this.engineSound = null;
+            
+            this.laserActive = false;
+            this.laserSoundId = null;
+        } catch (error) {
+            console.warn('Audio setup failed:', error);
         }
-        start() {
-          if (!this.initialized) {
-            try {
-              this.initialized = !0
-            } catch (error) {
-              console.warn('Audio start failed:', error)
+    }
+
+    // Add spatial audio support
+    calculateSpatialVolume(sourcePosition, listenerPosition, baseVolume = 1.0, maxDistance = 100) {
+        if (!sourcePosition || !listenerPosition) return baseVolume;
+        
+        const distance = sourcePosition.distanceTo(listenerPosition);
+        if (distance >= maxDistance) return 0;
+        
+        // Linear falloff - closer = louder
+        const spatialVolume = Math.max(0, 1 - (distance / maxDistance));
+        return baseVolume * spatialVolume;
+    }
+
+    // Improved sound management to prevent spam
+    canPlaySound(soundType) {
+        const maxConcurrent = this.maxConcurrentSounds[soundType] || 1;
+        const activeSoundsOfType = this.activeSounds.get(soundType) || [];
+        
+        // Clean up finished sounds
+        const stillPlaying = activeSoundsOfType.filter(soundId => this.sfxSprite.playing(soundId));
+        this.activeSounds.set(soundType, stillPlaying);
+        
+        return stillPlaying.length < maxConcurrent;
+    }
+
+    trackSound(soundType, soundId) {
+        if (!this.activeSounds.has(soundType)) {
+            this.activeSounds.set(soundType, []);
+        }
+        this.activeSounds.get(soundType).push(soundId);
+    }
+
+    playBlaster(sourcePos = null, listenerPos = null) {
+        if (!this.initialized || !this.sfxSprite) return;
+        
+        // Prevent spam
+        const currentTime = Date.now();
+        if (currentTime - this.lastBlasterTime < 50) return;
+        this.lastBlasterTime = currentTime;
+        
+        if (!this.canPlaySound('blaster')) return;
+        
+        try {
+            const soundId = this.sfxSprite.play('blaster');
+            this.trackSound('blaster', soundId);
+            
+            // Apply spatial audio if positions provided
+            if (sourcePos && listenerPos) {
+                const volume = this.calculateSpatialVolume(sourcePos, listenerPos, 0.7, 80);
+                this.sfxSprite.volume(volume, soundId);
             }
-          }
+        } catch (e) {}
+    }
+
+    playEnemyShot(sourcePos = null, listenerPos = null) {
+        if (!this.initialized || !this.sfxSprite) return;
+        
+        // Prevent spam
+        const currentTime = Date.now();
+        if (currentTime - this.lastEnemyShotTime < 30) return;
+        this.lastEnemyShotTime = currentTime;
+        
+        if (!this.canPlaySound('enemyShot')) return;
+        
+        try {
+            const soundId = this.sfxSprite.play('enemyShot');
+            this.trackSound('enemyShot', soundId);
+            
+            // Apply spatial audio
+            if (sourcePos && listenerPos) {
+                const volume = this.calculateSpatialVolume(sourcePos, listenerPos, 0.6, 100);
+                this.sfxSprite.volume(volume, soundId);
+            }
+        } catch (e) {}
+    }
+
+    playExplosion(size = 1, sourcePos = null, listenerPos = null) {
+        if (!this.initialized || !this.sfxSprite) return;
+        
+        if (!this.canPlaySound('explosion')) return;
+        
+        try {
+            const soundId = this.sfxSprite.play('explosion');
+            this.trackSound('explosion', soundId);
+            
+            let volume = Math.min(size * 0.7, 1.0);
+            
+            // Apply spatial audio
+            if (sourcePos && listenerPos) {
+                volume = this.calculateSpatialVolume(sourcePos, listenerPos, volume, 150);
+            }
+            
+            this.sfxSprite.volume(volume, soundId);
+        } catch (e) {}
+    }
+
+    playCollision() {
+        if (!this.initialized || !this.sfxSprite) return;
+        const currentTime = Date.now();
+        if (currentTime - this.lastCollisionTime < 300) return; // Increased cooldown
+        this.lastCollisionTime = currentTime;
+        
+        try {
+            this.sfxSprite.play('collision');
+        } catch (e) {}
+    }
+
+    playDamage() {
+        if (!this.initialized || !this.sfxSprite) return;
+        const currentTime = Date.now();
+        if (currentTime - this.lastCollisionTime < 200) return; // Increased cooldown
+        this.lastCollisionTime = currentTime;
+        
+        try {
+            this.sfxSprite.play('damage');
+        } catch (e) {}
+    }
+
+    // Simplified laser audio
+    playLaser() {
+        if (!this.initialized || !this.sfxSprite || this.laserActive) return;
+        
+        try {
+            this.laserActive = true;
+            this.laserSoundId = this.sfxSprite.play('laser');
+            this.sfxSprite.loop(true, this.laserSoundId);
+            this.sfxSprite.volume(0.5, this.laserSoundId); // Lower volume for laser
+        } catch (e) {
+            this.laserActive = false;
         }
-        dispose() {
-          try {
+    }
+
+    stopLaser() {
+        if (!this.initialized || !this.sfxSprite || !this.laserActive) return;
+        
+        try {
+            if (this.laserSoundId) {
+                this.sfxSprite.stop(this.laserSoundId);
+            }
+            this.laserActive = false;
+            this.laserSoundId = null;
+        } catch (e) {
+            this.laserActive = false;
+        }
+    }
+
+    // Keep all other methods unchanged
+    start() {
+        if (!this.initialized) {
+            try {
+                this.initialized = true;
+            } catch (error) {
+                console.warn('Audio start failed:', error);
+            }
+        }
+    }
+
+    dispose() {
+        try {
             if (this.sfxSprite) {
-              this.sfxSprite.stop();
-              this.sfxSprite.unload()
+                this.sfxSprite.stop();
+                this.sfxSprite.unload();
             }
             if (this.backgroundMusic) {
-              this.backgroundMusic.stop();
-              this.backgroundMusic.unload()
+                this.backgroundMusic.stop();
+                this.backgroundMusic.unload();
             }
             if (this.engineSound) {
-              this.engineSound.stop();
-              this.engineSound.unload()
+                this.engineSound.stop();
+                this.engineSound.unload();
             }
-            this.laserActive = !1;
-            this.engineRunning = !1
-          } catch (error) {
-            console.warn('Audio disposal error:', error)
-          }
+            this.laserActive = false;
+            this.engineRunning = false;
+        } catch (error) {
+            console.warn('Audio disposal error:', error);
         }
-        playBlaster() {
-          if (!this.initialized || !this.sfxSprite) return;
-          try {
-            this.sfxSprite.play('blaster')
-          } catch (e) {}
-        }
-        playEnemyShot() {
-          if (!this.initialized || !this.sfxSprite) return;
-          try {
-            this.sfxSprite.play('enemyShot')
-          } catch (e) {}
-        }
-        playScatter() {
-          if (!this.initialized || !this.sfxSprite) return;
-          try {
-            this.sfxSprite.play('scatter')
-          } catch (e) {}
-        }
-        playShotgun() {
-          if (!this.initialized || !this.sfxSprite) return;
-          try {
-            this.sfxSprite.play('shotgun')
-          } catch (e) {}
-        }
-        playLaser() {
-          if (!this.initialized || !this.sfxSprite || this.laserActive) return;
-          try {
-            this.laserActive = !0;
-            this.laserSoundId = this.sfxSprite.play('laser');
-            this.sfxSprite.loop(!0, this.laserSoundId)
-          } catch (e) {
-            this.laserActive = !1
-          }
-        }
-        stopLaser() {
-          if (!this.initialized || !this.sfxSprite || !this.laserActive) return;
-          try {
-            if (this.laserSoundId) {
-              this.sfxSprite.stop(this.laserSoundId)
-            }
-            this.laserActive = !1;
-            this.laserSoundId = null
-          } catch (e) {
-            this.laserActive = !1
-          }
-        }
-        playExplosion(size = 1) {
-          if (!this.initialized || !this.sfxSprite) return;
-          try {
-            const soundId = this.sfxSprite.play('explosion');
-            this.sfxSprite.volume(Math.min(size * 0.7, 1.0), soundId)
-          } catch (e) {}
-        }
-        playCollision() {
-          if (!this.initialized || !this.sfxSprite) return;
-          const currentTime = Date.now();
-          if (currentTime - this.lastCollisionTime < 200) return;
-          this.lastCollisionTime = currentTime;
-          try {
-            this.sfxSprite.play('collision')
-          } catch (e) {}
-        }
-        playDamage() {
-          if (!this.initialized || !this.sfxSprite) return;
-          const currentTime = Date.now();
-          if (currentTime - this.lastCollisionTime < 150) return;
-          this.lastCollisionTime = currentTime;
-          try {
-            this.sfxSprite.play('damage')
-          } catch (e) {}
-        }
-        playEnemyHit() {
-          if (!this.initialized || !this.sfxSprite) return;
-          try {
-            this.sfxSprite.play('enemyHit')
-          } catch (e) {}
-        }
-        playWeaponSwitch() {
-          if (!this.initialized || !this.sfxSprite) return;
-          try {
-            this.sfxSprite.play('weaponSwitch')
-          } catch (e) {}
-        }
-        playPowerUp() {
-          if (!this.initialized || !this.sfxSprite) return;
-          try {
-            this.sfxSprite.play('powerUp')
-          } catch (e) {}
-        }
-        playMine() {
-          if (!this.initialized || !this.sfxSprite) return;
-          try {
-            this.sfxSprite.play('mine')
-          } catch (e) {}
-        }
-        playLanding() {
-          if (!this.initialized || !this.sfxSprite) return;
-          try {
-            this.sfxSprite.play('landing')
-          } catch (e) {}
-        }
-        playTakeoff() {
-          if (!this.initialized || !this.sfxSprite) return;
-          try {
-            this.sfxSprite.play('takeoff')
-          } catch (e) {}
-        }
-        startBackgroundMusic() {
-          if (!this.initialized || !this.backgroundMusic) return;
-          try {
-            if (!this.backgroundMusic.playing()) {
-              this.backgroundMusic.play()
-            }
-          } catch (e) {}
-        }
-        stopBackgroundMusic() {
-          if (!this.initialized || !this.backgroundMusic) return;
-          try {
-            this.backgroundMusic.stop()
-          } catch (e) {}
-        }
-        pauseBackgroundMusic() {
-          if (!this.initialized || !this.backgroundMusic) return;
-          try {
-            this.backgroundMusic.pause()
-          } catch (e) {}
-        }
-        resumeBackgroundMusic() {
-          if (!this.initialized || !this.backgroundMusic) return;
-          try {
-            if (this.backgroundMusic.playing() === !1) {
-              this.backgroundMusic.play()
-            }
-          } catch (e) {}
-        }
-        startEngine() {
-          if (!this.initialized || !this.engineSound || this.engineRunning) return;
-          try {
-            this.engineRunning = !0;
-            this.engineSound.play()
-          } catch (e) {
-            this.engineRunning = !1
-          }
-        }
-        stopEngine() {
-          if (!this.initialized || !this.engineSound || !this.engineRunning) return;
-          try {
-            this.engineSound.stop();
-            this.engineRunning = !1
-          } catch (e) {
-            this.engineRunning = !1
-          }
-        }
-        setMasterVolume(volume) {
-          if (!this.initialized) return;
-          try {
-            Howler.volume(Math.max(0, Math.min(1, volume)))
-          } catch (e) {}
-        }
-        setSFXVolume(volume) {
-          if (!this.initialized || !this.sfxSprite) return;
-          try {
-            this.sfxSprite.volume(Math.max(0, Math.min(1, volume)))
-          } catch (e) {}
-        }
-        setMusicVolume(volume) {
-          if (!this.initialized || !this.backgroundMusic) return;
-          try {
-            this.backgroundMusic.volume(Math.max(0, Math.min(1, volume)))
-          } catch (e) {}
-        }
-        setEngineVolume(volume) {
-          if (!this.initialized || !this.engineSound) return;
-          try {
-            this.engineSound.volume(Math.max(0, Math.min(1, volume)))
-          } catch (e) {}
-        }
-        mute() {
-          if (!this.initialized) return;
-          try {
-            Howler.mute(!0)
-          } catch (e) {}
-        }
-        unmute() {
-          if (!this.initialized) return;
-          try {
-            Howler.mute(!1)
-          } catch (e) {}
-        }
-      }
+    }
+
+    // Keep other methods as they are, just add spatial audio support where needed
+    playScatter() { if (this.initialized && this.sfxSprite) try { this.sfxSprite.play('scatter'); } catch (e) {} }
+    playShotgun() { if (this.initialized && this.sfxSprite) try { this.sfxSprite.play('shotgun'); } catch (e) {} }
+    playEnemyHit() { if (this.initialized && this.sfxSprite) try { this.sfxSprite.play('enemyHit'); } catch (e) {} }
+    playWeaponSwitch() { if (this.initialized && this.sfxSprite) try { this.sfxSprite.play('weaponSwitch'); } catch (e) {} }
+    playPowerUp() { if (this.initialized && this.sfxSprite) try { this.sfxSprite.play('powerUp'); } catch (e) {} }
+    playMine() { if (this.initialized && this.sfxSprite) try { this.sfxSprite.play('mine'); } catch (e) {} }
+    playLanding() { if (this.initialized && this.sfxSprite) try { this.sfxSprite.play('landing'); } catch (e) {} }
+    playTakeoff() { if (this.initialized && this.sfxSprite) try { this.sfxSprite.play('takeoff'); } catch (e) {} }
+
+    // Stub methods for removed features
+    startBackgroundMusic() {}
+    stopBackgroundMusic() {}
+    pauseBackgroundMusic() {}
+    resumeBackgroundMusic() {}
+    startEngine() {}
+    stopEngine() {}
+    setMasterVolume(volume) { try { Howler.volume(Math.max(0, Math.min(1, volume))); } catch (e) {} }
+    setSFXVolume(volume) { if (this.sfxSprite) try { this.sfxSprite.volume(Math.max(0, Math.min(1, volume))); } catch (e) {} }
+    setMusicVolume(volume) {}
+    setEngineVolume(volume) {}
+    mute() { try { Howler.mute(true); } catch (e) {} }
+    unmute() { try { Howler.mute(false); } catch (e) {} }
+}
       class SpaceShooter {
         constructor() {
           this.initializeRenderer();
@@ -2543,9 +2528,10 @@ showWaypointSetFeedback(x, y) {
           }
         }
         fireBlaster() {
-          this.createBullet(0);
-          this.audioManager.playBlaster()
-        }
+    this.createBullet(0);
+    this.audioManager.playBlaster(this.playerShip.position, this.playerShip.position); // Same position for player sounds
+}
+
         fireScatter(count) {
           const spreadAngle = Math.PI / 6;
           for (let i = 0; i < count; i++) {
@@ -2864,28 +2850,25 @@ this.allies.forEach(otherAlly => {
     });
 }
 createAllyBullet(ally, target) {
-    const bulletGeom = new THREE.SphereGeometry(0.3, 8, 8); // Bullet size
-    const bulletMat = new THREE.MeshBasicMaterial({color: 0x00ff00});
+    const bulletGeom = new THREE.SphereGeometry(0.3, 8, 8);
+    const bulletMat = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
     const bullet = new THREE.Mesh(bulletGeom, bulletMat);
-    
     bullet.position.copy(ally.mesh.position);
     bullet.position.y += 0.5;
-    
-    const direction = new THREE.Vector3()
-        .subVectors(target.mesh.position, ally.mesh.position)
-        .normalize();
-    
-    const bulletVelocity = direction.multiplyScalar(CONFIG.bullet.speed * 1.5); // 1.5x faster bullets
+    const direction = new THREE.Vector3().subVectors(target.mesh.position, ally.mesh.position).normalize();
+    const bulletVelocity = direction.multiplyScalar(CONFIG.bullet.speed * 1.5);
     
     this.bullets.push({
         mesh: bullet,
         velocity: bulletVelocity,
         life: CONFIG.bullet.life,
         isAlly: true,
-        damage: 25 // Add custom damage property
+        damage: 25
     });
-    
     this.scene.add(bullet);
+    
+    // Add spatial audio for ally shots
+    this.audioManager.playBlaster(ally.mesh.position, this.playerShip.position);
 }
         createTrail() {
           if (Math.random() > 0.3) return;
@@ -3085,29 +3068,29 @@ createAllyBullet(ally, target) {
           return avoidanceForce
         }
         enemyShoot(enemy) {
-          const weaponTypes = {
-            'rapid': () => {
-              this.createEnemyBullet(enemy);
-              this.audioManager.playEnemyShot()
-            },
-            'burst': () => {
-              for (let i = 0; i < 3; i++) {
+    const weaponTypes = {
+        'rapid': () => {
+            this.createEnemyBullet(enemy);
+            this.audioManager.playEnemyShot(enemy.mesh.position, this.playerShip.position);
+        },
+        'burst': () => {
+            for (let i = 0; i < 3; i++) {
                 setTimeout(() => {
-                  if (enemy.health > 0) {
-                    this.createEnemyBullet(enemy);
-                    this.audioManager.playEnemyShot()
-                  }
-                }, i * 100)
-              }
-            },
-            'heavy': () => {
-              this.createEnemyBullet(enemy);
-              this.audioManager.playEnemyShot()
+                    if (enemy.health > 0) {
+                        this.createEnemyBullet(enemy);
+                        this.audioManager.playEnemyShot(enemy.mesh.position, this.playerShip.position);
+                    }
+                }, i * 100);
             }
-          };
-          const shootFunction = weaponTypes[enemy.weaponType] || weaponTypes.rapid;
-          shootFunction()
+        },
+        'heavy': () => {
+            this.createEnemyBullet(enemy);
+            this.audioManager.playEnemyShot(enemy.mesh.position, this.playerShip.position);
         }
+    };
+    const shootFunction = weaponTypes[enemy.weaponType] || weaponTypes.rapid;
+    shootFunction();
+}
         createEnemyBullet(enemy) {
           const bulletGeom = new THREE.SphereGeometry(0.3, 8, 8);
           const bulletMat = new THREE.MeshBasicMaterial({
@@ -3502,51 +3485,47 @@ createAllyBullet(ally, target) {
           })
         }
         destroyPlanet(planet) {
-          planet.destroyed = !0;
-          this.createExplosion(planet.center, planet.config.radius);
-          this.audioManager.playExplosion(2);
-          this.scene.remove(planet.mesh);
-          this.player.score += 500;
-          this.updateHUD();
-          this.enemies = this.enemies.filter(enemy => {
-            if (enemy.planet === planet) {
-              this.scene.remove(enemy.mesh);
-              return !1
-            }
-            return !0
-          })
+    planet.destroyed = true;
+    this.createExplosion(planet.center, planet.config.radius);
+    this.audioManager.playExplosion(2, planet.center, this.playerShip.position); // Updated call
+    this.scene.remove(planet.mesh);
+    this.player.score += 500;
+    this.updateHUD();
+    
+    this.enemies = this.enemies.filter(enemy => {
+        if (enemy.planet === planet) {
+            this.scene.remove(enemy.mesh);
+            return false;
         }
+        return true;
+    });
+}
         explodeMine(mine) {
-          const explosionGeom = new THREE.SphereGeometry(8, 16, 16);
-          const explosionMat = new THREE.MeshBasicMaterial({
-            color: 0xff4757,
-            transparent: !0,
-            opacity: 0.6
-          });
-          const explosion = new THREE.Mesh(explosionGeom, explosionMat);
-          explosion.position.copy(mine.mesh.position);
-          this.scene.add(explosion);
-          this.explosions.push({
-            mesh: explosion,
-            scale: 0
-          });
-          this.audioManager.playExplosion(1.5);
-          this.enemies.forEach(enemy => {
-            if (enemy.health > 0 && explosion.position.distanceTo(enemy.mesh.position) < 8) {
-              enemy.health -= 50;
-              this.audioManager.playEnemyHit();
-              if (enemy.health <= 0) {
+    const explosionGeom = new THREE.SphereGeometry(8, 16, 16);
+    const explosionMat = new THREE.MeshBasicMaterial({ color: 0xff4757, transparent: true, opacity: 0.6 });
+    const explosion = new THREE.Mesh(explosionGeom, explosionMat);
+    explosion.position.copy(mine.mesh.position);
+    this.scene.add(explosion);
+    this.explosions.push({ mesh: explosion, scale: 0 });
+    
+    this.audioManager.playExplosion(1.5, mine.mesh.position, this.playerShip.position); // Updated call
+    
+    this.enemies.forEach(enemy => {
+        if (enemy.health > 0 && explosion.position.distanceTo(enemy.mesh.position) < 8) {
+            enemy.health -= 50;
+            this.audioManager.playEnemyHit();
+            if (enemy.health <= 0) {
                 this.createExplosion(enemy.mesh.position);
-                this.audioManager.playExplosion();
-                enemy.mesh.visible = !1;
-                enemy.stuck = !0;
+                this.audioManager.playExplosion(1, enemy.mesh.position, this.playerShip.position); // Updated call
+                enemy.mesh.visible = false;
+                enemy.stuck = true;
                 this.player.score += enemy.score;
                 this.dropArtifact(enemy.mesh.position);
-                this.updateHUD()
-              }
+                this.updateHUD();
             }
-          })
         }
+    });
+}
         updateHUD() {
           document.getElementById('health').textContent = this.player.health;
           document.getElementById('score').textContent = this.player.score

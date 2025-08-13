@@ -1177,13 +1177,71 @@ nebula.position.set(
           this.canvas = document.getElementById('minimapCanvas');
           this.ctx = this.canvas.getContext('2d');
           this.expanded = !1;
+            this.waypoint = null;
           this.setupEvents()
         }
         setupEvents() {
           document.getElementById('minimapToggle').addEventListener('click', () => {
             this.toggleExpanded()
-          })
+          });
+           this.canvas.addEventListener('click', (e) => {
+        this.setWaypoint(e);
+    });
         }
+        updateWaypoint() {
+    if (this.waypoint && this.waypoint.type === 'planet' && this.waypoint.planet) {
+        // Update waypoint position to follow the planet
+        this.waypoint.x = this.waypoint.planet.center.x;
+        this.waypoint.z = this.waypoint.planet.center.z;
+    }
+}
+       setWaypoint(event) {
+    const rect = this.canvas.getBoundingClientRect();
+    const clickX = event.clientX - rect.left;
+    const clickY = event.clientY - rect.top;
+    
+    const size = this.expanded ? 300 : 120;
+    const scale = this.expanded ? 0.8 : 0.3;
+    const centerX = size / 2;
+    const centerY = size / 2;
+    
+    // Convert click coordinates to world coordinates
+    const worldX = (clickX - centerX) / scale + game.playerShip.position.x;
+    const worldZ = (clickY - centerY) / scale + game.playerShip.position.z;
+    
+    // Check if click is near a planet
+    let targetPlanet = null;
+    let minDistance = Infinity;
+    
+    game.planets.forEach(planet => {
+        if (planet.destroyed) return;
+        const distance = Math.sqrt(
+            Math.pow(worldX - planet.center.x, 2) + 
+            Math.pow(worldZ - planet.center.z, 2)
+        );
+        const clickRadius = planet.config.radius + 10; // Give some tolerance
+        
+        if (distance < clickRadius && distance < minDistance) {
+            minDistance = distance;
+            targetPlanet = planet;
+        }
+    });
+    
+    if (targetPlanet) {
+        this.waypoint = { 
+            x: targetPlanet.center.x, 
+            z: targetPlanet.center.z, 
+            planet: targetPlanet,
+            type: 'planet'
+        };
+    } else {
+        this.waypoint = { 
+            x: worldX, 
+            z: worldZ, 
+            type: 'static'
+        };
+    }
+}
         toggleExpanded() {
           this.expanded = !this.expanded;
           const minimap = document.getElementById('minimap');
@@ -1199,61 +1257,156 @@ nebula.position.set(
           }
         }
         update(playerPos, planets, enemies) {
-          const ctx = this.ctx;
-          const size = this.expanded ? 300 : 120;
-          const scale = this.expanded ? 0.8 : 0.3;
-          const centerX = size / 2;
-          const centerY = size / 2;
-          ctx.clearRect(0, 0, size, size);
-          ctx.fillStyle = 'rgba(0, 0, 20, 0.9)';
-          ctx.fillRect(0, 0, size, size);
-          ctx.strokeStyle = 'rgba(79, 172, 254, 0.3)';
-          ctx.lineWidth = 1;
-          ctx.strokeRect(1, 1, size - 2, size - 2);
-          planets.forEach(planet => {
-            if (planet.destroyed) return;
-            const relX = (planet.center.x - playerPos.x) * scale + centerX;
-            const relY = (planet.center.z - playerPos.z) * scale + centerY;
-            if (relX >= -10 && relX <= size + 10 && relY >= -10 && relY <= size + 10) {
-              const radius = Math.max(2, planet.config.radius * scale * 0.3);
-              ctx.fillStyle = `#${planet.config.color.toString(16).padStart(6,'0')}`;
-              ctx.beginPath();
-              ctx.arc(relX, relY, radius, 0, Math.PI * 2);
-              ctx.fill();
-              ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-              ctx.lineWidth = 1;
-              ctx.stroke()
+    const ctx = this.ctx;
+    const size = this.expanded ? 300 : 120;
+    const scale = this.expanded ? 0.8 : 0.3;
+    const centerX = size / 2;
+    const centerY = size / 2;
+
+    ctx.clearRect(0, 0, size, size);
+    ctx.fillStyle = 'rgba(0, 0, 20, 0.9)';
+    ctx.fillRect(0, 0, size, size);
+    ctx.strokeStyle = 'rgba(79, 172, 254, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(1, 1, size - 2, size - 2);
+
+    // Draw orbital paths when expanded
+    if (this.expanded) {
+        planets.forEach(planet => {
+            if (planet.destroyed || !planet.config.orbitCenter) return;
+            
+            const orbitCenterX = (planet.config.orbitCenter.x - playerPos.x) * scale + centerX;
+            const orbitCenterY = (planet.config.orbitCenter.z - playerPos.z) * scale + centerY;
+            const orbitRadius = planet.config.orbitDistance * scale;
+            
+            if (orbitRadius > 5) { // Only draw if orbit is visible
+                ctx.strokeStyle = 'rgba(100, 100, 100, 0.3)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([2, 2]);
+                ctx.beginPath();
+                ctx.arc(orbitCenterX, orbitCenterY, orbitRadius, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
             }
-          });
-          enemies.forEach(enemy => {
-            if (enemy.health <= 0) return;
-            const relX = (enemy.mesh.position.x - playerPos.x) * scale + centerX;
-            const relY = (enemy.mesh.position.z - playerPos.z) * scale + centerY;
-            if (relX >= -5 && relX <= size + 5 && relY >= -5 && relY <= size + 5) {
-              ctx.fillStyle = enemy.attacking ? '#ff4757' : '#ff9f43';
-              ctx.beginPath();
-              ctx.arc(relX, relY, 2, 0, Math.PI * 2);
-              ctx.fill()
+        });
+    }
+
+    // Draw planets
+    planets.forEach(planet => {
+        if (planet.destroyed) return;
+        const relX = (planet.center.x - playerPos.x) * scale + centerX;
+        const relY = (planet.center.z - playerPos.z) * scale + centerY;
+        
+        if (relX >= -10 && relX <= size + 10 && relY >= -10 && relY <= size + 10) {
+            const radius = Math.max(2, planet.config.radius * scale * 0.3);
+            ctx.fillStyle = `#${planet.config.color.toString(16).padStart(6, '0')}`;
+            ctx.beginPath();
+            ctx.arc(relX, relY, radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            
+            // Draw planet names when expanded
+            if (this.expanded && planet.config.dialogue) {
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '10px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(planet.config.dialogue.name, relX, relY - radius - 5);
             }
-          });
-          ctx.fillStyle = '#00f2fe';
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-          const angle = Math.atan2(0, 1);
-          const arrowLength = 8;
-          const arrowX = centerX + Math.cos(angle) * arrowLength;
-          const arrowY = centerY + Math.sin(angle) * arrowLength;
-          ctx.strokeStyle = '#00f2fe';
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.moveTo(centerX, centerY);
-          ctx.lineTo(arrowX, arrowY);
-          ctx.stroke()
         }
+    });
+
+    // Draw enemies
+    enemies.forEach(enemy => {
+        if (enemy.health <= 0) return;
+        const relX = (enemy.mesh.position.x - playerPos.x) * scale + centerX;
+        const relY = (enemy.mesh.position.z - playerPos.z) * scale + centerY;
+        
+        if (relX >= -5 && relX <= size + 5 && relY >= -5 && relY <= size + 5) {
+            ctx.fillStyle = enemy.attacking ? '#ff4757' : '#ff9f43';
+            ctx.beginPath();
+            ctx.arc(relX, relY, 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    });
+
+    // Draw waypoint
+    if (this.waypoint) {
+        const waypointX = (this.waypoint.x - playerPos.x) * scale + centerX;
+        const waypointY = (this.waypoint.z - playerPos.z) * scale + centerY;
+        
+        // Draw waypoint if in view
+        if (waypointX >= -10 && waypointX <= size + 10 && waypointY >= -10 && waypointY <= size + 10) {
+            ctx.fillStyle = '#feca57';
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(waypointX, waypointY, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            
+            // Draw X marker
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(waypointX - 2, waypointY - 2);
+            ctx.lineTo(waypointX + 2, waypointY + 2);
+            ctx.moveTo(waypointX + 2, waypointY - 2);
+            ctx.lineTo(waypointX - 2, waypointY + 2);
+            ctx.stroke();
+        }
+        
+        // Draw compass arrow to waypoint (always visible)
+        const dx = this.waypoint.x - playerPos.x;
+        const dz = this.waypoint.z - playerPos.z;
+        const distance = Math.sqrt(dx * dx + dz * dz);
+        
+        if (distance > 5) { // Only show compass if waypoint is not too close
+            const angle = Math.atan2(dx, dz);
+            const compassRadius = size * 0.35;
+            const arrowX = centerX + Math.sin(angle) * compassRadius;
+            const arrowY = centerY + Math.cos(angle) * compassRadius;
+            
+            // Draw compass arrow
+            ctx.strokeStyle = '#feca57';
+            ctx.fillStyle = '#feca57';
+            ctx.lineWidth = 2;
+            
+            const arrowSize = 6;
+            ctx.beginPath();
+            ctx.moveTo(arrowX, arrowY);
+            ctx.lineTo(arrowX - arrowSize * Math.sin(angle + 0.5), arrowY - arrowSize * Math.cos(angle + 0.5));
+            ctx.lineTo(arrowX - arrowSize * Math.sin(angle - 0.5), arrowY - arrowSize * Math.cos(angle - 0.5));
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        }
+    }
+
+    // Draw player
+    ctx.fillStyle = '#00f2fe';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    const angle = Math.atan2(0, 1);
+    const arrowLength = 8;
+    const arrowX = centerX + Math.cos(angle) * arrowLength;
+    const arrowY = centerY + Math.sin(angle) * arrowLength;
+    ctx.strokeStyle = '#00f2fe';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY);
+    ctx.lineTo(arrowX, arrowY);
+    ctx.stroke();
+}
+clearWaypoint() {
+    this.waypoint = null;
+}
       }
       class AudioManager {
         constructor() {
@@ -1590,10 +1743,140 @@ nebula.position.set(
     this.allies.push(ally);
     this.scene.add(ally.mesh);
 }
+createWaypointIndicator() {
+    this.removeWaypointIndicator();
+    
+    // Create a subtle arrow indicator
+    const arrowGeometry = new THREE.ConeGeometry(0.5, 2, 8);
+    const arrowMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0xfeca57, 
+        transparent: true, 
+        opacity: 0.8 
+    });
+    this.waypointIndicator = new THREE.Mesh(arrowGeometry, arrowMaterial);
+    this.waypointIndicator.rotation.x = -Math.PI / 2; // Point forward
+    this.scene.add(this.waypointIndicator);
+}
+
+removeWaypointIndicator() {
+    if (this.waypointIndicator) {
+        this.scene.remove(this.waypointIndicator);
+        this.waypointIndicator = null;
+    }
+}
+
+updateWaypointIndicator() {
+    const waypoint = this.minimapManager.waypoint;
+    
+    if (!waypoint) {
+        this.removeWaypointIndicator();
+        return;
+    }
+    
+    // Check if we've reached the waypoint
+    const distance = Math.sqrt(
+        Math.pow(this.playerShip.position.x - waypoint.x, 2) + 
+        Math.pow(this.playerShip.position.z - waypoint.z, 2)
+    );
+    
+    const reachDistance = waypoint.type === 'planet' ? 
+        (waypoint.planet ? waypoint.planet.config.radius + 15 : 10) : 10;
+    
+    if (distance < reachDistance) {
+        if (this.waypointReachedCooldown <= 0) {
+            this.showWaypointReachedNotification(waypoint);
+            this.minimapManager.waypoint = null; // Clear waypoint
+            this.removeWaypointIndicator();
+            this.waypointReachedCooldown = 180; // 3 second cooldown
+        }
+        return;
+    }
+    
+    // Create indicator if it doesn't exist
+    if (!this.waypointIndicator) {
+        this.createWaypointIndicator();
+    }
+    
+    // Position the indicator
+    const direction = new THREE.Vector3(
+        waypoint.x - this.playerShip.position.x,
+        0,
+        waypoint.z - this.playerShip.position.z
+    ).normalize();
+    
+    // Place indicator in front of player
+    const indicatorDistance = 8;
+    this.waypointIndicator.position.copy(this.playerShip.position);
+    this.waypointIndicator.position.add(direction.multiplyScalar(indicatorDistance));
+    this.waypointIndicator.position.y = 6;
+    
+    // Point toward waypoint
+    this.waypointIndicator.lookAt(new THREE.Vector3(waypoint.x, 6, waypoint.z));
+    
+    // Add subtle pulsing animation
+    const pulse = 0.8 + 0.2 * Math.sin(Date.now() * 0.005);
+    this.waypointIndicator.scale.setScalar(pulse);
+}
+
+showWaypointReachedNotification(waypoint) {
+    // Create subtle notification
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: #feca57;
+        font-family: 'Courier New', monospace;
+        font-size: 18px;
+        font-weight: bold;
+        text-shadow: 0 0 15px rgba(254, 202, 87, 0.9);
+        background: rgba(0, 0, 0, 0.7);
+        padding: 15px 25px;
+        border-radius: 10px;
+        border: 2px solid rgba(254, 202, 87, 0.6);
+        z-index: 1000;
+        animation: waypointFade 2s ease-out forwards;
+        pointer-events: none;
+    `;
+    
+    const message = waypoint.type === 'planet' && waypoint.planet?.config.dialogue ?
+        `Reached: ${waypoint.planet.config.dialogue.name}` :
+        'Waypoint Reached';
+    
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    // Add CSS animation if not exists
+    if (!document.querySelector('#waypointStyles')) {
+        const style = document.createElement('style');
+        style.id = 'waypointStyles';
+        style.textContent = `
+            @keyframes waypointFade {
+                0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+                20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+                80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+                100% { opacity: 0; transform: translate(-50%, -50%) scale(1.1); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    // Remove notification after animation
+    setTimeout(() => {
+        document.body.removeChild(notification);
+    }, 2000);
+    
+    // Play subtle sound
+    this.audioManager.playPowerUp();
+}
         initializeGameState() {
           this.gameStarted = !1;
           this.trails = [];
           this.allies = [];
+
+    this.waypointIndicator = null; // ADD THIS
+    this.waypointReachedCooldown = 0; // ADD THIS
           this.collisionEnabled = !0;
           this.trailStyle = 'nebula';
           this.player = {
@@ -2281,6 +2564,9 @@ nebula.position.set(
           this.updateCollisions();
           this.updateBackground();
           this.updateEffects();
+           this.minimapManager.updateWaypoint(); // Update planet waypoints
+    this.updateWaypointIndicator(); // Update 3D indicator
+    if (this.waypointReachedCooldown > 0) this.waypointReachedCooldown--;
           this.updateMinimap();
           this.updateExplosions()
         }
@@ -3143,6 +3429,9 @@ createAllyBullet(ally, target) {
           this.removeLandingGlow();
           this.restorePlayerDepth();
 
+    this.minimapManager.waypoint = null;
+    this.removeWaypointIndicator();
+    this.waypointReachedCooldown = 0;
 this.allies.forEach(ally => this.scene.remove(ally.mesh));
 this.allies = [];
           this.enemies.forEach(enemy => {

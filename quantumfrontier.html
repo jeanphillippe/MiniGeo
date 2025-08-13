@@ -1466,7 +1466,7 @@
           document.getElementById('gameContainer').appendChild(this.renderer.domElement)
         }
         spawnAlly() {
-    const ally = EnemyFactory.create('f', null, 0, 1); // Red fighter ship
+    const ally = EnemyFactory.create('i', null, 0, 1); // Red fighter ship
     if (!ally) return;
     
     // Position ally near player
@@ -2192,13 +2192,13 @@
             );
             
             moveDirection.subVectors(target.mesh.position, ally.mesh.position).normalize();
-            ally.mesh.position.add(moveDirection.multiplyScalar(0.3));
+            ally.mesh.position.add(moveDirection.multiplyScalar(0.5));
             
             // Shoot at enemy
             ally.shootCooldown--;
             if (ally.shootCooldown <= 0) {
                 this.createAllyBullet(ally, target);
-                ally.shootCooldown = 90;
+                ally.shootCooldown = 40;
             }
         } else {
             // Follow/heal mode
@@ -2226,7 +2226,7 @@
             ally.healCooldown--;
             if (ally.healCooldown <= 0 && this.player.health < CONFIG.player.health) {
                 this.player.health = Math.min(CONFIG.player.health, this.player.health + 5);
-                ally.healCooldown = 120;
+                ally.healCooldown = 30;
                 this.updateHUD();
                 
                 // Create healing beam visual
@@ -2259,7 +2259,7 @@ this.allies.forEach(otherAlly => {
     });
 }
 createAllyBullet(ally, target) {
-    const bulletGeom = new THREE.SphereGeometry(0.2, 8, 8);
+    const bulletGeom = new THREE.SphereGeometry(0.3, 8, 8); // Bullet size
     const bulletMat = new THREE.MeshBasicMaterial({color: 0x00ff00});
     const bullet = new THREE.Mesh(bulletGeom, bulletMat);
     
@@ -2270,13 +2270,14 @@ createAllyBullet(ally, target) {
         .subVectors(target.mesh.position, ally.mesh.position)
         .normalize();
     
-    const bulletVelocity = direction.multiplyScalar(CONFIG.bullet.speed);
+    const bulletVelocity = direction.multiplyScalar(CONFIG.bullet.speed * 1.5); // 1.5x faster bullets
     
     this.bullets.push({
         mesh: bullet,
         velocity: bulletVelocity,
         life: CONFIG.bullet.life,
-        isAlly: true
+        isAlly: true,
+        damage: 25 // Add custom damage property
     });
     
     this.scene.add(bullet);
@@ -2543,7 +2544,9 @@ createAllyBullet(ally, target) {
               if (!enemy || !enemy.mesh || !enemy.mesh.position || enemy.health <= 0) continue;
               try {
                 if (bullet.mesh.position.distanceTo(enemy.mesh.position) < 3) {
-                  enemy.health -= damage;
+                  const bulletDamage = bullet.isAlly ? (bullet.damage || 25) : 
+                        (this.player.effects.damage.active ? CONFIG.bullet.damage * CONFIG.audio.damage.mult : CONFIG.bullet.damage);
+    enemy.health -= bulletDamage;
                   enemy.attacking = true;
                   enemy.retreating = false;
                   this.audioManager.playEnemyHit();

@@ -2135,21 +2135,22 @@ showWaypointSetFeedback(x, y) {
           enemy.mesh.position.set(x, 5, z)
         }
         switchWeapon(weaponNumber) {
-          if (weaponNumber >= 1 && weaponNumber <= 5) {
-            this.player.currentWeapon = weaponNumber;
-            const weaponNames = ['Blaster', 'Scatter', 'Shotgun', 'Mines', 'Laser'];
-            document.getElementById('currentWeapon').textContent = `${weaponNumber}-${weaponNames[weaponNumber-1]}`;
-            document.getElementById('weaponBtn').innerHTML = `W
-                                                                  
-            <br>${weaponNumber}`;
-            if (this.laserBeam) {
-              this.scene.remove(this.laserBeam);
-              this.laserBeam = null;
-              this.audioManager.stopLaser()
-            }
-            this.audioManager.playWeaponSwitch()
-          }
+    if (weaponNumber >= 1 && weaponNumber <= 5) {
+        this.player.currentWeapon = weaponNumber;
+        const weaponNames = ['Blaster', 'Scatter', 'Shotgun', 'Mines', 'Laser'];
+        document.getElementById('currentWeapon').textContent = `${weaponNumber}-${weaponNames[weaponNumber-1]}`;
+        document.getElementById('weaponBtn').innerHTML = `W<br>${weaponNumber}`;
+        
+        if (this.laserBeam) {
+            this.scene.remove(this.laserBeam);
+            this.laserBeam = null;
+            this.audioManager.stopLaser();
         }
+        
+        // Use weaponSwitch sound, NOT powerUp
+        //this.audioManager.playWeaponSwitch();
+    }
+}
         cycleWeapon() {
           const nextWeapon = this.player.currentWeapon % 5 + 1;
           this.switchWeapon(nextWeapon)
@@ -2501,8 +2502,8 @@ showWaypointSetFeedback(x, y) {
             // Show navigation notification after a short delay
             setTimeout(() => {
                 this.showNavigationNotification(displayName);
-                this.audioManager.playWeaponSwitch(); // Reuse power-up sound
-            }, 1000);
+                //this.audioManager.playWeaponSwitch(); // Reuse power-up sound
+            }, 100);
         }
     }
 }

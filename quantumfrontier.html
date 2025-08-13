@@ -3030,6 +3030,9 @@ createHealEffect(position) {
             if (e.code === 'KeyE') {
               this.startLanding()
             }
+             if (e.code === 'KeyG') {
+        this.createAlly(this.playerShip.position.clone());
+    }
             if (e.code.startsWith('Digit')) {
               const weaponNumber = parseInt(e.code.charAt(5));
               this.switchWeapon(weaponNumber)

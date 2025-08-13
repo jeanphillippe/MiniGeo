@@ -1974,7 +1974,7 @@ showWaypointReachedNotification(waypoint) {
     }, 2000);
     
     // Play subtle sound
-    this.audioManager.playPowerUp();
+    this.audioManager.playWeaponSwitch();
 }
 showWaypointSetFeedback(x, y) {
     // Create brief visual feedback for mobile users
@@ -2515,7 +2515,7 @@ showWaypointSetFeedback(x, y) {
             // Show navigation notification after a short delay
             setTimeout(() => {
                 this.showNavigationNotification(displayName);
-                this.audioManager.playPowerUp(); // Reuse power-up sound
+                this.audioManager.playWeaponSwitch(); // Reuse power-up sound
             }, 1000);
         }
     }
@@ -3468,7 +3468,7 @@ createAllyBullet(ally, target) {
             this.player.effects[type].active = !0;
             this.player.effects[type].endTime = currentTime + artifactConfig.duration
           }
-          this.audioManager.playPowerUp();
+          this.audioManager.playWeaponSwitch();
           this.updateHUD()
         }
         createExplosion(position, size = 5) {

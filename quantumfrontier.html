@@ -516,6 +516,11 @@ class OptimizedSpaceShooter {
   }
 
   createEnemy(planet, index, totalCount, type) {
+    if (!planet || !planet.config) {
+      console.error('Invalid planet provided to createEnemy');
+      return null;
+    }
+    
     const shipType = { f: 'fighter', d: 'doradito', p: 'purplediamond', h: 'heavy', i: 'interceptor', s: 'scout' }[type] || 'fighter';
     const ship = OptimizedShipFactory.create(shipType);
     
@@ -544,23 +549,35 @@ class OptimizedSpaceShooter {
   }
 
   spawnAlly() {
-    const ally = this.createEnemy(null, 0, 1, 's');
-    if (!ally) return;
+    const ship = OptimizedShipFactory.create('scout');
     
     const angle = Math.random() * Math.PI * 2;
     const distance = 15 + Math.random() * 10;
-    ally.mesh.position.set(
+    ship.position.set(
       this.playerShip.position.x + Math.cos(angle) * distance,
       5,
       this.playerShip.position.z + Math.sin(angle) * distance
     );
     
-    ally.isAlly = true;
-    ally.followSide = Math.random() < 0.5 ? -1 : 1;
-    ally.healCooldown = 0;
-    ally.health = GAME_CONFIG.ally.health;
-    ally.maxHealth = GAME_CONFIG.ally.health;
-    ally.targetPosition = new THREE.Vector3();
+    const ally = {
+      mesh: ship,
+      planet: null,
+      angle: 0,
+      originalAngle: 0,
+      health: GAME_CONFIG.ally.health,
+      maxHealth: GAME_CONFIG.ally.health,
+      attacking: false,
+      retreating: false,
+      shootCooldown: 0,
+      chaseSpeed: 0.6,
+      attackRange: 45,
+      type: 's',
+      score: 150,
+      isAlly: true,
+      followSide: Math.random() < 0.5 ? -1 : 1,
+      healCooldown: 0,
+      targetPosition: new THREE.Vector3()
+    };
     
     this.allies.push(ally);
     this.scene.add(ally.mesh);
@@ -1208,8 +1225,99 @@ class OptimizedSpaceShooter {
   }
 
   updateAllies() {
-    // Simplified ally AI
-    this.allies = this.allies.filter(ally => ally.health > 0);
+    this.allies = this.allies.filter(ally => {
+      if (ally.health <= 0) {
+        this.scene.remove(ally.mesh);
+        return false;
+      }
+
+      const distanceToPlayer = ally.mesh.position.distanceTo(this.playerShip.position);
+      const combatRadius = 40;
+      const followDistance = GAME_CONFIG.ally.followDistance;
+
+      // Find nearby enemies
+      const nearbyEnemies = this.enemies.filter(enemy => 
+        enemy.health > 0 && 
+        enemy.mesh.position.distanceTo(this.playerShip.position) < combatRadius
+      );
+
+      let moveDirection = new THREE.Vector3();
+
+      if (nearbyEnemies.length > 0) {
+        // Combat mode - attack nearest enemy
+        const target = nearbyEnemies.reduce((nearest, enemy) =>
+          enemy.mesh.position.distanceTo(ally.mesh.position) < 
+          nearest.mesh.position.distanceTo(ally.mesh.position) ? enemy : nearest
+        );
+
+        moveDirection.subVectors(target.mesh.position, ally.mesh.position).normalize();
+        ally.mesh.position.add(moveDirection.multiplyScalar(0.9));
+
+        // Shoot at enemies
+        ally.shootCooldown--;
+        if (ally.shootCooldown <= 0) {
+          this.createAllyBullet(ally, target);
+          ally.shootCooldown = GAME_CONFIG.ally.shootCooldown;
+        }
+      } else {
+        // Follow mode
+        if (distanceToPlayer > followDistance) {
+          moveDirection.subVectors(this.playerShip.position, ally.mesh.position).normalize();
+          ally.mesh.position.add(moveDirection.multiplyScalar(0.8));
+        } else {
+          // Formation flying
+          const baseDistance = 15 + (ally.followSide * 2);
+          const sideAngle = ally.followSide * Math.PI / 3 + (Math.sin(Date.now() * 0.001 + ally.followSide) * 0.1);
+          const behindOffset = new THREE.Vector3(
+            Math.sin(this.playerShip.rotation.y + sideAngle) * baseDistance,
+            Math.sin(Date.now() * 0.002 + ally.followSide * 2) * 0.5,
+            Math.cos(this.playerShip.rotation.y + sideAngle) * baseDistance
+          );
+
+          ally.targetPosition.copy(this.playerShip.position).add(behindOffset);
+          const distanceToTarget = ally.mesh.position.distanceTo(ally.targetPosition);
+
+          if (distanceToTarget > 2) {
+            moveDirection.subVectors(ally.targetPosition, ally.mesh.position).normalize();
+            const moveSpeed = Math.min(0.4, distanceToTarget * 0.15) * (0.8 + Math.random() * 0.4);
+            ally.mesh.position.add(moveDirection.multiplyScalar(moveSpeed));
+          }
+        }
+
+        // Healing
+        ally.healCooldown--;
+        if (ally.healCooldown <= 0 && this.player.health < this.player.maxHealth) {
+          this.player.health = Math.min(this.player.maxHealth, this.player.health + GAME_CONFIG.ally.healAmount);
+          ally.healCooldown = GAME_CONFIG.ally.healCooldown;
+          this.updateHUD();
+          this.createHealingBeam(ally, this.playerShip);
+        }
+      }
+
+      // Update rotation
+      if (moveDirection.length() > 0.1) {
+        const targetRotation = Math.atan2(moveDirection.x, moveDirection.z);
+        ally.mesh.rotation.y = targetRotation;
+      } else if (nearbyEnemies.length === 0) {
+        ally.mesh.rotation.y = this.playerShip.rotation.y;
+      }
+
+      // Avoid other allies
+      this.allies.forEach(otherAlly => {
+        if (otherAlly === ally) return;
+        const distance = ally.mesh.position.distanceTo(otherAlly.mesh.position);
+        if (distance < 6 && distance > 0) {
+          const avoidDirection = new THREE.Vector3()
+            .subVectors(ally.mesh.position, otherAlly.mesh.position)
+            .normalize()
+            .multiplyScalar((6 - distance) * 0.1);
+          ally.mesh.position.add(avoidDirection);
+        }
+      });
+
+      ally.mesh.position.y = 5;
+      return true;
+    });
   }
 
   updateArtifacts() {
@@ -1223,13 +1331,30 @@ class OptimizedSpaceShooter {
   }
 
   updateEffects() {
-    // Update player effects
     const currentTime = Date.now();
-    if (this.player.effects.speed.active && currentTime > this.player.effects.speed.endTime) {
-      this.player.effects.speed.active = false;
+    let effectsText = '';
+
+    if (this.player.effects.speed.active) {
+      if (currentTime > this.player.effects.speed.endTime) {
+        this.player.effects.speed.active = false;
+      } else {
+        const remaining = Math.ceil((this.player.effects.speed.endTime - currentTime) / 1000);
+        effectsText += `SPEED BOOST: ${remaining}s<br>`;
+      }
     }
-    if (this.player.effects.damage.active && currentTime > this.player.effects.damage.endTime) {
-      this.player.effects.damage.active = false;
+
+    if (this.player.effects.damage.active) {
+      if (currentTime > this.player.effects.damage.endTime) {
+        this.player.effects.damage.active = false;
+      } else {
+        const remaining = Math.ceil((this.player.effects.damage.endTime - currentTime) / 1000);
+        effectsText += `DAMAGE BOOST: ${remaining}s<br>`;
+      }
+    }
+
+    const effectsElement = document.getElementById('effects');
+    if (effectsElement) {
+      effectsElement.innerHTML = effectsText;
     }
   }
 
@@ -1268,11 +1393,241 @@ class OptimizedSpaceShooter {
   }
 
   dropArtifact(position) {
-    // Simplified artifact drop
+    const artifactTypes = ['speed', 'damage', 'health'];
+    const randomType = artifactTypes[Math.floor(Math.random() * artifactTypes.length)];
+    
+    const colors = { speed: 0x00ff00, damage: 0xff0000, health: 0x0088ff };
+    const artifactGeom = new THREE.SphereGeometry(1.5, 12, 12);
+    const artifactMat = new THREE.MeshBasicMaterial({
+      color: colors[randomType],
+      transparent: true,
+      opacity: 0.9
+    });
+    
+    const artifact = new THREE.Mesh(artifactGeom, artifactMat);
+    artifact.position.copy(position);
+    artifact.position.y = 1;
+    
+    this.artifacts.push({
+      mesh: artifact,
+      type: randomType,
+      life: 900,
+      bobOffset: Math.random() * Math.PI * 2
+    });
+    
+    this.scene.add(artifact);
+  }
+
+  updateArtifacts() {
+    this.artifacts = this.artifacts.filter(artifact => {
+      artifact.life--;
+      artifact.mesh.position.y = 1 + Math.sin(Date.now() * 0.005 + artifact.bobOffset) * 0.5;
+      artifact.mesh.rotation.y += 0.08;
+      artifact.mesh.rotation.x += 0.03;
+
+      const playerPosition = this.playerShip.position.clone();
+      playerPosition.y = artifact.mesh.position.y;
+      const distance = artifact.mesh.position.distanceTo(playerPosition);
+
+      if (distance < 6) {
+        this.applyArtifactEffect(artifact.type);
+        this.scene.remove(artifact.mesh);
+        return false;
+      }
+
+      if (artifact.life <= 0) {
+        this.scene.remove(artifact.mesh);
+        return false;
+      }
+
+      return true;
+    });
+  }
+
+  applyArtifactEffect(type) {
+    const currentTime = Date.now();
+    
+    switch(type) {
+      case 'health':
+        this.player.health = Math.min(this.player.maxHealth, this.player.health + 200);
+        break;
+      case 'speed':
+        this.player.effects.speed.active = true;
+        this.player.effects.speed.endTime = currentTime + 30000;
+        break;
+      case 'damage':
+        this.player.effects.damage.active = true;
+        this.player.effects.damage.endTime = currentTime + 30000;
+        break;
+    }
+    
+    this.audioManager.playPowerUp();
+    this.updateHUD();
+  }
+
+  fireMine() {
+    const mineGeom = new THREE.SphereGeometry(0.5, 8, 8);
+    const mineMat = new THREE.MeshBasicMaterial({
+      color: 0xff4757,
+      transparent: true,
+      opacity: 0.8
+    });
+    
+    const mine = new THREE.Mesh(mineGeom, mineMat);
+    mine.position.copy(this.playerShip.position);
+    mine.position.y += 0.5;
+    
+    this.mines.push({
+      mesh: mine,
+      life: 600,
+      exploded: false
+    });
+    
+    this.scene.add(mine);
+    this.audioManager.playMine();
+  }
+
+  updateMines() {
+    this.mines = this.mines.filter(mine => {
+      mine.life--;
+
+      if (mine.life <= 0 && !mine.exploded) {
+        this.scene.remove(mine.mesh);
+        return false;
+      }
+
+      if (!mine.exploded) {
+        const nearbyEnemies = this.enemies.filter(enemy => 
+          enemy.health > 0 && 
+          mine.mesh.position.distanceTo(enemy.mesh.position) < 8
+        );
+
+        if (nearbyEnemies.length > 0) {
+          mine.exploded = true;
+          this.explodeMine(mine);
+          this.scene.remove(mine.mesh);
+          return false;
+        }
+      }
+
+      return !mine.exploded;
+    });
+  }
+
+  explodeMine(mine) {
+    this.createExplosion(mine.mesh.position, 8);
+    this.audioManager.playExplosion(1.5);
+
+    this.enemies.forEach(enemy => {
+      if (enemy.health > 0 && mine.mesh.position.distanceTo(enemy.mesh.position) < 8) {
+        enemy.health -= GAME_CONFIG.weapons.mine.damage;
+        this.audioManager.playEnemyHit();
+        
+        if (enemy.health <= 0) {
+          this.destroyEnemy(enemy);
+        }
+      }
+    });
+  }
+
+  fireLaser() {
+    if (this.laserBeam) {
+      this.scene.remove(this.laserBeam);
+    }
+
+    const direction = new THREE.Vector3(
+      Math.sin(this.playerShip.rotation.y),
+      0,
+      Math.cos(this.playerShip.rotation.y)
+    );
+    
+    const laserEnd = this.playerShip.position.clone().add(direction.clone().multiplyScalar(100));
+    
+    const laserGeom = new THREE.BufferGeometry().setFromPoints([
+      this.playerShip.position.clone().add(new THREE.Vector3(0, 0.5, 0)),
+      laserEnd
+    ]);
+    
+    const laserMat = new THREE.LineBasicMaterial({
+      color: 0x00ff00,
+      transparent: true,
+      opacity: 0.8
+    });
+    
+    this.laserBeam = new THREE.Line(laserGeom, laserMat);
+    this.scene.add(this.laserBeam);
+    this.audioManager.playLaser();
+
+    // Laser damage
+    const damage = this.player.effects.damage.active ? GAME_CONFIG.weapons.laser.damage * 2 : GAME_CONFIG.weapons.laser.damage;
+    
+    this.enemies.forEach(enemy => {
+      if (enemy.health > 0) {
+        const distanceToLine = this.distancePointToLine(enemy.mesh.position, this.playerShip.position, laserEnd);
+        if (distanceToLine < 2) {
+          enemy.health -= damage;
+          if (enemy.health <= 0) {
+            this.destroyEnemy(enemy);
+          } else {
+            this.audioManager.playEnemyHit();
+          }
+        }
+      }
+    });
+  }
+
+  distancePointToLine(point, lineStart, lineEnd) {
+    const lineDir = new THREE.Vector3().subVectors(lineEnd, lineStart);
+    const pointToStart = new THREE.Vector3().subVectors(point, lineStart);
+    const t = Math.max(0, Math.min(1, pointToStart.dot(lineDir) / lineDir.dot(lineDir)));
+    const projection = lineStart.clone().add(lineDir.multiplyScalar(t));
+    return point.distanceTo(projection);
   }
 
   createDamageEffect(position) {
     this.createExplosion(position, 3);
+  }
+
+  createAllyBullet(ally, target) {
+    const bulletGeom = new THREE.SphereGeometry(0.3, 8, 8);
+    const bulletMat = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+    const bullet = new THREE.Mesh(bulletGeom, bulletMat);
+    
+    bullet.position.copy(ally.mesh.position);
+    bullet.position.y += 0.5;
+    
+    const direction = new THREE.Vector3().subVectors(target.mesh.position, ally.mesh.position).normalize();
+    const bulletVelocity = direction.multiplyScalar(GAME_CONFIG.weapons.blaster.speed * 1.5);
+    
+    this.bullets.push({
+      mesh: bullet,
+      velocity: bulletVelocity,
+      life: 80,
+      isAlly: true,
+      damage: GAME_CONFIG.ally.damage
+    });
+    
+    this.scene.add(bullet);
+  }
+
+  createHealingBeam(ally, target) {
+    const healGeom = new THREE.BufferGeometry().setFromPoints([
+      ally.mesh.position.clone().add(new THREE.Vector3(0, 0.5, 0)),
+      target.position.clone().add(new THREE.Vector3(0, 0.5, 0))
+    ]);
+    
+    const healMat = new THREE.LineBasicMaterial({
+      color: 0x00ff88,
+      transparent: true,
+      opacity: 0.8
+    });
+    
+    const healBeam = new THREE.Line(healGeom, healMat);
+    this.scene.add(healBeam);
+    
+    setTimeout(() => {
+      this.scene.remove(healBeam);
+    }, 200);
   }
 
   destroyPlanet(planet) {
@@ -1282,6 +1637,15 @@ class OptimizedSpaceShooter {
     this.scene.remove(planet.mesh);
     this.player.score += 500;
     this.updateHUD();
+    
+    // Remove enemies orbiting this planet
+    this.enemies = this.enemies.filter(enemy => {
+      if (enemy.planet === planet) {
+        this.scene.remove(enemy.mesh);
+        return false;
+      }
+      return true;
+    });
   }
 
   switchWeapon(weaponNumber) {
@@ -1349,7 +1713,7 @@ class AudioManager {
     this.initialized = false;
   }
   
-  start() { this.initialized = true; }
+  start() { this.initialized = true; return Promise.resolve(); }
   playBlaster() { if (this.initialized) console.log('Blaster sound'); }
   playScatter() { if (this.initialized) console.log('Scatter sound'); }
   playEnemyShot() { if (this.initialized) console.log('Enemy shot sound'); }
@@ -1358,6 +1722,9 @@ class AudioManager {
   playDamage() { if (this.initialized) console.log('Damage sound'); }
   playCollision() { if (this.initialized) console.log('Collision sound'); }
   playWeaponSwitch() { if (this.initialized) console.log('Weapon switch sound'); }
+  playPowerUp() { if (this.initialized) console.log('PowerUp sound'); }
+  playMine() { if (this.initialized) console.log('Mine sound'); }
+  playLaser() { if (this.initialized) console.log('Laser sound'); }
   stopLaser() { console.log('Stop laser sound'); }
 }
 

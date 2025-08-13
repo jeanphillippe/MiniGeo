@@ -45,7 +45,7 @@
       </div>
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  
     <script>
       const CONFIG = {
         player: {
@@ -1465,9 +1465,140 @@
           this.renderer.sortObjects = !0;
           document.getElementById('gameContainer').appendChild(this.renderer.domElement)
         }
+        createAlly(position) {
+    const ally = EnemyFactory.create('f', null, 0, 1); // Red fighter ship as requested
+    // Remove the color change - keep original red color
+    ally.mesh.position.copy(position);
+    ally.isAlly = true;
+    ally.followOffset = {
+        x: (Math.random() - 0.5) * 20,
+        z: (Math.random() - 0.5) * 20 + 15
+    };
+    ally.healCooldown = 0;
+    this.allies.push(ally);
+    this.scene.add(ally.mesh);
+    return ally;
+}
+updateAllies() {
+    this.allies.forEach(ally => {
+        if (ally.health <= 0) return;
+        
+        const playerPos = this.playerShip.position;
+        const targetPos = new THREE.Vector3(
+            playerPos.x + ally.followOffset.x,
+            5,
+            playerPos.z + ally.followOffset.z
+        );
+        
+        const distanceToTarget = ally.mesh.position.distanceTo(targetPos);
+        const distanceToPlayer = ally.mesh.position.distanceTo(playerPos);
+        
+        // Calculate avoidance force from other allies
+        const avoidanceForce = this.calculateAllyAvoidance(ally);
+        
+        // Follow player if too far
+        if (distanceToTarget > 3) {
+            const direction = new THREE.Vector3()
+                .subVectors(targetPos, ally.mesh.position)
+                .normalize();
+            
+            // Combine movement direction with avoidance
+            const combinedDirection = direction.add(avoidanceForce).normalize();
+            const moveDistance = Math.min(ally.chaseSpeed * 1.5, distanceToTarget);
+            const movement = combinedDirection.multiplyScalar(moveDistance);
+            
+            const newPos = ally.mesh.position.clone().add(movement);
+            if (!this.checkPlanetCollision(newPos)) {
+                ally.mesh.position.copy(newPos);
+                ally.mesh.position.y = 5;
+            }
+        }
+        
+        // Check for enemies in combat range around player
+        const enemiesInCombat = this.enemies.filter(enemy => 
+            enemy.health > 0 && 
+            enemy.mesh.position.distanceTo(playerPos) < 40
+        );
+        
+        // Attack nearest enemy
+        let nearestEnemy = null;
+        let nearestDistance = 30;
+        
+        enemiesInCombat.forEach(enemy => {
+            const distance = ally.mesh.position.distanceTo(enemy.mesh.position);
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearestEnemy = enemy;
+            }
+        });
+        
+        if (nearestEnemy) {
+            ally.mesh.lookAt(nearestEnemy.mesh.position);
+            ally.shootCooldown--;
+            if (ally.shootCooldown <= 0) {
+                this.createAllyBullet(ally, nearestEnemy);
+                ally.shootCooldown = 60;
+            }
+        } else {
+            // Heal player ONLY if no combat anywhere near player and player needs healing
+            ally.healCooldown--;
+            if (ally.healCooldown <= 0 && 
+                enemiesInCombat.length === 0 && // No combat around player
+                distanceToPlayer < 15 && 
+                this.player.health < CONFIG.player.health) {
+                
+                this.player.health = Math.min(CONFIG.player.health, this.player.health + 5);
+                ally.healCooldown = 120;
+                this.updateHUD();
+                
+                // Visual healing effect
+                this.createHealEffect(this.playerShip.position);
+            }
+        }
+    });
+}
+calculateAllyAvoidance(currentAlly) {
+    const avoidanceForce = new THREE.Vector3();
+    let neighborCount = 0;
+    
+    this.allies.forEach(otherAlly => {
+        if (otherAlly === currentAlly || otherAlly.health <= 0) return;
+        
+        const distance = currentAlly.mesh.position.distanceTo(otherAlly.mesh.position);
+        const avoidanceRadius = 8; // Minimum distance between allies
+        
+        if (distance < avoidanceRadius && distance > 0) {
+            const repelDirection = new THREE.Vector3()
+                .subVectors(currentAlly.mesh.position, otherAlly.mesh.position);
+            const repelStrength = (avoidanceRadius - distance) / avoidanceRadius * 2;
+            repelDirection.normalize().multiplyScalar(repelStrength);
+            avoidanceForce.add(repelDirection);
+            neighborCount++;
+        }
+    });
+    
+    if (neighborCount > 0) {
+        avoidanceForce.divideScalar(neighborCount);
+    }
+    
+    return avoidanceForce;
+}
+createHealEffect(position) {
+    const healGeom = new THREE.SphereGeometry(2, 16, 16);
+    const healMat = new THREE.MeshBasicMaterial({
+        color: 0x00ff88, 
+        transparent: true, 
+        opacity: 0.6
+    });
+    const heal = new THREE.Mesh(healGeom, healMat);
+    heal.position.copy(position);
+    this.scene.add(heal);
+    this.explosions.push({mesh: heal, scale: 0});
+}
         initializeGameState() {
           this.gameStarted = !1;
           this.trails = [];
+          this.allies = [];
           this.collisionEnabled = !0;
           this.trailStyle = 'nebula';
           this.player = {

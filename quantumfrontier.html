@@ -1782,15 +1782,15 @@ clearWaypoint() {
 createWaypointIndicator() {
     this.removeWaypointIndicator();
     
-    // Create a subtle arrow indicator
-    const arrowGeometry = new THREE.ConeGeometry(0.5, 2, 8);
+    // Create a bigger arrow indicator
+    const arrowGeometry = new THREE.ConeGeometry(1.2, 4, 8); // CHANGED: bigger size (was 0.5, 2)
     const arrowMaterial = new THREE.MeshBasicMaterial({ 
         color: 0xfeca57, 
         transparent: true, 
         opacity: 0.8 
     });
     this.waypointIndicator = new THREE.Mesh(arrowGeometry, arrowMaterial);
-    this.waypointIndicator.rotation.x = -Math.PI / 2; // Point forward
+    // REMOVED: this.waypointIndicator.rotation.x = -Math.PI / 2; // Let lookAt handle direction
     this.scene.add(this.waypointIndicator);
 }
 
@@ -1847,7 +1847,10 @@ updateWaypointIndicator() {
     this.waypointIndicator.position.y = 6;
     
     // Point toward waypoint
-    this.waypointIndicator.lookAt(new THREE.Vector3(waypoint.x, 6, waypoint.z));
+    // Point toward waypoint - UPDATED FOR PROPER DIRECTION
+const waypointTarget = new THREE.Vector3(waypoint.x, this.waypointIndicator.position.y, waypoint.z);
+this.waypointIndicator.lookAt(waypointTarget);
+this.waypointIndicator.rotateX(Math.PI / 2); // ADDED: Adjust for cone orientation
     
     // Add subtle pulsing animation
     const pulse = 0.8 + 0.2 * Math.sin(Date.now() * 0.005);
@@ -2749,7 +2752,7 @@ if (distanceToTarget > 2) {
             // Face same direction as player when in formation
             ally.mesh.rotation.y = this.playerShip.rotation.y;
         }
-        const avoidanceRadius = 30;
+        const avoidanceRadius = 13;
 this.allies.forEach(otherAlly => {
     if (otherAlly === ally) return;
     const distance = ally.mesh.position.distanceTo(otherAlly.mesh.position);

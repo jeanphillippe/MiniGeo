@@ -1539,10 +1539,8 @@
           this.landingStartTime = 0;
           this.wasPlayerVisible = !0;
           this.visitedPlanets = new Set();
-          this.typewriterSpeed = 100;
-           for (let i = 0; i < 3; i++) {
-        this.spawnAlly();
-    }
+          this.typewriterSpeed = 60;
+
         }
         initializeScene() {
           this.camera.position.set(0, 60, 60);
@@ -1555,7 +1553,10 @@
           this.backgroundManager = new BackgroundManager(this.scene);
           this.createPlayer();
           this.createPlanets();
-          this.createEnemies()
+          this.createEnemies();
+          this.spawnAlly();
+          this.spawnAlly();
+          this.spawnAlly();
         }
         createPlayer() {
           this.playerShip = ShipFactory.create('player');

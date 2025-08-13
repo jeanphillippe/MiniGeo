@@ -2170,13 +2170,15 @@
         
         const distanceToPlayer = ally.mesh.position.distanceTo(this.playerShip.position);
         const combatRadius = 40;
-        const followDistance = 20;
+        const followDistance = 25;
         
         // Find nearby enemies
         const nearbyEnemies = this.enemies.filter(enemy => 
             enemy.health > 0 && 
             enemy.mesh.position.distanceTo(this.playerShip.position) < combatRadius
         );
+        
+        let moveDirection = new THREE.Vector3();
         
         if (nearbyEnemies.length > 0) {
             // Combat mode - attack nearest enemy
@@ -2185,12 +2187,8 @@
                 nearest.mesh.position.distanceTo(ally.mesh.position) ? enemy : nearest
             );
             
-            const directionToTarget = new THREE.Vector3()
-                .subVectors(target.mesh.position, ally.mesh.position)
-                .normalize();
-            
-            ally.mesh.position.add(directionToTarget.multiplyScalar(0.3));
-            ally.mesh.lookAt(target.mesh.position);
+            moveDirection.subVectors(target.mesh.position, ally.mesh.position).normalize();
+            ally.mesh.position.add(moveDirection.multiplyScalar(0.3));
             
             // Shoot at enemy
             ally.shootCooldown--;
@@ -2201,35 +2199,57 @@
         } else {
             // Follow/heal mode
             if (distanceToPlayer > followDistance) {
-                // Follow player
-                const directionToPlayer = new THREE.Vector3()
-                    .subVectors(this.playerShip.position, ally.mesh.position)
-                    .normalize();
-                ally.mesh.position.add(directionToPlayer.multiplyScalar(0.2));
+                // Follow player directly when too far
+                moveDirection.subVectors(this.playerShip.position, ally.mesh.position).normalize();
+                ally.mesh.position.add(moveDirection.multiplyScalar(0.4));
             } else {
-                // Stay behind and to side
+                // Stay in formation behind and to side
                 const behindOffset = new THREE.Vector3(
-                    -Math.sin(this.playerShip.rotation.y) * ally.followSide * 8,
+                    Math.sin(this.playerShip.rotation.y + (ally.followSide * Math.PI/3)) * 15,
                     0,
-                    -Math.cos(this.playerShip.rotation.y) * 12
+                    Math.cos(this.playerShip.rotation.y + (ally.followSide * Math.PI/3)) * 15
                 );
                 ally.targetPosition.copy(this.playerShip.position).add(behindOffset);
                 
-                const directionToTarget = new THREE.Vector3()
-                    .subVectors(ally.targetPosition, ally.mesh.position)
-                    .normalize();
-                ally.mesh.position.add(directionToTarget.multiplyScalar(0.1));
+                const distanceToTarget = ally.mesh.position.distanceTo(ally.targetPosition);
+                if (distanceToTarget > 3) {
+                    moveDirection.subVectors(ally.targetPosition, ally.mesh.position).normalize();
+                    ally.mesh.position.add(moveDirection.multiplyScalar(Math.min(0.2, distanceToTarget * 0.1)));
+                }
             }
             
-            // Heal player
+            // Heal player with visual effect
             ally.healCooldown--;
             if (ally.healCooldown <= 0 && this.player.health < CONFIG.player.health) {
                 this.player.health = Math.min(CONFIG.player.health, this.player.health + 5);
                 ally.healCooldown = 120;
                 this.updateHUD();
+                
+                // Create healing beam visual
+                this.createHealingBeam(ally, this.playerShip);
             }
         }
         
+        // Always rotate to face movement direction
+        if (moveDirection.length() > 0.1) {
+            const targetRotation = Math.atan2(moveDirection.x, moveDirection.z);
+            ally.mesh.rotation.y = targetRotation;
+        } else if (nearbyEnemies.length === 0) {
+            // Face same direction as player when in formation
+            ally.mesh.rotation.y = this.playerShip.rotation.y;
+        }
+        const avoidanceRadius = 8;
+this.allies.forEach(otherAlly => {
+    if (otherAlly === ally) return;
+    const distance = ally.mesh.position.distanceTo(otherAlly.mesh.position);
+    if (distance < avoidanceRadius && distance > 0) {
+        const avoidDirection = new THREE.Vector3()
+            .subVectors(ally.mesh.position, otherAlly.mesh.position)
+            .normalize()
+            .multiplyScalar((avoidanceRadius - distance) * 0.1);
+        ally.mesh.position.add(avoidDirection);
+    }
+});
         ally.mesh.position.y = 5;
         return true;
     });
@@ -2952,6 +2972,24 @@ createAllyBullet(ally, target) {
             this.resetGame()
           })
         }
+        createHealingBeam(ally, target) {
+    const healGeom = new THREE.BufferGeometry().setFromPoints([
+        ally.mesh.position.clone().add(new THREE.Vector3(0, 0.5, 0)),
+        target.position.clone().add(new THREE.Vector3(0, 0.5, 0))
+    ]);
+    const healMat = new THREE.LineBasicMaterial({
+        color: 0x00ff88,
+        transparent: true,
+        opacity: 0.8
+    });
+    const healBeam = new THREE.Line(healGeom, healMat);
+    this.scene.add(healBeam);
+    
+    // Remove beam after short time
+    setTimeout(() => {
+        this.scene.remove(healBeam);
+    }, 200);
+}
         resetGame() {
           this.player.health = CONFIG.player.health;
           this.player.score = 0;
@@ -2967,7 +3005,7 @@ createAllyBullet(ally, target) {
           this.landingTarget = null;
           this.removeLandingGlow();
           this.restorePlayerDepth();
-          
+
 this.allies.forEach(ally => this.scene.remove(ally.mesh));
 this.allies = [];
           this.enemies.forEach(enemy => {

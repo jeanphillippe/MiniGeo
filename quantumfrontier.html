@@ -3030,9 +3030,7 @@ createHealEffect(position) {
             if (e.code === 'KeyE') {
               this.startLanding()
             }
-             if (e.code === 'KeyG') {
-        this.createAlly(this.playerShip.position.clone());
-    }
+
             if (e.code.startsWith('Digit')) {
               const weaponNumber = parseInt(e.code.charAt(5));
               this.switchWeapon(weaponNumber)
@@ -3122,7 +3120,9 @@ createHealEffect(position) {
         async startGame() {
           document.getElementById('intro').classList.add('hidden');
           await this.audioManager.start();
-          this.gameStarted = !0
+          this.gameStarted = !0;
+          this.createAlly(this.playerShip.position.clone());
+
         }
         animate() {
           requestAnimationFrame(() => this.animate());

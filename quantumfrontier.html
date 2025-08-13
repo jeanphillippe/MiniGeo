@@ -1539,7 +1539,10 @@
           this.landingStartTime = 0;
           this.wasPlayerVisible = !0;
           this.visitedPlanets = new Set();
-          this.typewriterSpeed = 60;
+          this.typewriterSpeed = 100;
+           for (let i = 0; i < 3; i++) {
+        this.spawnAlly();
+    }
         }
         initializeScene() {
           this.camera.position.set(0, 60, 60);

@@ -1183,7 +1183,7 @@ nebula.position.set(
             this.waypoint = null;
           this.setupEvents()
         }
- setupEvents(){
+setupEvents(){
     document.getElementById('minimapToggle').addEventListener('click',()=>{
         this.toggleExpanded()
     });
@@ -1239,49 +1239,59 @@ nebula.position.set(
 }
 setWaypoint(event){
     const rect=this.canvas.getBoundingClientRect();
-    const clickX=event.clientX-rect.left;
-    const clickY=event.clientY-rect.top;
     
-    const size=this.expanded?300:120;
-    const scale=this.expanded?0.8:0.3;
-    const centerX=size/2;
-    const centerY=size/2;
+    // Get actual canvas size (not just CSS size)
+    const canvasWidth = this.canvas.width;
+    const canvasHeight = this.canvas.height;
     
-    const worldX=(clickX-centerX)/scale+game.playerShip.position.x;
-    const worldZ=(clickY-centerY)/scale+game.playerShip.position.z;
+    // Calculate click position relative to canvas, accounting for any scaling
+    const scaleX = canvasWidth / rect.width;
+    const scaleY = canvasHeight / rect.height;
     
-    let targetPlanet=null;
-    let minDistance=Infinity;
+    const clickX = (event.clientX - rect.left) * scaleX;
+    const clickY = (event.clientY - rect.top) * scaleY;
+    
+    const size = this.expanded ? 300 : 120;
+    const scale = this.expanded ? 0.8 : 0.3;
+    const centerX = size / 2;
+    const centerY = size / 2;
+    
+    // Convert canvas coordinates to world coordinates
+    const worldX = (clickX - centerX) / scale + game.playerShip.position.x;
+    const worldZ = (clickY - centerY) / scale + game.playerShip.position.z;
+    
+    let targetPlanet = null;
+    let minDistance = Infinity;
     
     // Check for planet clicks with better precision
-    game.planets.forEach(planet=>{
+    game.planets.forEach(planet => {
         if(planet.destroyed) return;
         
-        const distance=Math.sqrt(Math.pow(worldX-planet.center.x,2)+Math.pow(worldZ-planet.center.z,2));
-        const clickRadius=Math.max(planet.config.radius+10, 15); // Minimum click radius
+        const distance = Math.sqrt(Math.pow(worldX - planet.center.x, 2) + Math.pow(worldZ - planet.center.z, 2));
+        const clickRadius = Math.max(planet.config.radius + 10, 20); // Increased minimum click radius for mobile
         
-        if(distance<clickRadius && distance<minDistance){
-            minDistance=distance;
-            targetPlanet=planet;
+        if(distance < clickRadius && distance < minDistance){
+            minDistance = distance;
+            targetPlanet = planet;
         }
     });
     
     if(targetPlanet){
-        this.waypoint={
-            x:targetPlanet.center.x,
-            z:targetPlanet.center.z,
-            planet:targetPlanet,
-            type:'planet'
+        this.waypoint = {
+            x: targetPlanet.center.x,
+            z: targetPlanet.center.z,
+            planet: targetPlanet,
+            type: 'planet'
         };
-    }else{
-        this.waypoint={
-            x:worldX,
-            z:worldZ,
-            type:'static'
+    } else {
+        this.waypoint = {
+            x: worldX,
+            z: worldZ,
+            type: 'static'
         };
     }
     
-    this.showWaypointSetFeedback(event.clientX,event.clientY);
+    this.showWaypointSetFeedback(event.clientX, event.clientY);
 }
         toggleExpanded() {
           this.expanded = !this.expanded;
@@ -1297,7 +1307,7 @@ setWaypoint(event){
             this.canvas.width = this.canvas.height = 120
           }
         }
- update(playerPos,planets,enemies){
+update(playerPos,planets,enemies){
     const ctx=this.ctx;
     const size=this.expanded?300:120;
     const scale=this.expanded?0.8:0.3;

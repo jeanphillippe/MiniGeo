@@ -1492,7 +1492,7 @@ class AudioManager {
         this.audioContext = null;
         this.audioBuffer = null;
         this.masterGain = null;
-        
+        this.lastDamageTime=0;
         // Sprite definitions (start time in seconds, duration in seconds)
         this.spriteMap = {
             blaster: [0, 0.132],
@@ -1746,25 +1746,20 @@ class AudioManager {
         this.playSprite('explosion', sourcePos, listenerPos, volume);
     }
     
-    playCollision() {
-        if (!this.initialized) return;
-        
-        const currentTime = Date.now();
-        if (currentTime - this.lastCollisionTime < 300) return;
-        this.lastCollisionTime = currentTime;
-        
-        this.playSprite('collision', null, null, 0.8);
-    }
-    
-    playDamage() {
-        if (!this.initialized) return;
-        
-        const currentTime = Date.now();
-        if (currentTime - this.lastCollisionTime < 200) return;
-        this.lastCollisionTime = currentTime;
-        
-        this.playSprite('damage', null, null, 0.7);
-    }
+    playCollision(sourcePos=null,listenerPos=null){
+    if(!this.initialized)return;
+    const currentTime=Date.now();
+    if(currentTime-this.lastCollisionTime<300)return;
+    this.lastCollisionTime=currentTime;
+    this.playSprite('collision',sourcePos,listenerPos,0.8)
+}
+playDamage(sourcePos=null,listenerPos=null){
+    if(!this.initialized)return;
+    const currentTime=Date.now();
+    if(currentTime-this.lastDamageTime<200)return;  // Changed from lastCollisionTime
+    this.lastDamageTime=currentTime;                // Changed from lastCollisionTime
+    this.playSprite('damage',sourcePos,listenerPos,0.7)
+}
     
     playLaser() {
         if (!this.initialized || this.laserActive) return;
@@ -3068,12 +3063,14 @@ showWaypointSetFeedback(x, y) {
             
             // Healing logic (only when not in combat)
             ally.healCooldown--;
-            if(ally.healCooldown <= 0 && this.player.health < CONFIG.player.health){
-                this.player.health = Math.min(CONFIG.player.health, this.player.health + 3);
-                ally.healCooldown = 45;
-                this.updateHUD();
-                this.createHealingBeam(ally, this.playerShip);
-            }
+const healingRange=35; // Add healing range limit
+
+if(ally.healCooldown<=0&&this.player.health<CONFIG.player.health&&distanceToPlayer<=healingRange){
+    this.player.health=Math.min(CONFIG.player.health,this.player.health+3);
+    ally.healCooldown=45;
+    this.updateHUD();
+    this.createHealingBeam(ally,this.playerShip)
+}
         }
         
         // Apply rotation smoothly if we have a target to look at
@@ -3316,7 +3313,8 @@ createAllyBullet(ally, target){
                 enemy.currentTarget = null;
             }
         } else if(enemy.retreating){
-              if (distanceToPlayer !== undefined && distanceToPlayer < enemy.attackRange * 1.2) {
+             const distanceToPlayer=enemy.mesh.position.distanceTo(this.playerShip.position);
+    if(distanceToPlayer<enemy.attackRange*1.2){
   enemy.attacking = true;
   enemy.retreating = false;
   return;
@@ -3645,7 +3643,7 @@ createAllyBullet(ally, target){
         enemy.mesh.position.distanceTo(this.playerShip.position) < 4) {
         this.player.health -= 5;
         this.collisionCooldown = 60;
-        this.audioManager.playCollision();
+        this.audioManager.playCollision(enemy.mesh.position,this.playerShip.position);
         this.updateHUD();
         if (this.player.health <= 0) {
             this.gameOver();
@@ -3732,7 +3730,7 @@ createAllyBullet(ally, target){
                 this.playerVelocity.copy(bounceDirection.multiplyScalar(0.5));
                 this.player.health -= 10;
                 this.createDamageEffect(this.playerShip.position);
-                this.audioManager.playDamage();
+                this.audioManager.playDamage(planet.center,this.playerShip.position);
                 this.updateHUD();
                 if (this.player.health <= 0) {
                   this.gameOver()

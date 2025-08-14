@@ -2331,7 +2331,7 @@ showWaypointSetFeedback(x, y) {
         }
         
         // Use weaponSwitch sound, NOT powerUp
-        //this.audioManager.playWeaponSwitch();
+        this.audioManager.playWeaponSwitch();
     }
 }
         cycleWeapon() {
@@ -3870,10 +3870,10 @@ createAllyBullet(ally, target){
     this.enemies.forEach(enemy => {
         if (enemy.health > 0 && explosion.position.distanceTo(enemy.mesh.position) < 8) {
             enemy.health -= 50;
-            this.audioManager.playEnemyHit();
+            //this.audioManager.playEnemyHit();
             if (enemy.health <= 0) {
                 this.createExplosion(enemy.mesh.position);
-                this.audioManager.playExplosion(1, enemy.mesh.position, this.playerShip.position); // Updated call
+                //this.audioManager.playExplosion(1, enemy.mesh.position, this.playerShip.position); // Updated call
                 enemy.mesh.visible = false;
                 enemy.stuck = true;
                 this.player.score += enemy.score;

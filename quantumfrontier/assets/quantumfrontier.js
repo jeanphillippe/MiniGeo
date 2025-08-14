@@ -3533,7 +3533,9 @@ createAllyBullet(ally, target){
                 const distance = bullet.mesh.position.distanceTo(this.playerShip.position);
                 if(distance < 3){
                     this.player.health -= CONFIG.bullet.enemyDamage;
-                    this.audioManager.playDamage();
+                    const damageVariants = ['damage', 'enemyHit'];
+const randomSound = damageVariants[Math.floor(Math.random() * damageVariants.length)];
+this.audioManager.playSprite(randomSound, this.playerShip.position, this.playerShip.position, 0.7);
                     this.createDamageEffect(this.playerShip.position);
                     this.updateHUD();
                     if(this.player.health <= 0){
@@ -3732,7 +3734,10 @@ createAllyBullet(ally, target){
                 this.playerVelocity.copy(bounceDirection.multiplyScalar(0.5));
                 this.player.health -= 10;
                 this.createDamageEffect(this.playerShip.position);
-                this.audioManager.playDamage(planet.center,this.playerShip.position);
+                this.audioManager.playSprite('collision', planet.center, this.playerShip.position, 0.8);
+setTimeout(() => {
+    this.audioManager.playSprite('damage', this.playerShip.position, this.playerShip.position, 0.6);
+}, 50); // Slight delay for impact feel
                 this.updateHUD();
                 if (this.player.health <= 0) {
                   this.gameOver()

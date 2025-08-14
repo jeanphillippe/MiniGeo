@@ -2338,7 +2338,7 @@ showWaypointSetFeedback(x, y) {
     }
 }
         cycleWeapon() {
-          const nextWeapon = this.player.currentWeapon % 5 + 1;
+          const nextWeapon = this.player.currentWeapon % 11 + 1;
           this.switchWeapon(nextWeapon)
         }
         isPlanetLandable(planet){

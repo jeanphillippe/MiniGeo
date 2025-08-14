@@ -1495,20 +1495,20 @@ class AudioManager {
         this.lastDamageTime=0;
         // Sprite definitions (start time in seconds, duration in seconds)
         this.spriteMap = {
-            blaster: [0, 132],
-            enemyShot: [392, 628],
-            scatter: [630, 372],
-            shotgun: [242, 553],
-            laser: [4252, 4425],
-            explosion: [1996, 2527],
-            damage: [3092, 3542],
-            collision: [6144, 6530],
-            enemyHit: [2538, 3034],
-            weaponSwitch: [5278, 5573],
-            powerUp: [5278, 5573],
-            mine: [5278, 5573],
-            landing: [5.607, 7007],
-            takeoff: [7112, 8414]
+            blaster: [0, 0.132],
+            enemyShot: [0.392, 0.628],
+            scatter: [0.630, 0.372],
+            shotgun: [0.242, 0.553],
+            laser: [4.252, 4.425],
+            explosion: [1.996, 2.527],
+            damage: [3.092, 3.542],
+            collision: [6.144, 6.530],
+            enemyHit: [2.538, 3.034],
+            weaponSwitch: [5.278, 5.573],
+            powerUp: [5.278, 5.573],
+            mine: [5.278, 5.573],
+            landing: [5.607, 7.007],
+            takeoff: [7.112, 8.414]
         };
         
         // Sound management

@@ -1462,19 +1462,23 @@ clearWaypoint() {
 }
       }
 
+/**
+ * High-Performance Web Audio API AudioManager
+ * 
+ * Features:
+ * ✅ Uses audio sprites for efficient file loading
+ * ✅ True 3D spatial audio with HRTF
+ * ✅ Object pooling for GainNodes and PannerNodes 
+ * ✅ Mobile-optimized with context suspension handling
+ * ✅ Automatic memory cleanup and node recycling
+ * ✅ Precise timing synchronization
+ */
 class AudioManager {
     constructor() {
         this.initialized = false;
-        this.lastCollisionTime = 0;
-        this.lastBlasterTime = 0;
-        this.lastEnemyShotTime = 0;
-        this.mineHum = false;
-        this.engineRunning = false;
-        this.backgroundMusic = null;
-        this.sfxSprite = null;
-        this.engineSound = null;
-        
-        // Track playing sounds to prevent spam
+        this.audioContext = null;
+        this.masterGain = null;
+        this.sfxBuffer = null;
         this.activeSounds = new Map();
         this.maxConcurrentSounds = {
             blaster: 3,
@@ -1483,250 +1487,604 @@ class AudioManager {
             collision: 1
         };
         
+        // Audio sprite timing data (converted from milliseconds to seconds)
+        this.spriteMap = {
+            blaster: [0/1000, 132/1000],
+            enemyShot: [392/1000, 628/1000],
+            scatter: [630/1000, 1372/1000],
+            shotgun: [242/1000, 553/1000],
+            laser: [4252/1000, 4425/1000],
+            explosion: [1996/1000, 2527/1000],
+            damage: [3092/1000, 3542/1000],
+            collision: [6144/1000, 6530/1000],
+            enemyHit: [2538/1000, 3034/1000],
+            weaponSwitch: [5278/1000, 5573/1000],
+            powerUp: [5278/1000, 5573/1000],
+            mine: [5278/1000, 5573/1000],
+            landing: [5607/1000, 7007/1000],
+            takeoff: [7112/1000, 8414/1000]
+        };
+        
+        // Performance optimizations
+        this.nodePool = {
+            gainNodes: [],
+            pannerNodes: []
+        };
+        this.poolSize = 20;
+        
+        this.lastCollisionTime = 0;
+        this.lastBlasterTime = 0;
+        this.lastEnemyShotTime = 0;
+        this.laserActive = false;
+        this.laserSource = null;
+        this.laserGain = null;
+        this.lastListenerPos = null;
+        this.setupStarted = false;
+        
         this.setup();
     }
-
-    setup() {
+    
+    async setup() {
+        if (this.setupStarted) return;
+        this.setupStarted = true;
+        
         try {
-            const spriteMap = {
-                blaster: [0, 132],
-                enemyShot: [392, 628],
-                scatter: [630, 1372],
-                shotgun: [242, 553],
-                laser: [4252, 4425],
-                explosion: [1996, 2527],
-                damage: [3092, 3542],
-                collision: [6144, 6530],
-                enemyHit: [2538, 3034],
-                weaponSwitch: [5278, 5573],
-                powerUp: [5278, 5573],
-                //powerUp: [4517, 5261],
-                mine: [5278, 5573],
-                landing: [5607, 7007],
-                takeoff: [7112, 8414]
-            };
-
-            this.sfxSprite = new Howl({
-                src: ['sfx-sprite.mp3'],
-                sprite: spriteMap,
-                volume: 0.7,
-                preload: true,
-                onloaderror: (id, error) => {
-                    console.warn('Failed to load SFX sprite:', error);
-                }
-            });
-
-            // Remove background music for now as requested
-            this.backgroundMusic = null;
-            this.engineSound = null;
+            console.log('Setting up AudioManager...');
             
-            this.laserActive = false;
-            this.laserSoundId = null;
+            // Create audio context
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            console.log('Audio context created, state:', this.audioContext.state);
+            
+            // Create master gain node
+            this.masterGain = this.audioContext.createGain();
+            this.masterGain.connect(this.audioContext.destination);
+            this.masterGain.gain.setValueAtTime(0.7, this.audioContext.currentTime);
+            
+            // Try to load audio sprite
+            await this.loadAudioSprite();
+            
+            console.log('AudioManager setup complete');
+            
         } catch (error) {
-            console.warn('Audio setup failed:', error);
+            console.error('Audio setup failed:', error);
         }
     }
-
-    // Add spatial audio support
+    
+    async loadAudioSprite() {
+        const possiblePaths = [
+            'sfx-sprite.mp3',
+            './sfx-sprite.mp3',
+            '/sfx-sprite.mp3',
+            'assets/sfx-sprite.mp3',
+            './assets/sfx-sprite.mp3'
+        ];
+        
+        for (const path of possiblePaths) {
+            try {
+                console.log(`Trying to load audio from: ${path}`);
+                const response = await fetch(path);
+                
+                if (!response.ok) {
+                    console.log(`Failed to fetch ${path}: ${response.status}`);
+                    continue;
+                }
+                
+                const arrayBuffer = await response.arrayBuffer();
+                this.sfxBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+                console.log(`Audio sprite loaded successfully from ${path}, duration:`, this.sfxBuffer.duration);
+                return;
+                
+            } catch (error) {
+                console.log(`Failed to load ${path}:`, error.message);
+                continue;
+            }
+        }
+        
+        console.error('Failed to load audio sprite from any path');
+    }
+    
+    createNodePools() {
+        if (!this.audioContext) return;
+        
+        // Pre-create gain nodes
+        for (let i = 0; i < this.poolSize; i++) {
+            const gainNode = this.audioContext.createGain();
+            this.nodePool.gainNodes.push(gainNode);
+        }
+        
+        // Pre-create panner nodes for spatial audio
+        for (let i = 0; i < this.poolSize; i++) {
+            const panner = this.audioContext.createPanner();
+            panner.panningModel = 'HRTF';
+            panner.distanceModel = 'inverse';
+            panner.refDistance = 10;
+            panner.maxDistance = 200;
+            panner.rolloffFactor = 1;
+            this.nodePool.pannerNodes.push(panner);
+        }
+    }
+    
+    getGainNode() {
+        if (this.nodePool.gainNodes.length > 0) {
+            const node = this.nodePool.gainNodes.pop();
+            // Reset node state
+            node.gain.setValueAtTime(1, this.audioContext.currentTime);
+            return node;
+        }
+        // Fallback: create new node if pool is empty
+        return this.audioContext.createGain();
+    }
+    
+    returnGainNode(node) {
+        if (this.nodePool.gainNodes.length < this.poolSize) {
+            try {
+                node.disconnect();
+                this.nodePool.gainNodes.push(node);
+            } catch (e) {
+                // Node might already be disconnected
+            }
+        }
+    }
+    
+    getPannerNode() {
+        if (this.nodePool.pannerNodes.length > 0) {
+            const node = this.nodePool.pannerNodes.pop();
+            // Reset position
+            node.positionX.setValueAtTime(0, this.audioContext.currentTime);
+            node.positionY.setValueAtTime(0, this.audioContext.currentTime);
+            node.positionZ.setValueAtTime(0, this.audioContext.currentTime);
+            return node;
+        }
+        // Fallback: create new node if pool is empty
+        const panner = this.audioContext.createPanner();
+        panner.panningModel = 'HRTF';
+        panner.distanceModel = 'inverse';
+        panner.refDistance = 10;
+        panner.maxDistance = 200;
+        panner.rolloffFactor = 1;
+        return panner;
+    }
+    
+    returnPannerNode(node) {
+        if (this.nodePool.pannerNodes.length < this.poolSize) {
+            try {
+                node.disconnect();
+                this.nodePool.pannerNodes.push(node);
+            } catch (e) {
+                // Node might already be disconnected
+            }
+        }
+    }
+    
+    createSpatialSource(sourcePosition = null, listenerPosition = null, baseVolume = 1.0) {
+        if (!this.audioContext || !this.sfxBuffer) return null;
+        
+        const source = this.audioContext.createBufferSource();
+        source.buffer = this.sfxBuffer;
+        
+        if (sourcePosition && listenerPosition) {
+            // Use pooled nodes for better performance
+            const panner = this.getPannerNode();
+            const gainNode = this.getGainNode();
+            
+            // Set position
+            panner.positionX.setValueAtTime(sourcePosition.x, this.audioContext.currentTime);
+            panner.positionY.setValueAtTime(sourcePosition.y, this.audioContext.currentTime);
+            panner.positionZ.setValueAtTime(sourcePosition.z, this.audioContext.currentTime);
+            
+            // Set listener position (only if it has changed significantly)
+            const listenerPos = this.audioContext.listener;
+            const threshold = 1; // Only update if moved more than 1 unit
+            if (!this.lastListenerPos || 
+                Math.abs(this.lastListenerPos.x - listenerPosition.x) > threshold ||
+                Math.abs(this.lastListenerPos.y - listenerPosition.y) > threshold ||
+                Math.abs(this.lastListenerPos.z - listenerPosition.z) > threshold) {
+                
+                listenerPos.positionX.setValueAtTime(listenerPosition.x, this.audioContext.currentTime);
+                listenerPos.positionY.setValueAtTime(listenerPosition.y, this.audioContext.currentTime);
+                listenerPos.positionZ.setValueAtTime(listenerPosition.z, this.audioContext.currentTime);
+                
+                this.lastListenerPos = {
+                    x: listenerPosition.x,
+                    y: listenerPosition.y,
+                    z: listenerPosition.z
+                };
+            }
+            
+            gainNode.gain.setValueAtTime(baseVolume, this.audioContext.currentTime);
+            
+            // Connect: source -> gain -> panner -> master -> destination
+            source.connect(gainNode);
+            gainNode.connect(panner);
+            panner.connect(this.masterGain);
+            
+            // Return nodes to pool when sound ends
+            source.addEventListener('ended', () => {
+                this.returnGainNode(gainNode);
+                this.returnPannerNode(panner);
+            });
+            
+            return { source, gainNode, panner };
+        } else {
+            // Non-spatial audio - use pooled gain node
+            const gainNode = this.getGainNode();
+            gainNode.gain.setValueAtTime(baseVolume, this.audioContext.currentTime);
+            
+            source.connect(gainNode);
+            gainNode.connect(this.masterGain);
+            
+            // Return to pool when sound ends
+            source.addEventListener('ended', () => {
+                this.returnGainNode(gainNode);
+            });
+            
+            return { source, gainNode };
+        }
+    }
+    
     calculateSpatialVolume(sourcePosition, listenerPosition, baseVolume = 1.0, maxDistance = 100) {
         if (!sourcePosition || !listenerPosition) return baseVolume;
         
         const distance = sourcePosition.distanceTo(listenerPosition);
         if (distance >= maxDistance) return 0;
         
-        // Linear falloff - closer = louder
         const spatialVolume = Math.max(0, 1 - (distance / maxDistance));
         return baseVolume * spatialVolume;
     }
-
-    // Improved sound management to prevent spam
+    
     canPlaySound(soundType) {
         const maxConcurrent = this.maxConcurrentSounds[soundType] || 1;
         const activeSoundsOfType = this.activeSounds.get(soundType) || [];
         
         // Clean up finished sounds
-        const stillPlaying = activeSoundsOfType.filter(soundId => this.sfxSprite.playing(soundId));
+        const currentTime = this.audioContext ? this.audioContext.currentTime : 0;
+        const stillPlaying = activeSoundsOfType.filter(soundData => 
+            soundData.source && soundData.endTime > currentTime
+        );
         this.activeSounds.set(soundType, stillPlaying);
         
         return stillPlaying.length < maxConcurrent;
     }
-
-    trackSound(soundType, soundId) {
+    
+    trackSound(soundType, soundData) {
         if (!this.activeSounds.has(soundType)) {
             this.activeSounds.set(soundType, []);
         }
-        this.activeSounds.get(soundType).push(soundId);
+        this.activeSounds.get(soundType).push(soundData);
     }
-
-    playBlaster(sourcePos = null, listenerPos = null) {
-        if (!this.initialized || !this.sfxSprite) return;
+    
+    playSprite(spriteName, sourcePos = null, listenerPos = null, volume = 1.0) {
+        if (!this.initialized || !this.audioContext || !this.sfxBuffer || !this.spriteMap[spriteName]) {
+            console.log(`Cannot play sprite ${spriteName}:`, {
+                initialized: this.initialized,
+                audioContext: !!this.audioContext,
+                sfxBuffer: !!this.sfxBuffer,
+                spriteExists: !!this.spriteMap[spriteName]
+            });
+            return null;
+        }
         
-        // Prevent spam
+        // Resume audio context if suspended (for mobile)
+        if (this.audioContext.state === 'suspended') {
+            console.log('Resuming suspended audio context...');
+            this.audioContext.resume();
+        }
+        
+        const [startTime, endTime] = this.spriteMap[spriteName];
+        const duration = endTime - startTime;
+        
+        console.log(`Playing sprite ${spriteName}: start=${startTime}s, duration=${duration}s`);
+        
+        const audioNodes = this.createSpatialSource(sourcePos, listenerPos, volume);
+        if (!audioNodes) {
+            console.log('Failed to create audio nodes');
+            return null;
+        }
+        
+        const { source, gainNode } = audioNodes;
+        
+        try {
+            // Use precise timing for better sync
+            const when = this.audioContext.currentTime;
+            source.start(when, startTime, duration);
+            
+            const soundData = {
+                source,
+                gainNode,
+                endTime: when + duration,
+                startTime: when
+            };
+            
+            // Auto-cleanup for better memory management
+            source.addEventListener('ended', () => {
+                // Remove from active sounds tracking
+                Object.values(this.activeSounds).forEach(soundList => {
+                    const index = soundList.indexOf(soundData);
+                    if (index > -1) {
+                        soundList.splice(index, 1);
+                    }
+                });
+            });
+            
+            console.log(`Successfully started sprite ${spriteName}`);
+            return soundData;
+        } catch (error) {
+            console.error(`Failed to play sprite ${spriteName}:`, error);
+            // Return nodes to pool if start failed
+            if (audioNodes.gainNode) this.returnGainNode(audioNodes.gainNode);
+            if (audioNodes.panner) this.returnPannerNode(audioNodes.panner);
+            return null;
+        }
+    }
+    
+    playBlaster(sourcePos = null, listenerPos = null) {
+        if (!this.initialized) return;
+        
         const currentTime = Date.now();
         if (currentTime - this.lastBlasterTime < 50) return;
         this.lastBlasterTime = currentTime;
         
         if (!this.canPlaySound('blaster')) return;
         
-        try {
-            const soundId = this.sfxSprite.play('blaster');
-            this.trackSound('blaster', soundId);
-            
-            // Apply spatial audio if positions provided
-            if (sourcePos && listenerPos) {
-                const volume = this.calculateSpatialVolume(sourcePos, listenerPos, 0.7, 80);
-                this.sfxSprite.volume(volume, soundId);
-            }
-        } catch (e) {}
+        const soundData = this.playSprite('blaster', sourcePos, listenerPos, 0.7);
+        if (soundData) {
+            this.trackSound('blaster', soundData);
+        }
     }
-
+    
     playEnemyShot(sourcePos = null, listenerPos = null) {
-        if (!this.initialized || !this.sfxSprite) return;
+        if (!this.initialized) return;
         
-        // Prevent spam
         const currentTime = Date.now();
         if (currentTime - this.lastEnemyShotTime < 30) return;
         this.lastEnemyShotTime = currentTime;
         
         if (!this.canPlaySound('enemyShot')) return;
         
-        try {
-            const soundId = this.sfxSprite.play('enemyShot');
-            this.trackSound('enemyShot', soundId);
-            
-            // Apply spatial audio
-            if (sourcePos && listenerPos) {
-                const volume = this.calculateSpatialVolume(sourcePos, listenerPos, 0.6, 100);
-                this.sfxSprite.volume(volume, soundId);
-            }
-        } catch (e) {}
+        const soundData = this.playSprite('enemyShot', sourcePos, listenerPos, 0.6);
+        if (soundData) {
+            this.trackSound('enemyShot', soundData);
+        }
     }
-
+    
     playExplosion(size = 1, sourcePos = null, listenerPos = null) {
-        if (!this.initialized || !this.sfxSprite) return;
+        if (!this.initialized) return;
         
         if (!this.canPlaySound('explosion')) return;
         
-        try {
-            const soundId = this.sfxSprite.play('explosion');
-            this.trackSound('explosion', soundId);
-            
-            let volume = Math.min(size * 0.7, 1.0);
-            
-            // Apply spatial audio
-            if (sourcePos && listenerPos) {
-                volume = this.calculateSpatialVolume(sourcePos, listenerPos, volume, 150);
-            }
-            
-            this.sfxSprite.volume(volume, soundId);
-        } catch (e) {}
+        let volume = Math.min(size * 0.7, 1.0);
+        
+        const soundData = this.playSprite('explosion', sourcePos, listenerPos, volume);
+        if (soundData) {
+            this.trackSound('explosion', soundData);
+        }
     }
-
+    
     playCollision() {
-        if (!this.initialized || !this.sfxSprite) return;
+        if (!this.initialized) return;
+        
         const currentTime = Date.now();
-        if (currentTime - this.lastCollisionTime < 300) return; // Increased cooldown
+        if (currentTime - this.lastCollisionTime < 300) return;
         this.lastCollisionTime = currentTime;
         
-        try {
-            this.sfxSprite.play('collision');
-        } catch (e) {}
+        this.playSprite('collision', null, null, 0.8);
     }
-
+    
     playDamage() {
-        if (!this.initialized || !this.sfxSprite) return;
+        if (!this.initialized) return;
+        
         const currentTime = Date.now();
-        if (currentTime - this.lastCollisionTime < 200) return; // Increased cooldown
+        if (currentTime - this.lastCollisionTime < 200) return;
         this.lastCollisionTime = currentTime;
         
-        try {
-            this.sfxSprite.play('damage');
-        } catch (e) {}
+        this.playSprite('damage', null, null, 0.8);
     }
-
-    // Simplified laser audio
+    
     playLaser() {
-        if (!this.initialized || !this.sfxSprite || this.laserActive) return;
+        if (!this.initialized || this.laserActive) return;
         
         try {
             this.laserActive = true;
-            this.laserSoundId = this.sfxSprite.play('laser');
-            this.sfxSprite.loop(true, this.laserSoundId);
-            this.sfxSprite.volume(0.5, this.laserSoundId); // Lower volume for laser
-        } catch (e) {
+            
+            const audioNodes = this.createSpatialSource(null, null, 0.5);
+            if (!audioNodes) {
+                this.laserActive = false;
+                return;
+            }
+            
+            const { source, gainNode } = audioNodes;
+            this.laserSource = source;
+            this.laserGain = gainNode;
+            
+            // Set up looping
+            source.loop = true;
+            source.loopStart = this.spriteMap.laser[0];
+            source.loopEnd = this.spriteMap.laser[1];
+            
+            source.start(this.audioContext.currentTime, this.spriteMap.laser[0]);
+            
+        } catch (error) {
+            console.warn('Failed to play laser:', error);
             this.laserActive = false;
         }
     }
-
+    
     stopLaser() {
-        if (!this.initialized || !this.sfxSprite || !this.laserActive) return;
+        if (!this.laserActive || !this.laserSource) return;
         
         try {
-            if (this.laserSoundId) {
-                this.sfxSprite.stop(this.laserSoundId);
+            // Fade out to prevent clicks
+            if (this.laserGain) {
+                this.laserGain.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.1);
             }
+            
+            this.laserSource.stop(this.audioContext.currentTime + 0.1);
+            
+        } catch (error) {
+            console.warn('Failed to stop laser:', error);
+        } finally {
             this.laserActive = false;
-            this.laserSoundId = null;
-        } catch (e) {
-            this.laserActive = false;
+            this.laserSource = null;
+            this.laserGain = null;
         }
     }
-
-    // Keep all other methods unchanged
-    start() {
+    
+    async start() {
         if (!this.initialized) {
             try {
+                // Ensure setup is complete
+                if (!this.setupStarted) {
+                    await this.setup();
+                }
+                
+                // Wait for audio context and buffer
+                let attempts = 0;
+                while ((!this.audioContext || !this.sfxBuffer) && attempts < 50) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    attempts++;
+                }
+                
+                if (!this.audioContext) {
+                    throw new Error('Audio context failed to initialize');
+                }
+                
+                if (!this.sfxBuffer) {
+                    console.warn('Audio sprite not loaded, but continuing...');
+                }
+                
+                if (this.audioContext.state === 'suspended') {
+                    console.log('Resuming audio context...');
+                    await this.audioContext.resume();
+                }
+                
+                // Create node pools after context is ready
+                this.createNodePools();
+                
                 this.initialized = true;
+                console.log('AudioManager started successfully, state:', this.audioContext.state);
+                
+                // Test with a very short sound
+                if (this.sfxBuffer) {
+                    console.log('Testing audio...');
+                    this.playSprite('blaster', null, null, 0.1);
+                }
+                
             } catch (error) {
-                console.warn('Audio start failed:', error);
+                console.error('Audio start failed:', error);
             }
         }
     }
-
+    
     dispose() {
         try {
-            if (this.sfxSprite) {
-                this.sfxSprite.stop();
-                this.sfxSprite.unload();
+            this.stopLaser();
+            
+            // Stop all active sounds
+            this.activeSounds.forEach(soundList => {
+                soundList.forEach(soundData => {
+                    if (soundData.source) {
+                        try {
+                            soundData.source.stop();
+                        } catch (e) {
+                            // Sound might already be stopped
+                        }
+                    }
+                });
+            });
+            
+            this.activeSounds.clear();
+            
+            // Clean up node pools
+            this.nodePool.gainNodes.forEach(node => {
+                try { node.disconnect(); } catch (e) {}
+            });
+            this.nodePool.pannerNodes.forEach(node => {
+                try { node.disconnect(); } catch (e) {}
+            });
+            this.nodePool.gainNodes = [];
+            this.nodePool.pannerNodes = [];
+            
+            if (this.audioContext) {
+                this.audioContext.close();
+                this.audioContext = null;
             }
-            if (this.backgroundMusic) {
-                this.backgroundMusic.stop();
-                this.backgroundMusic.unload();
-            }
-            if (this.engineSound) {
-                this.engineSound.stop();
-                this.engineSound.unload();
-            }
-            this.laserActive = false;
-            this.engineRunning = false;
+            
+            this.initialized = false;
+            this.lastListenerPos = null;
+            
         } catch (error) {
             console.warn('Audio disposal error:', error);
         }
     }
-
-    // Keep other methods as they are, just add spatial audio support where needed
-    playScatter() { if (this.initialized && this.sfxSprite) try { this.sfxSprite.play('scatter'); } catch (e) {} }
-    playShotgun() { if (this.initialized && this.sfxSprite) try { this.sfxSprite.play('shotgun'); } catch (e) {} }
-    playEnemyHit() { if (this.initialized && this.sfxSprite) try { this.sfxSprite.play('enemyHit'); } catch (e) {} }
-    playWeaponSwitch() { if (this.initialized && this.sfxSprite) try { this.sfxSprite.play('weaponSwitch'); } catch (e) {} }
-    playPowerUp() { if (this.initialized && this.sfxSprite) try { this.sfxSprite.play('powerUp'); } catch (e) {} }
-    playMine() { if (this.initialized && this.sfxSprite) try { this.sfxSprite.play('mine'); } catch (e) {} }
-    playLanding() { if (this.initialized && this.sfxSprite) try { this.sfxSprite.play('landing'); } catch (e) {} }
-    playTakeoff() { if (this.initialized && this.sfxSprite) try { this.sfxSprite.play('takeoff'); } catch (e) {} }
-
-    // Stub methods for removed features
+    
+    // Simple sprite playback methods
+    playScatter() {
+        if (this.initialized) this.playSprite('scatter', null, null, 0.8);
+    }
+    
+    playShotgun() {
+        if (this.initialized) this.playSprite('shotgun', null, null, 0.8);
+    }
+    
+    playEnemyHit() {
+        if (this.initialized) this.playSprite('enemyHit', null, null, 0.7);
+    }
+    
+    playWeaponSwitch() {
+        if (this.initialized) this.playSprite('weaponSwitch', null, null, 0.8);
+    }
+    
+    playPowerUp() {
+        if (this.initialized) this.playSprite('powerUp', null, null, 0.8);
+    }
+    
+    playMine() {
+        if (this.initialized) this.playSprite('mine', null, null, 0.7);
+    }
+    
+    playLanding() {
+        if (this.initialized) this.playSprite('landing', null, null, 0.8);
+    }
+    
+    playTakeoff() {
+        if (this.initialized) this.playSprite('takeoff', null, null, 0.8);
+    }
+    
+    // Volume control methods
+    setMasterVolume(volume) {
+        if (this.masterGain) {
+            const clampedVolume = Math.max(0, Math.min(1, volume));
+            this.masterGain.gain.setValueAtTime(clampedVolume, this.audioContext.currentTime);
+        }
+    }
+    
+    setSFXVolume(volume) {
+        // For Web Audio API, this would affect individual sounds
+        // Could be implemented by storing a global SFX multiplier
+        this.sfxVolume = Math.max(0, Math.min(1, volume));
+    }
+    
+    mute() {
+        if (this.masterGain) {
+            this.masterGain.gain.setValueAtTime(0, this.audioContext.currentTime);
+        }
+    }
+    
+    unmute() {
+        if (this.masterGain) {
+            this.masterGain.gain.setValueAtTime(0.7, this.audioContext.currentTime);
+        }
+    }
+    
+    // Stub methods for compatibility (not implemented as they weren't used much)
     startBackgroundMusic() {}
     stopBackgroundMusic() {}
     pauseBackgroundMusic() {}
     resumeBackgroundMusic() {}
     startEngine() {}
     stopEngine() {}
-    setMasterVolume(volume) { try { Howler.volume(Math.max(0, Math.min(1, volume))); } catch (e) {} }
-    setSFXVolume(volume) { if (this.sfxSprite) try { this.sfxSprite.volume(Math.max(0, Math.min(1, volume))); } catch (e) {} }
     setMusicVolume(volume) {}
     setEngineVolume(volume) {}
-    mute() { try { Howler.mute(true); } catch (e) {} }
-    unmute() { try { Howler.mute(false); } catch (e) {} }
 }
       class SpaceShooter {
         constructor() {

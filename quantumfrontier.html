@@ -2089,29 +2089,19 @@ showWaypointSetFeedback(x, y) {
           this.spawnAlly();
           this.spawnAlly();
           this.spawnAlly();
-          const targetPlanet = this.findPlanetByName("Asteria");
-            if (targetPlanet) {
-                waypointData = {
-                    x: targetPlanet.center.x,
-                    z: targetPlanet.center.z,
-                    planet: targetPlanet,
-                    type: 'planet'
-                };
-                displayName = storyWaypoint;
-            }
-        
-        
-        // Set the waypoint and show notification
-        if (waypointData) {
-            this.minimapManager.waypoint = waypointData;
-            
-            // Show navigation notification after a short delay
-            setTimeout(() => {
-                this.showNavigationNotification(displayName);
-                //this.audioManager.playWeaponSwitch(); // Reuse power-up sound
-            }, 100);
+          const asteriaPlanet = this.findPlanetByName('Asteria Prime');
+if (asteriaPlanet) {
+    this.minimapManager.waypoint = {
+        x: asteriaPlanet.center.x,
+        z: asteriaPlanet.center.z,
+        planet: asteriaPlanet,
+        type: 'planet'
+    };
+}
+setTimeout(() => {
+    this.showNavigationNotification('Asteria Prime');
+}, 500);
         }
-      }
         createPlayer() {
           this.playerShip = ShipFactory.create('player');
           this.playerShip.position.set(50, 5, 50);

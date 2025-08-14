@@ -1497,7 +1497,7 @@ class AudioManager {
         this.spriteMap = {
             blaster: [0, 0.132],
             enemyShot: [0.392, 0.628],
-            scatter: [0.630, 0.372],
+            scatter: [0.630, 1.372],
             shotgun: [0.242, 0.553],
             laser: [4.252, 4.425],
             explosion: [1.996, 2.527],
@@ -1665,7 +1665,8 @@ class AudioManager {
         if (!audioNodes) return null;
         
         const { source, gainNode } = audioNodes;
-        const [startTime, duration] = sprite;
+        const [startTime, endTime] = sprite;
+const duration = endTime - startTime;
         
         // Configure playback
         source.loop = loop;

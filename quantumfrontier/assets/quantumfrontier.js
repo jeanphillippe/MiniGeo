@@ -1030,10 +1030,13 @@ static createIrregularPlanet(radius, irregularity = 0, style = 'highdetail') {
           const material = new THREE.MeshBasicMaterial({
             map: texture,
             transparent: !1,
+              depthWrite: false,  // ADD THIS LINE
+        depthTest: true,     // ADD THIS LINE
             opacity: 1
           });
           this.mesh = new THREE.Mesh(geometry, material);
           this.mesh.position.z = -800;
+          this.mesh.renderOrder = -1000; 
           this.texture = texture
         }
         update(playerX, playerZ) {
@@ -1067,7 +1070,8 @@ static createIrregularPlanet(radius, irregularity = 0, style = 'highdetail') {
               map: nebulaTexture,
               transparent: !0,
               opacity: 0.33 - layer * 0.03,
-              blending: THREE.AdditiveBlending
+              blending: THREE.AdditiveBlending,    depthWrite: false,  // ADD THIS LINE
+            depthTest: true     // ADD THIS LINE
             });
             const nebula = new THREE.Mesh(geometry, material);
   //          nebula.position.set((Math.random() - 0.5) * 1000, (Math.random() - 0.5) * 1000, -300 - layer * 150);
@@ -1078,6 +1082,7 @@ nebula.position.set(
   -100 - layer * 50    // Closer to camera
 );
             nebula.rotation.z = Math.random() * Math.PI * 2;
+             nebula.renderOrder = -900 + layer; 
             this.group.add(nebula)
           }
         }
@@ -2426,6 +2431,7 @@ this.tractorBeam = null;
             this.landingState = 'none';
             this.landingTarget = null;
             this.removeLandingGlow();
+            this.restorePlayerDepth();  
             this.collisionEnabled = true;
             // Ensure player is visible and properly positioned
             if (this.playerShip) {
@@ -2722,12 +2728,14 @@ fireEMPBurst(){
         emissiveIntensity: 0.8, // Reduced intensity
         transparent: true,
         opacity: 0.6,
-        wireframe: true
+        wireframe: true,
+        depthTest: true,     // ADD THIS LINE
+        depthWrite: true  
     });
     const empSphere = new THREE.Mesh(empGeom, empMat);
     empSphere.position.copy(this.playerShip.position);
     empSphere.position.y = 5;
-    
+    empSphere.renderOrder = 150; 
     this.empBursts = this.empBursts || [];
     this.empBursts.push({
         mesh: empSphere,
@@ -3124,9 +3132,12 @@ deployEnergyShield(){
           try {
             const bulletGeom = new THREE.SphereGeometry(0.2, 8, 8);
             const bulletMat = new THREE.MeshBasicMaterial({
-              color: 0x00f2fe
+              color: 0x00f2fe,
+            depthTest: true,     // ADD THIS LINE
+            depthWrite: true  
             });
             const bullet = new THREE.Mesh(bulletGeom, bulletMat);
+               bullet.renderOrder = 60;
             if (!this.playerShip || !this.playerShip.position) {
               console.warn('Player ship not available for bullet creation');
               return;
@@ -3181,9 +3192,12 @@ deployEnergyShield(){
           const laserMat = new THREE.LineBasicMaterial({
             color: 0x00ff00,
             transparent: !0,
-            opacity: 0.8
+            opacity: 0.8,
+        depthTest: true,     // ADD THIS LINE
+        depthWrite: true
           });
           this.laserBeam = new THREE.Line(laserGeom, laserMat);
+          this.laserBeam.renderOrder = 100;
           this.scene.add(this.laserBeam);
           this.audioManager.playLaser();
           let hitSomething = !1;
@@ -3248,19 +3262,18 @@ deployEnergyShield(){
           });
           this.playerShip.renderOrder = 999
         }
-        restorePlayerDepth() {
-          if (this.originalPlayerMaterials) {
-            this.originalPlayerMaterials.forEach(({
-              mesh,
-              material
-            }) => {
-              mesh.material.depthTest = !0;
-              mesh.material.depthWrite = !0;
-              mesh.renderOrder = 0
-            });
-            this.playerShip.renderOrder = 0
-          }
-        }
+        restorePlayerDepth(){
+    if(this.originalPlayerMaterials){
+        this.originalPlayerMaterials.forEach(({mesh,material})=>{
+            // ✅ Actually restore the original material
+            mesh.material = material;
+            mesh.renderOrder = 0;
+        });
+        this.playerShip.renderOrder = 0;
+        // Clear the backup to prevent memory leaks
+        this.originalPlayerMaterials = null;
+    }
+}
         createLandingGlow() {
           this.removeLandingGlow();
           this.landingGlow = this.playerShip.clone();
@@ -3541,37 +3554,37 @@ createAllyBullet(ally, target){
     this.audioManager.playBlaster(ally.mesh.position, this.playerShip.position);
 }
 
-        createTrail() {
-          if (Math.random() > 0.3) return;
-          const trailCount = 3;
-          const coneAngle = Math.PI / 4;
-          const behindDistance = 3;
-          for (let i = 0; i < trailCount; i++) {
-            const spreadAngle = (Math.random() - 0.5) * coneAngle;
-            const playerAngle = this.playerShip.rotation.y + Math.PI;
-            const finalAngle = playerAngle + spreadAngle;
-            const distance = behindDistance + Math.random() * 2;
-            const x = this.playerShip.position.x + Math.sin(finalAngle) * distance;
-            const z = this.playerShip.position.z + Math.cos(finalAngle) * distance;
-            const noiseValue = new PerlinNoise().noise(x * 0.1, z * 0.1, Date.now() * 0.001);
-            const intensity = Math.abs(noiseValue);
-            const trailGeom = new THREE.SphereGeometry(0.3 + intensity * 0.5, 6, 6);
-            const hue = (intensity * 360 + 200) % 360;
-            const trailMat = new THREE.MeshBasicMaterial({
-              color: new THREE.Color().setHSL(hue / 360, 0.8, 0.6),
-              transparent: !0,
-              opacity: 0.7
-            });
-            const trail = new THREE.Mesh(trailGeom, trailMat);
-            trail.position.set(x, 4 + Math.random(), z);
-            this.trails.push({
-              mesh: trail,
-              life: 60 + Math.random() * 40,
-              maxLife: 60 + Math.random() * 40
-            });
-            this.scene.add(trail)
-          }
-        }
+        createTrail(){
+    if(Math.random()>0.3)return;
+    const trailCount=3;
+    const coneAngle=Math.PI/4;
+    const behindDistance=3;
+    for(let i=0;i<trailCount;i++){
+        const spreadAngle=(Math.random()-0.5)*coneAngle;
+        const playerAngle=this.playerShip.rotation.y+Math.PI;
+        const finalAngle=playerAngle+spreadAngle;
+        const distance=behindDistance+Math.random()*2;
+        const x=this.playerShip.position.x+Math.sin(finalAngle)*distance;
+        const z=this.playerShip.position.z+Math.cos(finalAngle)*distance;
+        const noiseValue=new PerlinNoise().noise(x*0.1,z*0.1,Date.now()*0.001);
+        const intensity=Math.abs(noiseValue);
+        const trailGeom=new THREE.SphereGeometry(0.3+intensity*0.5,6,6);
+        const hue=(intensity*360+200)%360;
+        const trailMat=new THREE.MeshBasicMaterial({
+            color:new THREE.Color().setHSL(hue/360,0.8,0.6),
+            transparent:!0,
+            opacity:0.7,
+            depthTest: true,  // ✅ Ensure proper depth testing
+            depthWrite: false // ✅ Prevent z-fighting
+        });
+        const trail=new THREE.Mesh(trailGeom,trailMat);
+        trail.position.set(x, 3.5 + Math.random() * 0.5, z);
+        trail.renderOrder = 50; 
+        this.trails.push({mesh:trail,life:60+Math.random()*40,maxLife:60+Math.random()*40});
+        this.scene.add(trail);
+    }
+}
+
         updateTrails() {
           this.trails = this.trails.filter(trail => {
             trail.life--;

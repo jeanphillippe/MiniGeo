@@ -4143,6 +4143,7 @@ setTimeout(() => {
         async startGame(){
     document.getElementById('intro').classList.add('hidden');
     await this.audioManager.start();
+    this.audioManager.playPowerUp();
     this.gameStarted=!0;
     
     // Solo setear waypoint inicial si no se ha seteado antes

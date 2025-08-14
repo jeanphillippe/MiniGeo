@@ -3774,9 +3774,12 @@ if (asteriaPlanet) {
         type: 'planet'
     };
 }
-setTimeout(() => {
-    this.showNavigationNotification('Asteria Prime');
-}, 500);
+   setTimeout(()=>{
+        // Only show if player isn't actively shooting
+        if(!this.keys.Space && !this.touchControls.firing){
+            this.showNavigationNotification('Asteria Prime')
+        }
+    },500);
         }
         animate() {
           requestAnimationFrame(() => this.animate());

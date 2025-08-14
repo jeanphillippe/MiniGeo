@@ -1,4 +1,3 @@
-
       const CONFIG = {
         player: {
           acc: 0.1,
@@ -582,6 +581,79 @@
             flagTexts: {
               visited_kepler: 'The quantum signatures here resonate with similar readings from Kepler-442b. This confirms the ancient network theory.',
               visited_proxima: 'Data correlation with Proxima Centauri b suggests this was the central hub of an ancient civilization.'
+            }
+          }
+        }, {
+          radius: 15,
+          color: 0x87ceeb,
+          distance: 140,
+          enemyCount: 4,
+          enemyType: 'f',
+          irregularity: 0,
+          health: 150,
+          orbitCenter: {
+            x: -30,
+            z: 20
+          },
+          orbitSpeed: 0.007,
+          startAngle: Math.PI,
+          dialogue: {
+            name: 'Glacialis',
+            image: './quantumfrontier/assets/images/planets.jpeg',
+            setStoryWaypoint: 'Asteria Prime',
+            baseText: 'Glacialis es un mundo de hielo eterno donde las temperaturas nunca superan los -200°C. Vastas llanuras de hielo azul se extienden hasta el horizonte, interrumpidas por imponentes cordilleras cristalinas que brillan bajo la luz de estrellas distantes./n Bajo la superficie helada, antiguos complejos de investigación permanecen preservados en el tiempo. Los laboratorios criogénicos aún funcionan con energía geotérmica, manteniendo muestras de civilizaciones perdidas y experimentos que desafían la comprensión actual./n Los registros hablan de "muestras de Asteria Prime" almacenadas en las bóvedas más profundas.',
+            flagTexts: {
+              visited_asteria: 'Cryogenic logs confirm mineral samples from Asteria Prime were stored here before the evacuation.',
+              visited_pyrrhos: 'Temperature differential studies between this ice world and Pyrrhos reveal connected research projects.'
+            }
+          }
+        }, {
+          radius: 35,
+          color: 0x4b0082,
+          distance: 320,
+          enemyCount: 12,
+          enemyType: 'd',
+          irregularity: 0.6,
+          health: 500,
+          orbitCenter: {
+            x: 0,
+            z: 0
+          },
+          orbitSpeed: 0.001,
+          startAngle: Math.PI / 6,
+          dialogue: {
+            name: 'Tempest Major',
+            image: './quantumfrontier/assets/images/planets44.jpeg',
+            setStoryWaypoint: 'Pyrrhos',
+            baseText: 'Tempest Major es un gigante gaseoso de tormentas perpetuas donde vientos de 2000 km/h crean un ballet caótico de nubes violetas y relámpagos plasmáticos. Sus tres lunas principales orbitan en formación, cada una equipada con estaciones de investigación atmosférica abandonadas./n En las capas superiores de la atmósfera, plataformas flotantes extraen gases raros utilizados en la fabricación de cristales de energía. Los trabajadores que sobrevivieron al abandono masivo hablan de extrañas resonancias que emergían desde las profundidades del planeta./n Las frecuencias registradas coinciden con las emanaciones cristalinas de Pyrrhos.',
+            flagTexts: {
+              visited_pyrrhos: 'Atmospheric resonance patterns match the crystal formations found on Pyrrhos.',
+              visited_helion: 'Gas extraction records show shipments to mercenary bases on Helion IV.'
+            }
+          }
+        }, {
+          radius: 20,
+          color: 0xffa500,
+          distance: 260,
+          enemyCount: 8,
+          enemyType: 'p',
+          style: 'sharp',
+          irregularity: 0.2,
+          health: 250,
+          orbitCenter: {
+            x: 80,
+            z: -40
+          },
+          orbitSpeed: 0.004,
+          startAngle: Math.PI / 3,
+          dialogue: {
+            name: 'Aridus',
+            image: './quantumfrontier/assets/images/planets3.jpeg',
+            setStoryWaypoint: 'Glacialis',
+            baseText: 'Aridus es un desierto sin fin de dunas doradas que cambian con los vientos solares. Dos soles gemelos baten este mundo durante 30 horas al día, creando un paisaje de espejismos y oasis efímeros donde la realidad se distorsiona./n Ocultas entre las dunas, estructuras piramidales de metal oxidado emergen ocasionalmente después de las tormentas. Estas ruinas contienen archivos holográficos de una civilización nómada que dominaba la navegación interdimensional./n Los archivos mencionan "refugios de hielo" donde guardaban sus descubrimientos más valiosos.',
+            flagTexts: {
+              visited_glacialis: 'Archive cross-references confirm research caches were hidden on the ice world Glacialis.',
+              visited_tempest: 'Navigation records show this civilization used gas giant gravitational fields for interdimensional travel.'
             }
           }
         }];
@@ -3244,11 +3316,11 @@ createAllyBullet(ally, target){
                 enemy.currentTarget = null;
             }
         } else if(enemy.retreating){
-              if (distanceToPlayer < enemy.attackRange * 1.2) {
-                enemy.attacking = !0;
-                enemy.retreating = !1;
-                return
-              }
+              if (distanceToPlayer !== undefined && distanceToPlayer < enemy.attackRange * 1.2) {
+  enemy.attacking = true;
+  enemy.retreating = false;
+  return;
+}
               if(closestDistance < enemy.attackRange * 1.2){
                 enemy.attacking = true;
                 enemy.retreating = false;

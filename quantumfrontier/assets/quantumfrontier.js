@@ -2318,20 +2318,22 @@ showWaypointSetFeedback(x, y) {
           const z = enemy.planet.center.z + Math.sin(enemy.angle) * enemy.planet.radius;
           enemy.mesh.position.set(x, 5, z)
         }
-        switchWeapon(weaponNumber) {
-    if (weaponNumber >= 1 && weaponNumber <= 5) {
+        switchWeapon(weaponNumber){
+    if(weaponNumber >= 1 && weaponNumber <= 11){
         this.player.currentWeapon = weaponNumber;
-        const weaponNames = ['Blaster', 'Scatter', 'Shotgun', 'Mines', 'Laser'];
+        const weaponNames = ['Blaster', 'Scatter', 'Shotgun', 'Mines', 'Laser', 'Plasma', 'Homing', 'Shield', 'EMP', 'Tractor', 'TimeDilation'];
         document.getElementById('currentWeapon').textContent = `${weaponNumber}-${weaponNames[weaponNumber-1]}`;
         document.getElementById('weaponBtn').innerHTML = `W<br>${weaponNumber}`;
         
-        if (this.laserBeam) {
+        if(this.laserBeam){
             this.scene.remove(this.laserBeam);
             this.laserBeam = null;
             this.audioManager.stopLaser();
         }
-        
-        // Use weaponSwitch sound, NOT powerUp
+        if(this.tractorBeam){
+            this.scene.remove(this.tractorBeam);
+            this.tractorBeam = null;
+        }
         this.audioManager.playWeaponSwitch();
     }
 }
@@ -2695,25 +2697,424 @@ showWaypointSetFeedback(x, y) {
         getPlanetName(planet) {
           return planet.config.dialogue?.name || `Planet ${this.planets.indexOf(planet) + 1}`
         }
-        fireWeapon() {
-          switch (this.player.currentWeapon) {
-            case 1:
-              this.fireBlaster();
-              break;
-            case 2:
-              this.fireScatter(3);
-              break;
-            case 3:
-              this.fireScatter(5);
-              break;
-            case 4:
-              this.fireMine();
-              break;
-            case 5:
-              this.fireLaser();
-              break
-          }
+        fireWeapon(){
+    switch(this.player.currentWeapon){
+        case 1: this.fireBlaster(); break;
+        case 2: this.fireScatter(3); break;
+        case 3: this.fireScatter(5); break;
+        case 4: this.fireMine(); break;
+        case 5: this.fireLaser(); break;
+        case 6: this.firePlasmaBurst(); break;
+        case 7: this.fireHomingMissile(); break;
+        case 8: this.deployEnergyShield(); break;
+        case 9: this.fireEMPBurst(); break;
+        case 10: this.activateTractorBeam(); break;
+        case 11: this.activateTimeDilation(); break;
+    }
+}
+
+fireEMPBurst(){
+    // Create expanding EMP sphere
+    const empGeom = new THREE.SphereGeometry(2, 16, 16);
+    const empMat = new THREE.MeshBasicMaterial({
+        color: 0x4169E1,
+        emissive: 0x1E90FF,
+        emissiveIntensity: 0.8,
+        transparent: true,
+        opacity: 0.6,
+        wireframe: true
+    });
+    const empSphere = new THREE.Mesh(empGeom, empMat);
+    empSphere.position.copy(this.playerShip.position);
+    empSphere.position.y = 5;
+    
+    this.empBursts = this.empBursts || [];
+    this.empBursts.push({
+        mesh: empSphere,
+        life: 45,
+        maxLife: 45,
+        expansion: 0.5,
+        maxRadius: 25
+    });
+    this.scene.add(empSphere);
+    this.audioManager.playWeaponSwitch();
+}
+
+// 4. TRACTOR BEAM WEAPON
+activateTractorBeam(){
+    if(this.tractorBeam){
+        this.scene.remove(this.tractorBeam);
+    }
+    
+    // Create beam geometry extending forward
+    const direction = new THREE.Vector3(
+        Math.sin(this.playerShip.rotation.y), 0, 
+        Math.cos(this.playerShip.rotation.y)
+    );
+    const beamEnd = this.playerShip.position.clone()
+        .add(direction.clone().multiplyScalar(40));
+    
+    // Create wider beam using cylinder
+    const beamGeom = new THREE.CylinderGeometry(0.5, 2, 40, 12);
+    const beamMat = new THREE.MeshBasicMaterial({
+        color: 0xFF69B4,
+        emissive: 0xFF1493,
+        emissiveIntensity: 0.6,
+        transparent: true,
+        opacity: 0.4
+    });
+    
+    this.tractorBeam = new THREE.Mesh(beamGeom, beamMat);
+    this.tractorBeam.position.copy(this.playerShip.position);
+    this.tractorBeam.position.add(direction.multiplyScalar(20));
+    this.tractorBeam.lookAt(beamEnd);
+    this.tractorBeam.rotateX(Math.PI / 2);
+    
+    this.scene.add(this.tractorBeam);
+    this.audioManager.playLaser();
+}
+
+// 5. TIME DILATION WEAPON  
+activateTimeDilation(){
+    if(this.timeDilationActive) return; // Prevent multiple activations
+    
+    this.timeDilationActive = true;
+    this.timeDilationDuration = 300; // 5 seconds at 60fps
+    this.timeScale = 0.2; // Slow everything to 20% speed
+    
+    // Create visual effect
+    const dilationGeom = new THREE.RingGeometry(5, 50, 32);
+    const dilationMat = new THREE.MeshBasicMaterial({
+        color: 0x9932CC,
+        emissive: 0x8A2BE2,
+        emissiveIntensity: 0.5,
+        transparent: true,
+        opacity: 0.3,
+        side: THREE.DoubleSide
+    });
+    
+    this.timeDilationEffect = new THREE.Mesh(dilationGeom, dilationMat);
+    this.timeDilationEffect.position.copy(this.playerShip.position);
+    this.timeDilationEffect.rotation.x = -Math.PI / 2;
+    this.scene.add(this.timeDilationEffect);
+    
+    this.audioManager.playPowerUp();
+}
+
+// 6. UPDATE EMP BURSTS
+updateEMPBursts(){
+    if(!this.empBursts) return;
+    
+    this.empBursts = this.empBursts.filter(emp => {
+        emp.life--;
+        emp.expansion += 0.8;
+        
+        const currentRadius = Math.min(emp.expansion, emp.maxRadius);
+        emp.mesh.scale.setScalar(currentRadius / 2);
+        emp.mesh.material.opacity = (emp.life / emp.maxLife) * 0.6;
+        emp.mesh.rotation.y += 0.1;
+        emp.mesh.rotation.x += 0.05;
+        
+        // Apply EMP effect to enemies in range
+        this.enemies.forEach(enemy => {
+            if(enemy.health > 0 && !enemy.empDisabled){
+                const dist = enemy.mesh.position.distanceTo(emp.mesh.position);
+                if(dist < currentRadius){
+                    enemy.empDisabled = true;
+                    enemy.empDuration = 300; // 5 seconds
+                    enemy.originalSpeed = enemy.speed;
+                    enemy.originalChaseSpeed = enemy.chaseSpeed;
+                    enemy.speed = 0;
+                    enemy.chaseSpeed = 0;
+                    
+                    // Visual feedback - make enemy flash blue
+                    enemy.mesh.traverse(child => {
+                        if(child.isMesh){
+                            child.material.emissive = new THREE.Color(0x4169E1);
+                            child.material.emissiveIntensity = 0.3;
+                        }
+                    });
+                }
+            }
+        });
+        
+        if(emp.life <= 0){
+            this.scene.remove(emp.mesh);
+            return false;
         }
+        return true;
+    });
+}
+
+// 7. UPDATE TRACTOR BEAM
+updateTractorBeam(){
+    if(!this.tractorBeam) return;
+    
+    // Update beam position and rotation
+    const direction = new THREE.Vector3(
+        Math.sin(this.playerShip.rotation.y), 0,
+        Math.cos(this.playerShip.rotation.y)
+    );
+    
+    this.tractorBeam.position.copy(this.playerShip.position);
+    this.tractorBeam.position.add(direction.clone().multiplyScalar(20));
+    this.tractorBeam.lookAt(this.playerShip.position.clone().add(direction.multiplyScalar(60)));
+    this.tractorBeam.rotateX(Math.PI / 2);
+    
+    // Animate beam
+    this.tractorBeam.material.emissiveIntensity = 0.4 + 0.3 * Math.sin(Date.now() * 0.01);
+    
+    // Apply tractor effect to enemies
+    this.enemies.forEach(enemy => {
+        if(enemy.health <= 0) return;
+        
+        const enemyToPlayer = new THREE.Vector3()
+            .subVectors(this.playerShip.position, enemy.mesh.position);
+        const distance = enemyToPlayer.length();
+        
+        // Check if enemy is in beam cone
+        const beamDirection = direction.clone().normalize();
+        const enemyDirection = enemyToPlayer.clone().normalize();
+        const angle = beamDirection.angleTo(enemyDirection);
+        
+        if(distance < 40 && angle < Math.PI / 8){ // 22.5 degree cone
+            // Pull enemy toward player
+            const pullForce = Math.max(0.5, (40 - distance) / 40 * 2);
+            const pullVector = enemyToPlayer.normalize().multiplyScalar(pullForce);
+            
+            const newPos = enemy.mesh.position.clone().add(pullVector);
+            if(!this.checkPlanetCollision(newPos)){
+                enemy.mesh.position.copy(newPos);
+            }
+            
+            // Damage enemy
+            enemy.health -= 2;
+            if(enemy.health <= 0){
+                this.createExplosion(enemy.mesh.position);
+                enemy.mesh.visible = false;
+                this.player.score += enemy.score;
+                this.dropArtifact(enemy.mesh.position);
+            }
+        }
+    });
+}
+
+// 8. UPDATE TIME DILATION
+updateTimeDilation(){
+    if(!this.timeDilationActive) return;
+    
+    this.timeDilationDuration--;
+    
+    // Update visual effect
+    if(this.timeDilationEffect){
+        this.timeDilationEffect.position.copy(this.playerShip.position);
+        this.timeDilationEffect.rotation.z += 0.02;
+        this.timeDilationEffect.material.opacity = (this.timeDilationDuration / 300) * 0.3;
+        
+        // Pulsing effect
+        const pulse = 1 + 0.2 * Math.sin(Date.now() * 0.008);
+        this.timeDilationEffect.scale.setScalar(pulse);
+    }
+    
+    if(this.timeDilationDuration <= 0){
+        this.timeDilationActive = false;
+        this.timeScale = 1.0;
+        
+        if(this.timeDilationEffect){
+            this.scene.remove(this.timeDilationEffect);
+            this.timeDilationEffect = null;
+        }
+    }
+}
+
+// 9. UPDATE ENEMY RECOVERY FROM EMP
+updateEnemyEMPRecovery(){
+    this.enemies.forEach(enemy => {
+        if(enemy.empDisabled){
+            enemy.empDuration--;
+            
+            if(enemy.empDuration <= 0){
+                enemy.empDisabled = false;
+                enemy.speed = enemy.originalSpeed || CONFIG.enemy.baseSpeed;
+                enemy.chaseSpeed = enemy.originalChaseSpeed || CONFIG.enemy.chaseSpeed;
+                
+                // Restore original material
+                enemy.mesh.traverse(child => {
+                    if(child.isMesh){
+                        child.material.emissive = new THREE.Color(0x000000);
+                        child.material.emissiveIntensity = 0;
+                    }
+                });
+            }
+        }
+    });
+}
+
+updatePlasmaBursts(){
+    if(!this.plasmaBursts) return;
+    this.plasmaBursts = this.plasmaBursts.filter(burst => {
+        burst.life--;
+        burst.expansion += 0.3;
+        
+        burst.mesh.scale.setScalar(burst.expansion);
+        burst.mesh.material.opacity = (burst.life / burst.maxLife) * 0.8;
+        
+        // Damage enemies in range
+        this.enemies.forEach(enemy => {
+            if(enemy.health > 0){
+                const dist = enemy.mesh.position.distanceTo(burst.mesh.position);
+                if(dist < burst.expansion * 2){
+                    enemy.health -= 5;
+                    if(enemy.health <= 0){
+                        this.createExplosion(enemy.mesh.position);
+                        enemy.mesh.visible = false;
+                        this.player.score += enemy.score;
+                    }
+                }
+            }
+        });
+        
+        if(burst.life <= 0){
+            this.scene.remove(burst.mesh);
+            return false;
+        }
+        return true;
+    });
+}
+
+updateHomingMissiles(){
+    if(!this.homingMissiles) return;
+    this.homingMissiles = this.homingMissiles.filter(missile => {
+        missile.life--;
+        
+        if(missile.target && missile.target.health > 0){
+            const targetDir = new THREE.Vector3()
+                .subVectors(missile.target.mesh.position, missile.mesh.position)
+                .normalize();
+            
+            missile.velocity.lerp(targetDir.multiplyScalar(missile.speed), missile.turnRate);
+            missile.mesh.position.add(missile.velocity);
+            missile.mesh.lookAt(missile.mesh.position.clone().add(missile.velocity));
+            
+            // Check collision with target
+            if(missile.mesh.position.distanceTo(missile.target.mesh.position) < 2){
+                missile.target.health -= 40;
+                this.createExplosion(missile.mesh.position);
+                this.scene.remove(missile.mesh);
+                return false;
+            }
+        }
+        
+        if(missile.life <= 0){
+            this.scene.remove(missile.mesh);
+            return false;
+        }
+        return true;
+    });
+}
+
+updateEnergyShield(){
+    if(!this.energyShield) return;
+    
+    this.energyShield.life--;
+    this.energyShield.mesh.position.copy(this.playerShip.position);
+    
+    // Pulsing effect
+    const pulse = 0.2 + 0.1 * Math.sin(Date.now() * 0.01);
+    this.energyShield.mesh.material.opacity = pulse;
+    
+    if(this.energyShield.life <= 0 || this.energyShield.health <= 0){
+        this.scene.remove(this.energyShield.mesh);
+        this.energyShield = null;
+    }
+}
+firePlasmaBurst(){
+    const burstGeom = new THREE.RingGeometry(0.5, 1, 16);
+    const burstMat = new THREE.MeshBasicMaterial({
+        color: 0x00ffff,
+        emissive: 0x0088ff,
+        emissiveIntensity: 0.8,
+        transparent: true,
+        opacity: 0.8,
+        side: THREE.DoubleSide
+    });
+    const burst = new THREE.Mesh(burstGeom, burstMat);
+    burst.position.copy(this.playerShip.position);
+    burst.position.y = 5;
+    burst.rotation.x = -Math.PI / 2;
+    
+    this.plasmaBursts = this.plasmaBursts || [];
+    this.plasmaBursts.push({
+        mesh: burst,
+        life: 60,
+        maxLife: 60,
+        expansion: 0.2
+    });
+    this.scene.add(burst);
+}
+
+// Homing Missiles (weapon 7)
+fireHomingMissile(){
+    // Find nearest enemy
+    let target = null;
+    let minDist = Infinity;
+    this.enemies.forEach(enemy => {
+        if(enemy.health > 0){
+            const dist = enemy.mesh.position.distanceTo(this.playerShip.position);
+            if(dist < minDist && dist < 80){
+                minDist = dist;
+                target = enemy;
+            }
+        }
+    });
+    
+    if(!target) return;
+    
+    const missileGeom = new THREE.ConeGeometry(0.3, 1.5, 6);
+    const missileMat = new THREE.MeshBasicMaterial({
+        color: 0xfeca57,
+        emissive: 0xff9500,
+        emissiveIntensity: 0.6
+    });
+    const missile = new THREE.Mesh(missileGeom, missileMat);
+    missile.position.copy(this.playerShip.position);
+    missile.position.y += 0.5;
+    
+    this.homingMissiles = this.homingMissiles || [];
+    this.homingMissiles.push({
+        mesh: missile,
+        target: target,
+        velocity: new THREE.Vector3(),
+        speed: 1.5,
+        life: 120,
+        turnRate: 0.08
+    });
+    this.scene.add(missile);
+}
+
+// Energy Shield (weapon 8) - Temporary protective barrier
+deployEnergyShield(){
+    if(this.energyShield) return; // Only one shield at a time
+    
+    const shieldGeom = new THREE.SphereGeometry(8, 16, 16);
+    const shieldMat = new THREE.MeshBasicMaterial({
+        color: 0x00ff88,
+        emissive: 0x004420,
+        emissiveIntensity: 0.3,
+        transparent: true,
+        opacity: 0.3,
+        side: THREE.DoubleSide
+    });
+    const shield = new THREE.Mesh(shieldGeom, shieldMat);
+    shield.position.copy(this.playerShip.position);
+    
+    this.energyShield = {
+        mesh: shield,
+        life: 300, // 5 seconds at 60fps
+        health: 100
+    };
+    this.scene.add(shield);
+}
         fireBlaster() {
     this.createBullet(0);
     this.audioManager.playBlaster(this.playerShip.position, this.playerShip.position); // Same position for player sounds
@@ -2757,24 +3158,31 @@ showWaypointSetFeedback(x, y) {
             console.error('Failed to create bullet:', e);
           }
         }
-        fireMine() {
-          const mineGeom = new THREE.SphereGeometry(0.5, 8, 8);
-          const mineMat = new THREE.MeshBasicMaterial({
-            color: 0xff4757,
-            transparent: !0,
-            opacity: 0.8
-          });
-          const mine = new THREE.Mesh(mineGeom, mineMat);
-          mine.position.copy(this.playerShip.position);
-          mine.position.y += 0.5;
-          this.mines.push({
-            mesh: mine,
-            life: 600,
-            exploded: !1
-          });
-          this.scene.add(mine);
-          this.audioManager.playWeaponSwitch();//reused because its placing the mine, not exploding
-        }
+        fireMine(){
+    const mineGeom = new THREE.SphereGeometry(0.6, 12, 12);
+    const mineMat = new THREE.MeshBasicMaterial({
+        color: 0xff4757,
+        emissive: 0xff2030,
+        emissiveIntensity: 0.3,
+        transparent: true,
+        opacity: 0.9
+    });
+    const mine = new THREE.Mesh(mineGeom, mineMat);
+    mine.position.copy(this.playerShip.position);
+    mine.position.y += 0.5;
+    
+    // Add pulsing animation data
+    this.mines.push({
+        mesh: mine,
+        life: 600,
+        exploded: false,
+        pulseTime: 0,
+        pulseSpeed: 0.08 + Math.random() * 0.04 // Slight variation
+    });
+    this.scene.add(mine);
+    this.audioManager.playWeaponSwitch();
+}
+
         fireLaser() {
           if (this.laserBeam) {
             this.scene.remove(this.laserBeam)
@@ -2923,6 +3331,13 @@ showWaypointSetFeedback(x, y) {
           this.updateEnemyBullets();
           this.updateArtifacts();
           this.updateMines();
+          this.updatePlasmaBursts();
+this.updateHomingMissiles(); 
+this.updateEnergyShield();
+ this.updateEMPBursts();
+    this.updateTractorBeam();
+    this.updateTimeDilation();
+    this.updateEnemyEMPRecovery();
           this.updateCollisions();
           this.updateBackground();
           this.updateEffects();
@@ -3239,7 +3654,28 @@ createAllyBullet(ally, target){
           this.camera.lookAt(this.playerShip.position);
           this.updateCoordinates()
         }
+        handleWeaponRelease(){
+    if(!this.keys.Space && !this.touchControls.firing){
+        this.shootPressed = false;
+        
+        // Stop laser
+        if(this.laserBeam){
+            this.scene.remove(this.laserBeam);
+            this.laserBeam = null;
+            this.audioManager.stopLaser();
+        }
+        
+        // Stop tractor beam
+        if(this.tractorBeam){
+            this.scene.remove(this.tractorBeam);
+            this.tractorBeam = null;
+            this.audioManager.stopLaser();
+        }
+    }
+}
+
         updateEnemies(){
+
     this.enemies.forEach(enemy=>{
         if(enemy.health<=0||enemy.stuck)return;
         
@@ -3597,46 +4033,91 @@ this.audioManager.playSprite(randomSound, this.playerShip.position, this.playerS
         return true;
     });
 }
-        updateArtifacts() {
-          this.artifacts = this.artifacts.filter(artifact => {
-            artifact.life--;
-            artifact.mesh.position.y = 1 + Math.sin(Date.now() * 0.005 + artifact.bobOffset) * 0.5;
-            artifact.mesh.rotation.y += 0.08;
-            artifact.mesh.rotation.x += 0.03;
-            const playerPosition = this.playerShip.position.clone();
-            playerPosition.y = artifact.mesh.position.y;
-            const distance = artifact.mesh.position.distanceTo(playerPosition);
-            if (distance < 6) {
-              this.applyArtifactEffect(artifact.type);
-              this.scene.remove(artifact.mesh);
-              return !1
-            }
-            if (artifact.life <= 0) {
-              this.scene.remove(artifact.mesh);
-              return !1
-            }
-            return !0
-          })
+        updateArtifacts(){
+    this.artifacts = this.artifacts.filter(artifact => {
+        artifact.life--;
+        
+        // Enhanced bobbing and rotation
+        artifact.mesh.position.y = 1 + Math.sin(Date.now() * 0.005 + artifact.bobOffset) * 0.8;
+        artifact.mesh.rotation.y += 0.08;
+        artifact.mesh.rotation.x += 0.03;
+        
+        // Pulsing glow effect
+        const pulse = 0.4 + 0.6 * Math.sin(Date.now() * 0.008 + artifact.pulseOffset);
+        artifact.mesh.material.emissiveIntensity = pulse;
+        artifact.mesh.material.opacity = 0.7 + 0.3 * pulse;
+        
+        // Animate sparkles orbiting around the artifact
+        artifact.sparkles.forEach(sparkle => {
+            sparkle.angle += sparkle.speed;
+            const x = artifact.mesh.position.x + Math.cos(sparkle.angle) * sparkle.radius;
+            const z = artifact.mesh.position.z + Math.sin(sparkle.angle) * sparkle.radius;
+            const y = artifact.mesh.position.y + Math.sin(sparkle.angle * 2) * 0.5;
+            sparkle.mesh.position.set(x, y, z);
+            
+            // Sparkle pulsing
+            const sparklePulse = 0.3 + 0.7 * Math.sin(Date.now() * 0.012 + sparkle.angle);
+            sparkle.mesh.material.opacity = sparklePulse;
+            sparkle.mesh.scale.setScalar(0.5 + sparklePulse * 0.5);
+        });
+        
+        const playerPosition = this.playerShip.position.clone();
+        playerPosition.y = artifact.mesh.position.y;
+        const distance = artifact.mesh.position.distanceTo(playerPosition);
+        
+        if(distance < 6){
+            this.applyArtifactEffect(artifact.type);
+            // Clean up sparkles
+            artifact.sparkles.forEach(sparkle => this.scene.remove(sparkle.mesh));
+            this.scene.remove(artifact.mesh);
+            return false;
         }
-        updateMines() {
-          this.mines = this.mines.filter(mine => {
-            mine.life--;
-            if (mine.life <= 0 && !mine.exploded) {
-              this.scene.remove(mine.mesh);
-              return !1
-            }
-            if (!mine.exploded) {
-              const nearbyEnemies = this.enemies.filter(enemy => enemy.health > 0 && mine.mesh.position.distanceTo(enemy.mesh.position) < 8);
-              if (nearbyEnemies.length > 0) {
-                mine.exploded = !0;
+        
+        if(artifact.life <= 0){
+            // Clean up sparkles
+            artifact.sparkles.forEach(sparkle => this.scene.remove(sparkle.mesh));
+            this.scene.remove(artifact.mesh);
+            return false;
+        }
+        
+        return true;
+    });
+}
+        updateMines(){
+    this.mines = this.mines.filter(mine => {
+        mine.life--;
+        mine.pulseTime += mine.pulseSpeed;
+        
+        // Enhanced pulsing effect
+        const pulse = 0.3 + 0.7 * Math.sin(mine.pulseTime);
+        mine.mesh.material.emissiveIntensity = pulse;
+        mine.mesh.material.opacity = 0.7 + 0.3 * pulse;
+        
+        // Subtle scale pulsing
+        const scalePulse = 1.0 + 0.1 * Math.sin(mine.pulseTime * 0.7);
+        mine.mesh.scale.setScalar(scalePulse);
+        
+        if(mine.life <= 0 && !mine.exploded){
+            this.scene.remove(mine.mesh);
+            return false;
+        }
+        
+        if(!mine.exploded){
+            const nearbyEnemies = this.enemies.filter(enemy => 
+                enemy.health > 0 && 
+                mine.mesh.position.distanceTo(enemy.mesh.position) < 8
+            );
+            if(nearbyEnemies.length > 0){
+                mine.exploded = true;
                 this.explodeMine(mine);
                 this.scene.remove(mine.mesh);
-                return !1
-              }
+                return false;
             }
-            return !mine.exploded
-          })
         }
+        
+        return !mine.exploded;
+    });
+}
         updateCollisions() {
           if (this.collisionCooldown > 0) {
             this.collisionCooldown--;
@@ -3782,26 +4263,55 @@ setTimeout(() => {
             this.camera.position.set(this.playerShip.position.x, 80, this.playerShip.position.z)
           }
         }
-        createArtifact(position, type) {
-          const artifactGeom = new THREE.SphereGeometry(1.5, 12, 12);
-          const artifactMat = new THREE.MeshBasicMaterial({
-            color: CONFIG.audio[type].color,
-            transparent: !0,
-            opacity: 0.9
-          });
-          const artifact = new THREE.Mesh(artifactGeom, artifactMat);
-          artifact.position.copy(position);
-          artifact.position.y = 1;
-          const artifactObj = {
-            mesh: artifact,
-            type: type,
-            life: 900,
-            bobOffset: Math.random() * Math.PI * 2
-          };
-          this.artifacts.push(artifactObj);
-          this.scene.add(artifact);
-          return artifactObj
-        }
+        createArtifact(position, type){
+    const artifactGeom = new THREE.SphereGeometry(1.2, 16, 16);
+    const config = CONFIG.audio[type];
+    const artifactMat = new THREE.MeshBasicMaterial({
+        color: config.color,
+        emissive: config.color,
+        emissiveIntensity: 0.4,
+        transparent: true,
+        opacity: 0.9
+    });
+    const artifact = new THREE.Mesh(artifactGeom, artifactMat);
+    artifact.position.copy(position);
+    artifact.position.y = 1;
+    
+    const artifactObj = {
+        mesh: artifact,
+        type: type,
+        life: 900,
+        bobOffset: Math.random() * Math.PI * 2,
+        pulseOffset: Math.random() * Math.PI * 2,
+        sparkles: []
+    };
+    
+    // Add sparkle particles around the artifact
+    for(let i = 0; i < 6; i++){
+        const sparkleGeom = new THREE.SphereGeometry(0.1, 6, 6);
+        const sparkleMat = new THREE.MeshBasicMaterial({
+            color: config.color,
+            emissive: config.color,
+            emissiveIntensity: 0.8,
+            transparent: true,
+            opacity: 0.6
+        });
+        const sparkle = new THREE.Mesh(sparkleGeom, sparkleMat);
+        sparkle.position.copy(artifact.position);
+        artifactObj.sparkles.push({
+            mesh: sparkle,
+            angle: (i / 6) * Math.PI * 2,
+            radius: 2.5,
+            speed: 0.02 + Math.random() * 0.02
+        });
+        this.scene.add(sparkle);
+    }
+    
+    this.artifacts.push(artifactObj);
+    this.scene.add(artifact);
+    return artifactObj;
+}
+
         dropArtifact(position) {
           const artifactTypes = ['speed', 'damage', 'health'];
           const randomType = artifactTypes[Math.floor(Math.random() * artifactTypes.length)];

@@ -2486,6 +2486,7 @@ showWaypointSetFeedback(x, y) {
             if (this.landingProgress > 0.98) {
               this.playerShip.scale.setScalar(1.0);
             }
+            this.audioManager.playTakeoff();
             this.playerShip.visible = this.wasPlayerVisible;
             this.camera.lookAt(this.playerShip.position);
           }

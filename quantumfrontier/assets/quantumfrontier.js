@@ -1898,11 +1898,10 @@ showNavigationNotification(targetName){
           this.renderer.sortObjects = !0;
           document.getElementById('gameContainer').appendChild(this.renderer.domElement)
         }
-        spawnAlly() {
-    const ally = EnemyFactory.create('f', null, 0, 1); // Red fighter ship
-    if (!ally) return;
+        spawnAlly(shipType = "f"){
+    const ally = EnemyFactory.create(shipType, null, 0, 1);
+    if(!ally) return;
     
-    // Position ally near player
     const angle = Math.random() * Math.PI * 2;
     const distance = 15 + Math.random() * 10;
     ally.mesh.position.set(
@@ -1911,14 +1910,37 @@ showNavigationNotification(targetName){
         this.playerShip.position.z + Math.sin(angle) * distance
     );
     
-    // Mark as ally and set properties
+    // Set ally properties
     ally.isAlly = true;
-    ally.followSide = Math.random() < 0.5 ? -1 : 1; // Random side
+    ally.followSide = Math.random() < 0.5 ? -1 : 1;
     ally.healCooldown = 0;
     ally.targetPosition = new THREE.Vector3();
+    ally.health = ally.maxHealth; // Ensure health is properly set
     
     this.allies.push(ally);
     this.scene.add(ally.mesh);
+}
+calculateFormationPosition(allyIndex){
+    const positions = [
+        {x: 0, z: 18},     // directly behind
+        {x: -15, z: 28},   // left back
+        {x: 15, z: 28},    // right back
+        {x: -25, z: 40},   // far left
+        {x: 25, z: 40},    // far right
+        {x: 0, z: 45}      // rear guard
+    ];
+    const pos = positions[allyIndex % positions.length];
+    
+    // Transform relative to player's orientation
+    const playerAngle = this.playerShip.rotation.y;
+    const cos = Math.cos(playerAngle);
+    const sin = Math.sin(playerAngle);
+    
+    return new THREE.Vector3(
+        this.playerShip.position.x + (pos.x * cos - pos.z * sin),
+        5,
+        this.playerShip.position.z + (pos.x * sin + pos.z * cos)
+    );
 }
 createWaypointIndicator() {
     this.removeWaypointIndicator();
@@ -2164,8 +2186,11 @@ showWaypointSetFeedback(x, y) {
           this.createPlanets();
           this.createEnemies();
           this.spawnAlly();
-          this.spawnAlly();
-          this.spawnAlly();
+          this.spawnAlly('i');
+          this.spawnAlly('s');
+          this.spawnAlly('d');
+          this.spawnAlly('p');
+          this.spawnAlly('h');
         }
         createPlayer() {
           this.playerShip = ShipFactory.create('player');
@@ -2838,131 +2863,212 @@ showWaypointSetFeedback(x, y) {
           this.updateMinimap();
           this.updateExplosions()
         }
-        updateAllies() {
+ updateAllies(){
     this.allies = this.allies.filter(ally => {
-        if (ally.health <= 0) {
+        if(ally.health <= 0){
             this.scene.remove(ally.mesh);
             return false;
         }
         
+        // Define all distances at the start to avoid scoping issues
         const distanceToPlayer = ally.mesh.position.distanceTo(this.playerShip.position);
-        const combatRadius = 40;
+        const combatRadius = 50;
         const followDistance = 25;
+        const preferredCombatDistance = 20;
         
-        // Find nearby enemies
+        // Check if player is stationary (for formation flying)
+        const playerStationary = this.playerVelocity.length() < 0.05;
+        
+        // Find nearby enemies and check if this ally is being targeted
         const nearbyEnemies = this.enemies.filter(enemy => 
             enemy.health > 0 && 
-            enemy.mesh.position.distanceTo(this.playerShip.position) < combatRadius
+            enemy.mesh.position.distanceTo(ally.mesh.position) < combatRadius
         );
         
-        let moveDirection = new THREE.Vector3();
+        // Check if ally is being targeted by any enemy
+        const beingTargeted = this.enemies.some(enemy => 
+            enemy.health > 0 && 
+            enemy.attacking && 
+            enemy.currentTarget === ally.mesh
+        );
         
-        if (nearbyEnemies.length > 0) {
-            // Combat mode - attack nearest enemy
-            const target = nearbyEnemies.reduce((nearest, enemy) => 
-                enemy.mesh.position.distanceTo(ally.mesh.position) < 
-                nearest.mesh.position.distanceTo(ally.mesh.position) ? enemy : nearest
-            );
-            
-            moveDirection.subVectors(target.mesh.position, ally.mesh.position).normalize();
-            ally.mesh.position.add(moveDirection.multiplyScalar(0.9));
-            
-            // Shoot at enemy
-            ally.shootCooldown--;
-            if (ally.shootCooldown <= 0) {
-                this.createAllyBullet(ally, target);
-                ally.shootCooldown = 40;
+        // Find closest threatening enemy to this ally
+        let closestThreat = null;
+        let closestThreatDistance = Infinity;
+        nearbyEnemies.forEach(enemy => {
+            const distance = enemy.mesh.position.distanceTo(ally.mesh.position);
+            if(distance < closestThreatDistance) {
+                closestThreat = enemy;
+                closestThreatDistance = distance;
             }
-        } else {
-            // Follow/heal mode
-            if (distanceToPlayer > followDistance) {
-                // Follow player directly when too far
-                moveDirection.subVectors(this.playerShip.position, ally.mesh.position).normalize();
-                ally.mesh.position.add(moveDirection.multiplyScalar(0.8));
+        });
+        
+        let moveDirection = new THREE.Vector3();
+        let targetLookAt = null;
+        
+        if(closestThreat || beingTargeted){
+            // Combat mode - maintain distance and shoot
+            const threat = closestThreat;
+            const distanceToThreat = ally.mesh.position.distanceTo(threat.mesh.position);
+            
+            if(distanceToThreat < preferredCombatDistance * 0.7) {
+                // Too close - back away while shooting
+                moveDirection.subVectors(ally.mesh.position, threat.mesh.position).normalize();
+                ally.mesh.position.add(moveDirection.multiplyScalar(0.6));
+            } else if(distanceToThreat > preferredCombatDistance * 1.3) {
+                // Too far - move closer to effective range
+                moveDirection.subVectors(threat.mesh.position, ally.mesh.position).normalize();
+                ally.mesh.position.add(moveDirection.multiplyScalar(0.4));
             } else {
-               // Stay in formation behind and to side with improved positioning
-const baseDistance = 15 + (ally.followSide * 2); // Vary distance per ally
-const sideAngle = ally.followSide * Math.PI/3 + (Math.sin(Date.now() * 0.001 + ally.followSide) * 0.1); // Slight dynamic movement
-
-const behindOffset = new THREE.Vector3(
-    Math.sin(this.playerShip.rotation.y + sideAngle) * baseDistance,
-    Math.sin(Date.now() * 0.002 + ally.followSide * 2) * 0.5, // Subtle vertical bobbing
-    Math.cos(this.playerShip.rotation.y + sideAngle) * baseDistance
-);
-
-ally.targetPosition.copy(this.playerShip.position).add(behindOffset);
-
-const distanceToTarget = ally.mesh.position.distanceTo(ally.targetPosition);
-if (distanceToTarget > 2) {
-    moveDirection.subVectors(ally.targetPosition, ally.mesh.position).normalize();
-    
-    // Improved movement with better speed scaling and smoothing
-    const moveSpeed = Math.min(0.4, distanceToTarget * 0.15) * (0.8 + Math.random() * 0.4);
-    ally.mesh.position.add(moveDirection.multiplyScalar(moveSpeed));
-    
-    // Smooth rotation towards movement direction
-    const targetRotation = Math.atan2(moveDirection.x, moveDirection.z);
-    ally.mesh.rotation.y += (targetRotation - ally.mesh.rotation.y) * 0.1;
-}
+                // Good distance - strafe around enemy
+                const strafeAngle = Math.atan2(
+                    threat.mesh.position.z - ally.mesh.position.z,
+                    threat.mesh.position.x - ally.mesh.position.x
+                ) + Math.PI/2 + (ally.followSide * 0.5);
+                
+                moveDirection.set(Math.cos(strafeAngle), 0, Math.sin(strafeAngle));
+                ally.mesh.position.add(moveDirection.multiplyScalar(0.3));
             }
             
-            // Heal player with visual effect
-            ally.healCooldown--;
-            if (ally.healCooldown <= 0 && this.player.health < CONFIG.player.health) {
-                this.player.health = Math.min(CONFIG.player.health, this.player.health + 5);
-                ally.healCooldown = 30;
-                this.updateHUD();
+            // Always look at the threat when in combat
+            targetLookAt = threat.mesh.position;
+            
+            // Shoot at threat
+            ally.shootCooldown--;
+            if(ally.shootCooldown <= 0 && distanceToThreat < 35){
+                this.createAllyBullet(ally, threat);
+                ally.shootCooldown = 35 + Math.random() * 10;
+            }
+            
+        } else if(playerStationary && distanceToPlayer < followDistance * 1.5){
+            // Formation mode - arrange in formation behind player
+            const allyIndex = this.allies.indexOf(ally);
+            const formationPosition = this.calculateFormationPosition(allyIndex);
+            const distanceToFormation = ally.mesh.position.distanceTo(formationPosition);
+            
+            // Only move if significantly out of position (reduces twitching)
+            if(distanceToFormation > 5) {
+                moveDirection.subVectors(formationPosition, ally.mesh.position).normalize();
+                const moveSpeed = Math.min(0.25, distanceToFormation * 0.08);
+                ally.mesh.position.add(moveDirection.multiplyScalar(moveSpeed));
+            }
+            
+            // In formation, look at player or same direction as player
+            if(distanceToFormation > 8) {
+                targetLookAt = this.playerShip.position;
+            } else {
+                // Face same direction as player when in formation
+                ally.mesh.rotation.y = this.playerShip.rotation.y;
+            }
+            
+        } else {
+            // Follow mode - standard following behavior
+            if(distanceToPlayer > followDistance){
+                moveDirection.subVectors(this.playerShip.position, ally.mesh.position).normalize();
+                ally.mesh.position.add(moveDirection.multiplyScalar(0.7));
+                targetLookAt = this.playerShip.position;
+            } else {
+                // Escort positioning with smoother movement
+                const baseDistance = 15 + (ally.followSide * 3);
+                const sideAngle = ally.followSide * Math.PI/4 + (Math.sin(Date.now() * 0.0008 + ally.followSide) * 0.05);
+                const behindOffset = new THREE.Vector3(
+                    Math.sin(this.playerShip.rotation.y + sideAngle) * baseDistance,
+                    0,
+                    Math.cos(this.playerShip.rotation.y + sideAngle) * baseDistance
+                );
                 
-                // Create healing beam visual
+                ally.targetPosition.copy(this.playerShip.position).add(behindOffset);
+                const distanceToTarget = ally.mesh.position.distanceTo(ally.targetPosition);
+                
+                // Smoother following with deadzone
+                if(distanceToTarget > 4){
+                    moveDirection.subVectors(ally.targetPosition, ally.mesh.position).normalize();
+                    const moveSpeed = Math.min(0.35, distanceToTarget * 0.12);
+                    ally.mesh.position.add(moveDirection.multiplyScalar(moveSpeed));
+                    
+                    const targetRotation = Math.atan2(moveDirection.x, moveDirection.z);
+                    ally.mesh.rotation.y += (targetRotation - ally.mesh.rotation.y) * 0.08;
+                } else {
+                    // When close to position, face same direction as player
+                    ally.mesh.rotation.y += (this.playerShip.rotation.y - ally.mesh.rotation.y) * 0.05;
+                }
+            }
+            
+            // Healing logic (only when not in combat)
+            ally.healCooldown--;
+            if(ally.healCooldown <= 0 && this.player.health < CONFIG.player.health){
+                this.player.health = Math.min(CONFIG.player.health, this.player.health + 3);
+                ally.healCooldown = 45;
+                this.updateHUD();
                 this.createHealingBeam(ally, this.playerShip);
             }
         }
         
-        // Always rotate to face movement direction
-        if (moveDirection.length() > 0.1) {
-            const targetRotation = Math.atan2(moveDirection.x, moveDirection.z);
-            ally.mesh.rotation.y = targetRotation;
-        } else if (nearbyEnemies.length === 0) {
-            // Face same direction as player when in formation
-            ally.mesh.rotation.y = this.playerShip.rotation.y;
+        // Apply rotation smoothly if we have a target to look at
+        if(targetLookAt) {
+            const direction = new THREE.Vector3().subVectors(targetLookAt, ally.mesh.position);
+            const targetRotation = Math.atan2(direction.x, direction.z);
+            const rotationDiff = targetRotation - ally.mesh.rotation.y;
+            
+            // Normalize rotation difference to [-π, π]
+            let normalizedDiff = ((rotationDiff % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
+            ally.mesh.rotation.y += normalizedDiff * 0.15;
         }
-        const avoidanceRadius = 13;
-this.allies.forEach(otherAlly => {
-    if (otherAlly === ally) return;
-    const distance = ally.mesh.position.distanceTo(otherAlly.mesh.position);
-    if (distance < avoidanceRadius && distance > 0) {
-        const avoidDirection = new THREE.Vector3()
-            .subVectors(ally.mesh.position, otherAlly.mesh.position)
-            .normalize()
-            .multiplyScalar((avoidanceRadius - distance) * 1);
-        ally.mesh.position.add(avoidDirection);
-    }
-});
+        
+        // Avoidance between allies (with deadzone to reduce twitching)
+        const avoidanceRadius = 12;
+        this.allies.forEach(otherAlly => {
+            if(otherAlly === ally) return;
+            const distance = ally.mesh.position.distanceTo(otherAlly.mesh.position);
+            if(distance < avoidanceRadius && distance > 0.5) {
+                const avoidDirection = new THREE.Vector3()
+                    .subVectors(ally.mesh.position, otherAlly.mesh.position)
+                    .normalize().multiplyScalar((avoidanceRadius - distance) * 0.8);
+                ally.mesh.position.add(avoidDirection);
+            }
+        });
+        
         ally.mesh.position.y = 5;
         return true;
     });
 }
-createAllyBullet(ally, target) {
-    const bulletGeom = new THREE.SphereGeometry(0.3, 8, 8);
-    const bulletMat = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+
+createAllyBullet(ally, target){
+    const bulletGeom = new THREE.SphereGeometry(0.25, 8, 8);
+    const bulletMat = new THREE.MeshBasicMaterial({color: 0x00ff88});
     const bullet = new THREE.Mesh(bulletGeom, bulletMat);
+    
     bullet.position.copy(ally.mesh.position);
     bullet.position.y += 0.5;
-    const direction = new THREE.Vector3().subVectors(target.mesh.position, ally.mesh.position).normalize();
-    const bulletVelocity = direction.multiplyScalar(CONFIG.bullet.speed * 1.5);
+    
+    // Predictive shooting - aim where target will be
+    let targetPosition = target.mesh.position.clone();
+    
+    if(target.attacking && target.currentTarget) {
+        // If enemy is moving towards their target, predict their movement
+        const enemyDirection = new THREE.Vector3()
+            .subVectors(target.currentTarget.position, target.mesh.position)
+            .normalize();
+        targetPosition.add(enemyDirection.multiplyScalar(3));
+    }
+    
+    const direction = new THREE.Vector3()
+        .subVectors(targetPosition, ally.mesh.position)
+        .normalize();
+    const bulletVelocity = direction.multiplyScalar(CONFIG.bullet.speed * 1.8);
     
     this.bullets.push({
         mesh: bullet,
         velocity: bulletVelocity,
         life: CONFIG.bullet.life,
         isAlly: true,
-        damage: 25
+        damage: 30
     });
     this.scene.add(bullet);
     
-    // Add spatial audio for ally shots
     this.audioManager.playBlaster(ally.mesh.position, this.playerShip.position);
 }
+
         createTrail() {
           if (Math.random() > 0.3) return;
           const trailCount = 3;
@@ -3061,67 +3167,114 @@ createAllyBullet(ally, target) {
           this.camera.lookAt(this.playerShip.position);
           this.updateCoordinates()
         }
-        updateEnemies() {
-          this.enemies.forEach(enemy => {
-            if (enemy.health <= 0 || enemy.stuck) return;
-            const distanceToPlayer = enemy.mesh.position.distanceTo(this.playerShip.position);
-            enemy.shootCooldown--;
-            if (distanceToPlayer < enemy.attackRange && !enemy.attacking) {
-              enemy.attacking = !0;
-              enemy.retreating = !1
+        updateEnemies(){
+    this.enemies.forEach(enemy=>{
+        if(enemy.health<=0||enemy.stuck)return;
+        
+        // Find closest viable target (player + allies)
+        let closestTarget = this.playerShip;
+        let closestDistance = enemy.mesh.position.distanceTo(this.playerShip.position);
+        
+        // Check all allies as potential targets
+        this.allies.forEach(ally => {
+            if(ally.health > 0) {
+                const distanceToAlly = enemy.mesh.position.distanceTo(ally.mesh.position);
+                if(distanceToAlly < closestDistance) {
+                    closestTarget = ally.mesh;
+                    closestDistance = distanceToAlly;
+                }
             }
-            if (enemy.attacking) {
-              const distanceToPlayer = enemy.mesh.position.distanceTo(this.playerShip.position);
-              const avoidanceForce = this.calculateEnemyAvoidance(enemy);
-              if (distanceToPlayer > CONFIG.enemy.minDistance * 1.5) {
-                const directionToPlayer = new THREE.Vector3().subVectors(this.playerShip.position, enemy.mesh.position).normalize();
-                const combinedDirection = directionToPlayer.add(avoidanceForce).normalize();
-                const moveDistance = Math.min(enemy.chaseSpeed, distanceToPlayer - CONFIG.enemy.minDistance);
+        });
+        
+        enemy.shootCooldown--;
+        
+        if(closestDistance < enemy.attackRange && !enemy.attacking){
+            enemy.attacking = true;
+            enemy.retreating = false;
+            enemy.currentTarget = closestTarget; // Store current target
+        }
+            if(enemy.attacking && closestTarget) {
+    enemy.currentTarget = closestTarget; // Update target while attacking
+} else if(!enemy.attacking) {
+    enemy.currentTarget = null; // Clear target when not attacking
+}
+        
+        if(enemy.attacking){
+            const avoidanceForce = this.calculateEnemyAvoidance(enemy);
+            
+            if(closestDistance > CONFIG.enemy.minDistance * 1.5){
+                const directionToTarget = new THREE.Vector3()
+                    .subVectors(closestTarget.position, enemy.mesh.position).normalize();
+                const combinedDirection = directionToTarget.add(avoidanceForce).normalize();
+                const moveDistance = Math.min(enemy.chaseSpeed, closestDistance - CONFIG.enemy.minDistance);
                 const movement = combinedDirection.multiplyScalar(moveDistance);
                 const newPosition = enemy.mesh.position.clone().add(movement);
-                if (!this.checkPlanetCollision(newPosition)) {
-                  enemy.mesh.position.copy(newPosition);
-                  enemy.mesh.position.y = 5
+                
+                if(!this.checkPlanetCollision(newPosition)){
+                    enemy.mesh.position.copy(newPosition);
+                    enemy.mesh.position.y = 5;
                 }
-              } else {
-                const tangentAngle = Math.atan2(this.playerShip.position.z - enemy.mesh.position.z, this.playerShip.position.x - enemy.mesh.position.x) + Math.PI / 2;
+            } else {
+                // Circle around target
+                const tangentAngle = Math.atan2(
+                    closestTarget.position.z - enemy.mesh.position.z,
+                    closestTarget.position.x - enemy.mesh.position.x
+                ) + Math.PI/2;
                 const circleDirection = new THREE.Vector3(Math.cos(tangentAngle), 0, Math.sin(tangentAngle));
                 const combinedDirection = circleDirection.add(avoidanceForce.multiplyScalar(2)).normalize();
                 const movement = combinedDirection.multiplyScalar(enemy.chaseSpeed * 0.7);
                 const newPosition = enemy.mesh.position.clone().add(movement);
-                if (!this.checkPlanetCollision(newPosition)) {
-                  enemy.mesh.position.copy(newPosition);
-                  enemy.mesh.position.y = 5
+                
+                if(!this.checkPlanetCollision(newPosition)){
+                    enemy.mesh.position.copy(newPosition);
+                    enemy.mesh.position.y = 5;
                 }
-              }
-              enemy.mesh.lookAt(this.playerShip.position);
-              if (enemy.shootCooldown <= 0 && distanceToPlayer < 30 && distanceToPlayer > CONFIG.enemy.minDistance * 0.8) {
-                this.enemyShoot(enemy);
-                enemy.shootCooldown = this.getShootCooldown(enemy.weaponType)
-              }
-              if (distanceToPlayer > enemy.attackRange * 2.5) {
-                enemy.attacking = !1;
-                enemy.retreating = !0
-              }
-            } else if (enemy.retreating) {
+            }
+            
+            enemy.mesh.lookAt(closestTarget.position);
+            
+            if(enemy.shootCooldown <= 0 && closestDistance < 30 && closestDistance > CONFIG.enemy.minDistance * 0.8){
+                this.enemyShoot(enemy, closestTarget); // Pass target to shoot method
+                enemy.shootCooldown = this.getShootCooldown(enemy.weaponType);
+            }
+            
+            if(closestDistance > enemy.attackRange * 2.5){
+                enemy.attacking = false;
+                enemy.retreating = true;
+                enemy.currentTarget = null;
+            }
+        } else if(enemy.retreating){
               if (distanceToPlayer < enemy.attackRange * 1.2) {
                 enemy.attacking = !0;
                 enemy.retreating = !1;
                 return
               }
-              const targetPosition = new THREE.Vector3(enemy.planet.center.x + Math.cos(enemy.originalAngle) * enemy.planet.radius, 5, enemy.planet.center.z + Math.sin(enemy.originalAngle) * enemy.planet.radius);
-              const distanceToTarget = enemy.mesh.position.distanceTo(targetPosition);
-              if (distanceToTarget > 2) {
-                const direction = new THREE.Vector3().subVectors(targetPosition, enemy.mesh.position).normalize().multiplyScalar(CONFIG.enemy.retSpeed);
+              if(closestDistance < enemy.attackRange * 1.2){
+                enemy.attacking = true;
+                enemy.retreating = false;
+                return;
+            }
+            
+            const targetPosition = new THREE.Vector3(
+                enemy.planet.center.x + Math.cos(enemy.originalAngle) * enemy.planet.radius,
+                5,
+                enemy.planet.center.z + Math.sin(enemy.originalAngle) * enemy.planet.radius
+            );
+            const distanceToTarget = enemy.mesh.position.distanceTo(targetPosition);
+            
+            if(distanceToTarget > 2){
+                const direction = new THREE.Vector3()
+                    .subVectors(targetPosition, enemy.mesh.position)
+                    .normalize().multiplyScalar(CONFIG.enemy.retSpeed);
                 const newPos = enemy.mesh.position.clone().add(direction);
                 newPos.y = 5;
                 enemy.mesh.position.copy(newPos);
                 const lookAhead = enemy.mesh.position.clone().add(direction);
-                enemy.mesh.lookAt(lookAhead)
-              } else {
-                enemy.retreating = !1;
-                enemy.angle = enemy.originalAngle
-              }
+                enemy.mesh.lookAt(lookAhead);
+            } else {
+                enemy.retreating = false;
+                enemy.angle = enemy.originalAngle;
+            }
             } else {
               enemy.angle += enemy.speed;
               this.updateEnemyPosition(enemy);
@@ -3160,49 +3313,58 @@ createAllyBullet(ally, target) {
           }
           return avoidanceForce
         }
-        enemyShoot(enemy) {
+        enemyShoot(enemy, target = null){
+    const actualTarget = target || this.playerShip;
+    
     const weaponTypes = {
         'rapid': () => {
-            this.createEnemyBullet(enemy);
+            this.createEnemyBullet(enemy, actualTarget);
             this.audioManager.playEnemyShot(enemy.mesh.position, this.playerShip.position);
         },
         'burst': () => {
-            for (let i = 0; i < 3; i++) {
+            for(let i = 0; i < 3; i++){
                 setTimeout(() => {
-                    if (enemy.health > 0) {
-                        this.createEnemyBullet(enemy);
+                    if(enemy.health > 0){
+                        this.createEnemyBullet(enemy, actualTarget);
                         this.audioManager.playEnemyShot(enemy.mesh.position, this.playerShip.position);
                     }
                 }, i * 100);
             }
         },
         'heavy': () => {
-            this.createEnemyBullet(enemy);
+            this.createEnemyBullet(enemy, actualTarget);
             this.audioManager.playEnemyShot(enemy.mesh.position, this.playerShip.position);
         }
     };
+    
     const shootFunction = weaponTypes[enemy.weaponType] || weaponTypes.rapid;
     shootFunction();
 }
-        createEnemyBullet(enemy) {
-          const bulletGeom = new THREE.SphereGeometry(0.3, 8, 8);
-          const bulletMat = new THREE.MeshBasicMaterial({
-            color: 0xff4757,
-            emissive: 0xff2030,
-            emissiveIntensity: 0.5
-          });
-          const bullet = new THREE.Mesh(bulletGeom, bulletMat);
-          bullet.position.copy(enemy.mesh.position);
-          bullet.position.y = 5;
-          const direction = new THREE.Vector3().subVectors(this.playerShip.position, enemy.mesh.position).normalize();
-          const bulletVelocity = direction.clone().multiplyScalar(CONFIG.bullet.enemySpeed);
-          this.enemyBullets.push({
-            mesh: bullet,
-            velocity: bulletVelocity,
-            life: CONFIG.bullet.life
-          });
-          this.scene.add(bullet)
-        }
+        createEnemyBullet(enemy, target = null){
+    const actualTarget = target || this.playerShip;
+    
+    const bulletGeom = new THREE.SphereGeometry(0.3, 8, 8);
+    const bulletMat = new THREE.MeshBasicMaterial({
+        color: 0xff4757,
+        emissive: 0xff2030,
+        emissiveIntensity: 0.5
+    });
+    const bullet = new THREE.Mesh(bulletGeom, bulletMat);
+    
+    bullet.position.copy(enemy.mesh.position);
+    bullet.position.y = 5;
+    
+    const direction = new THREE.Vector3()
+        .subVectors(actualTarget.position, enemy.mesh.position).normalize();
+    const bulletVelocity = direction.clone().multiplyScalar(CONFIG.bullet.enemySpeed);
+    
+    this.enemyBullets.push({
+        mesh: bullet,
+        velocity: bulletVelocity,
+        life: CONFIG.bullet.life
+    });
+    this.scene.add(bullet);
+}
         getShootCooldown(weaponType) {
           const cooldowns = {
             'rapid': 60,
@@ -3284,50 +3446,82 @@ createAllyBullet(ally, target) {
             return true;
           });
         }
-        // Fix 2: Replace the updateEnemyBullets() method (around line 1200)
-        updateEnemyBullets() {
-          this.enemyBullets = this.enemyBullets.filter(bullet => {
-            // Safety check
-            if (!bullet || !bullet.mesh || !bullet.velocity) {
-              return false;
-            }
-            bullet.mesh.position.add(bullet.velocity);
-            bullet.life--;
-            // Check player collision only if not landing
-            if (this.landingState === 'none' && this.playerShip && this.playerShip.position) {
-              try {
-                const distance = bullet.mesh.position.distanceTo(this.playerShip.position);
-                if (distance < 3) {
-                  this.player.health -= CONFIG.bullet.enemyDamage;
-                  this.audioManager.playDamage();
-                  this.createDamageEffect(this.playerShip.position);
-                  this.updateHUD();
-                  if (this.player.health <= 0) {
-                    this.gameOver();
-                  }
-                  try {
-                    this.scene.remove(bullet.mesh);
-                  } catch (e) {
-                    console.warn('Failed to remove enemy bullet from scene:', e);
-                  }
-                  return false;
-                }
-              } catch (e) {
-                console.warn('Error in enemy bullet-player collision:', e);
-              }
-            }
-            // Check bullet lifetime
-            if (bullet.life <= 0) {
-              try {
-                this.scene.remove(bullet.mesh);
-              } catch (e) {
-                console.warn('Failed to remove expired enemy bullet:', e);
-              }
-              return false;
-            }
-            return true;
-          });
+        updateEnemyBullets(){
+    this.enemyBullets = this.enemyBullets.filter(bullet => {
+        if(!bullet || !bullet.mesh || !bullet.velocity){
+            return false;
         }
+        
+        bullet.mesh.position.add(bullet.velocity);
+        bullet.life--;
+        
+        // Check collision with player
+        if(this.landingState === 'none' && this.playerShip && this.playerShip.position){
+            try{
+                const distance = bullet.mesh.position.distanceTo(this.playerShip.position);
+                if(distance < 3){
+                    this.player.health -= CONFIG.bullet.enemyDamage;
+                    this.audioManager.playDamage();
+                    this.createDamageEffect(this.playerShip.position);
+                    this.updateHUD();
+                    if(this.player.health <= 0){
+                        this.gameOver();
+                    }
+                    
+                    try{
+                        this.scene.remove(bullet.mesh);
+                    }catch(e){
+                        console.warn('Failed to remove enemy bullet from scene:', e);
+                    }
+                    return false;
+                }
+            }catch(e){
+                console.warn('Error in enemy bullet-player collision:', e);
+            }
+        }
+        
+        // Check collision with allies
+        for(let ally of this.allies){
+            if(!ally || !ally.mesh || !ally.mesh.position || ally.health <= 0) continue;
+            
+            try{
+                const distance = bullet.mesh.position.distanceTo(ally.mesh.position);
+                if(distance < 3){
+                    ally.health -= CONFIG.bullet.enemyDamage;
+                    this.audioManager.playDamage();
+                    this.createDamageEffect(ally.mesh.position);
+                    
+                    // Ally destroyed
+                    if(ally.health <= 0){
+                        this.createExplosion(ally.mesh.position);
+                        this.audioManager.playExplosion();
+                    }
+                    
+                    try{
+                        this.scene.remove(bullet.mesh);
+                    }catch(e){
+                        console.warn('Failed to remove enemy bullet from scene:', e);
+                    }
+                    return false;
+                }
+            }catch(e){
+                console.warn('Error in enemy bullet-ally collision:', e);
+                continue;
+            }
+        }
+        
+        if(bullet.life <= 0){
+            try{
+                this.scene.remove(bullet.mesh);
+            }catch(e){
+                console.warn('Failed to remove expired enemy bullet:', e);
+            }
+            return false;
+        }
+        
+        return true;
+    });
+}
         updateArtifacts() {
           this.artifacts = this.artifacts.filter(artifact => {
             artifact.life--;

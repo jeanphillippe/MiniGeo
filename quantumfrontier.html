@@ -2089,18 +2089,6 @@ showWaypointSetFeedback(x, y) {
           this.spawnAlly();
           this.spawnAlly();
           this.spawnAlly();
-          const asteriaPlanet = this.findPlanetByName('Asteria Prime');
-if (asteriaPlanet) {
-    this.minimapManager.waypoint = {
-        x: asteriaPlanet.center.x,
-        z: asteriaPlanet.center.z,
-        planet: asteriaPlanet,
-        type: 'planet'
-    };
-}
-setTimeout(() => {
-    this.showNavigationNotification('Asteria Prime');
-}, 500);
         }
         createPlayer() {
           this.playerShip = ShipFactory.create('player');
@@ -3775,7 +3763,20 @@ this.allies = [];
         async startGame() {
           document.getElementById('intro').classList.add('hidden');
           await this.audioManager.start();
-          this.gameStarted = !0
+          this.gameStarted = !0;
+          
+          const asteriaPlanet = this.findPlanetByName('Asteria Prime');
+if (asteriaPlanet) {
+    this.minimapManager.waypoint = {
+        x: asteriaPlanet.center.x,
+        z: asteriaPlanet.center.z,
+        planet: asteriaPlanet,
+        type: 'planet'
+    };
+}
+setTimeout(() => {
+    this.showNavigationNotification('Asteria Prime');
+}, 500);
         }
         animate() {
           requestAnimationFrame(() => this.animate());

@@ -2225,6 +2225,9 @@ showWaypointSetFeedback(x, y) {
     this.playerShip=null;
     this.playerVelocity=new THREE.Vector3();
     this.laserBeam=null;
+    this.empBursts = [];
+this.homingMissiles = [];
+this.tractorBeam = null;
     this.landingGlow=null;
     this.originalPlayerMaterials=null;
     this.touchControls={moveX:0,moveY:0,firing:!1};
@@ -2319,9 +2322,9 @@ showWaypointSetFeedback(x, y) {
           enemy.mesh.position.set(x, 5, z)
         }
         switchWeapon(weaponNumber){
-    if(weaponNumber >= 1 && weaponNumber <= 11){
+    if(weaponNumber >= 1 && weaponNumber <= 8){
         this.player.currentWeapon = weaponNumber;
-        const weaponNames = ['Blaster', 'Scatter', 'Shotgun', 'Mines', 'Laser', 'Plasma', 'Homing', 'Shield', 'EMP', 'Tractor', 'TimeDilation'];
+        const weaponNames = ['Blaster', 'Scatter', 'Shotgun', 'Mines', 'Laser', 'EMP', 'Homing', 'Tractor'];
         document.getElementById('currentWeapon').textContent = `${weaponNumber}-${weaponNames[weaponNumber-1]}`;
         document.getElementById('weaponBtn').innerHTML = `W<br>${weaponNumber}`;
         
@@ -2333,6 +2336,7 @@ showWaypointSetFeedback(x, y) {
         if(this.tractorBeam){
             this.scene.remove(this.tractorBeam);
             this.tractorBeam = null;
+            this.audioManager.stopLaser();
         }
         this.audioManager.playWeaponSwitch();
     }
@@ -2697,19 +2701,16 @@ showWaypointSetFeedback(x, y) {
         getPlanetName(planet) {
           return planet.config.dialogue?.name || `Planet ${this.planets.indexOf(planet) + 1}`
         }
-        fireWeapon(){
+       fireWeapon(){
     switch(this.player.currentWeapon){
         case 1: this.fireBlaster(); break;
         case 2: this.fireScatter(3); break;
         case 3: this.fireScatter(5); break;
         case 4: this.fireMine(); break;
         case 5: this.fireLaser(); break;
-        case 6: this.firePlasmaBurst(); break;
+        case 6: this.fireEMPBurst(); break;
         case 7: this.fireHomingMissile(); break;
-        case 8: this.deployEnergyShield(); break;
-        case 9: this.fireEMPBurst(); break;
-        case 10: this.activateTractorBeam(); break;
-        case 11: this.activateTimeDilation(); break;
+        case 8: this.activateTractorBeam(); break;
     }
 }
 
@@ -2773,34 +2774,6 @@ activateTractorBeam(){
     this.scene.add(this.tractorBeam);
     this.audioManager.playLaser();
 }
-
-// 5. TIME DILATION WEAPON  
-activateTimeDilation(){
-    if(this.timeDilationActive) return; // Prevent multiple activations
-    
-    this.timeDilationActive = true;
-    this.timeDilationDuration = 300; // 5 seconds at 60fps
-    this.timeScale = 0.2; // Slow everything to 20% speed
-    
-    // Create visual effect
-    const dilationGeom = new THREE.RingGeometry(5, 50, 32);
-    const dilationMat = new THREE.MeshBasicMaterial({
-        color: 0x9932CC,
-        emissive: 0x8A2BE2,
-        emissiveIntensity: 0.5,
-        transparent: true,
-        opacity: 0.3,
-        side: THREE.DoubleSide
-    });
-    
-    this.timeDilationEffect = new THREE.Mesh(dilationGeom, dilationMat);
-    this.timeDilationEffect.position.copy(this.playerShip.position);
-    this.timeDilationEffect.rotation.x = -Math.PI / 2;
-    this.scene.add(this.timeDilationEffect);
-    
-    this.audioManager.playPowerUp();
-}
-
 // 6. UPDATE EMP BURSTS
 updateEMPBursts(){
     if(!this.empBursts) return;
@@ -2891,9 +2864,11 @@ updateTractorBeam(){
             enemy.health -= 2;
             if(enemy.health <= 0){
                 this.createExplosion(enemy.mesh.position);
+                this.audioManager.playExplosion();
                 enemy.mesh.visible = false;
                 this.player.score += enemy.score;
                 this.dropArtifact(enemy.mesh.position);
+                this.updateHUD();
             }
         }
     });
@@ -2950,40 +2925,9 @@ updateEnemyEMPRecovery(){
     });
 }
 
-updatePlasmaBursts(){
-    if(!this.plasmaBursts) return;
-    this.plasmaBursts = this.plasmaBursts.filter(burst => {
-        burst.life--;
-        burst.expansion += 0.3;
-        
-        burst.mesh.scale.setScalar(burst.expansion);
-        burst.mesh.material.opacity = (burst.life / burst.maxLife) * 0.8;
-        
-        // Damage enemies in range
-        this.enemies.forEach(enemy => {
-            if(enemy.health > 0){
-                const dist = enemy.mesh.position.distanceTo(burst.mesh.position);
-                if(dist < burst.expansion * 2){
-                    enemy.health -= 5;
-                    if(enemy.health <= 0){
-                        this.createExplosion(enemy.mesh.position);
-                        enemy.mesh.visible = false;
-                        this.player.score += enemy.score;
-                    }
-                }
-            }
-        });
-        
-        if(burst.life <= 0){
-            this.scene.remove(burst.mesh);
-            return false;
-        }
-        return true;
-    });
-}
-
 updateHomingMissiles(){
     if(!this.homingMissiles) return;
+    
     this.homingMissiles = this.homingMissiles.filter(missile => {
         missile.life--;
         
@@ -3000,6 +2944,13 @@ updateHomingMissiles(){
             if(missile.mesh.position.distanceTo(missile.target.mesh.position) < 2){
                 missile.target.health -= 40;
                 this.createExplosion(missile.mesh.position);
+                this.audioManager.playExplosion();
+                if(missile.target.health <= 0){
+                    missile.target.mesh.visible = false;
+                    this.player.score += missile.target.score;
+                    this.dropArtifact(missile.target.mesh.position);
+                    this.updateHUD();
+                }
                 this.scene.remove(missile.mesh);
                 return false;
             }
@@ -3012,7 +2963,6 @@ updateHomingMissiles(){
         return true;
     });
 }
-
 updateEnergyShield(){
     if(!this.energyShield) return;
     
@@ -3331,13 +3281,10 @@ deployEnergyShield(){
           this.updateEnemyBullets();
           this.updateArtifacts();
           this.updateMines();
-          this.updatePlasmaBursts();
+this.updateEMPBursts();
 this.updateHomingMissiles(); 
-this.updateEnergyShield();
- this.updateEMPBursts();
-    this.updateTractorBeam();
-    this.updateTimeDilation();
-    this.updateEnemyEMPRecovery();
+this.updateTractorBeam();
+this.updateEnemyEMPRecovery();
           this.updateCollisions();
           this.updateBackground();
           this.updateEffects();
@@ -3632,17 +3579,24 @@ createAllyBullet(ally, target){
             const angle = Math.atan2(this.playerVelocity.x, this.playerVelocity.z);
             this.playerShip.rotation.y = angle
           }
-          if ((this.keys.Space && !this.shootPressed) || this.touchControls.firing) {
-            this.fireWeapon();
-            this.shootPressed = !0
-          } else if (!this.keys.Space && !this.touchControls.firing) {
-            this.shootPressed = !1;
-            if (this.laserBeam) {
-              this.scene.remove(this.laserBeam);
-              this.laserBeam = null;
-              this.audioManager.stopLaser()
-            }
-          }
+          if((this.keys.Space && !this.shootPressed) || this.touchControls.firing){
+    this.fireWeapon();
+    this.shootPressed = true;
+} else if(!this.keys.Space && !this.touchControls.firing){
+    this.shootPressed = false;
+    
+    // Stop continuous weapons
+    if(this.laserBeam){
+        this.scene.remove(this.laserBeam);
+        this.laserBeam = null;
+        this.audioManager.stopLaser();
+    }
+    if(this.tractorBeam){
+        this.scene.remove(this.tractorBeam);
+        this.tractorBeam = null;
+        this.audioManager.stopLaser();
+    }
+}
           const targetCameraX = this.playerShip.position.x;
           const targetCameraZ = this.playerShip.position.z + 60;
           const cameraPosition = new THREE.Vector3(targetCameraX, 60, targetCameraZ);
@@ -4504,6 +4458,33 @@ setTimeout(() => {
         }
     });
     
+    if(this.empBursts){
+    this.empBursts.forEach(emp => this.scene.remove(emp.mesh));
+    this.empBursts = [];
+}
+if(this.homingMissiles){
+    this.homingMissiles.forEach(missile => this.scene.remove(missile.mesh));
+    this.homingMissiles = [];
+}
+if(this.tractorBeam){
+    this.scene.remove(this.tractorBeam);
+    this.tractorBeam = null;
+}
+
+// Reset enemy EMP states
+this.enemies.forEach(enemy => {
+    if(enemy.empDisabled){
+        enemy.empDisabled = false;
+        enemy.speed = enemy.originalSpeed || CONFIG.enemy.baseSpeed;
+        enemy.chaseSpeed = enemy.originalChaseSpeed || CONFIG.enemy.chaseSpeed;
+        enemy.mesh.traverse(child => {
+            if(child.isMesh){
+                child.material.emissive = new THREE.Color(0x000000);
+                child.material.emissiveIntensity = 0;
+            }
+        });
+    }
+});
     // Clean up game objects
     this.trails.forEach(trail=>this.scene.remove(trail.mesh));
     this.trails=[];

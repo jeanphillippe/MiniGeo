@@ -2713,14 +2713,13 @@ this.tractorBeam = null;
         case 8: this.activateTractorBeam(); break;
     }
 }
-
 fireEMPBurst(){
-    // Create expanding EMP sphere
+    //const empGeom = new THREE.SphereGeometry(2, 8, 6); // Reduced segments for mobile
     const empGeom = new THREE.SphereGeometry(2, 16, 16);
     const empMat = new THREE.MeshBasicMaterial({
         color: 0x4169E1,
         emissive: 0x1E90FF,
-        emissiveIntensity: 0.8,
+        emissiveIntensity: 0.8, // Reduced intensity
         transparent: true,
         opacity: 0.6,
         wireframe: true
@@ -2732,10 +2731,11 @@ fireEMPBurst(){
     this.empBursts = this.empBursts || [];
     this.empBursts.push({
         mesh: empSphere,
-        life: 45,
-        maxLife: 45,
-        expansion: 0.5,
-        maxRadius: 25
+        life: 40, // Slightly shorter for performance
+        maxLife: 40,
+        expansion: 0.8, // Start bigger, expand faster
+        maxRadius: 25,
+        updateCounter: 0 // For throttled updates
     });
     this.scene.add(empSphere);
     this.audioManager.playWeaponSwitch();
@@ -2930,29 +2930,82 @@ updateHomingMissiles(){
     
     this.homingMissiles = this.homingMissiles.filter(missile => {
         missile.life--;
+        missile.currentDelay--;
         
-        if(missile.target && missile.target.health > 0){
-            const targetDir = new THREE.Vector3()
-                .subVectors(missile.target.mesh.position, missile.mesh.position)
-                .normalize();
-            
-            missile.velocity.lerp(targetDir.multiplyScalar(missile.speed), missile.turnRate);
+        // Animate glowing tip
+        if(missile.tip){
+            const tipPulse = 0.8 + 0.4 * Math.sin(Date.now() * 0.02);
+            missile.tip.material.emissiveIntensity = tipPulse;
+        }
+        
+        // First phase: go forward, then start homing
+        if(missile.currentDelay > 0){
+            // Still in forward-only phase
             missile.mesh.position.add(missile.velocity);
-            missile.mesh.lookAt(missile.mesh.position.clone().add(missile.velocity));
+        } else {
+            // Homing phase begins
+            if(missile.target && missile.target.health > 0){
+                // Calculate direction to target
+                const targetDir = new THREE.Vector3()
+                    .subVectors(missile.target.mesh.position, missile.mesh.position)
+                    .normalize();
+                
+                // Gradually turn velocity toward target (homing behavior)
+                missile.velocity.lerp(targetDir.multiplyScalar(missile.speed), missile.turnRate);
+            }
             
-            // Check collision with target
-            if(missile.mesh.position.distanceTo(missile.target.mesh.position) < 2){
-                missile.target.health -= 40;
+            // Move missile
+            missile.mesh.position.add(missile.velocity);
+            
+            // Orient missile in direction of movement
+            missile.mesh.lookAt(missile.mesh.position.clone().add(missile.velocity));
+        }
+        
+        // Check collision with target
+        if(missile.target && missile.target.health > 0){
+            const distance = missile.mesh.position.distanceTo(missile.target.mesh.position);
+            if(distance < 2.5){
+                missile.target.health -= missile.damage;
                 this.createExplosion(missile.mesh.position);
                 this.audioManager.playExplosion();
+                
                 if(missile.target.health <= 0){
                     missile.target.mesh.visible = false;
                     this.player.score += missile.target.score;
                     this.dropArtifact(missile.target.mesh.position);
                     this.updateHUD();
+                } else {
+                    this.audioManager.playEnemyHit();
                 }
+                
                 this.scene.remove(missile.mesh);
                 return false;
+            }
+        }
+        
+        // Check collision with other enemies if original target is gone
+        if(!missile.target || missile.target.health <= 0){
+            for(let enemy of this.enemies){
+                if(enemy.health > 0){
+                    const distance = missile.mesh.position.distanceTo(enemy.mesh.position);
+                    if(distance < 2.5){
+                        enemy.health -= missile.damage;
+                        this.createExplosion(missile.mesh.position);
+                        this.audioManager.playExplosion();
+                        
+                        if(enemy.health <= 0){
+                            enemy.mesh.visible = false;
+                            this.player.score += enemy.score;
+                            this.dropArtifact(enemy.mesh.position);
+                            this.updateHUD();
+                        } else {
+                            this.audioManager.playEnemyHit();
+                        }
+                        
+                        this.scene.remove(missile.mesh);
+                        return false;
+                    }
+                }
             }
         }
         
@@ -2962,45 +3015,6 @@ updateHomingMissiles(){
         }
         return true;
     });
-}
-updateEnergyShield(){
-    if(!this.energyShield) return;
-    
-    this.energyShield.life--;
-    this.energyShield.mesh.position.copy(this.playerShip.position);
-    
-    // Pulsing effect
-    const pulse = 0.2 + 0.1 * Math.sin(Date.now() * 0.01);
-    this.energyShield.mesh.material.opacity = pulse;
-    
-    if(this.energyShield.life <= 0 || this.energyShield.health <= 0){
-        this.scene.remove(this.energyShield.mesh);
-        this.energyShield = null;
-    }
-}
-firePlasmaBurst(){
-    const burstGeom = new THREE.RingGeometry(0.5, 1, 16);
-    const burstMat = new THREE.MeshBasicMaterial({
-        color: 0x00ffff,
-        emissive: 0x0088ff,
-        emissiveIntensity: 0.8,
-        transparent: true,
-        opacity: 0.8,
-        side: THREE.DoubleSide
-    });
-    const burst = new THREE.Mesh(burstGeom, burstMat);
-    burst.position.copy(this.playerShip.position);
-    burst.position.y = 5;
-    burst.rotation.x = -Math.PI / 2;
-    
-    this.plasmaBursts = this.plasmaBursts || [];
-    this.plasmaBursts.push({
-        mesh: burst,
-        life: 60,
-        maxLife: 60,
-        expansion: 0.2
-    });
-    this.scene.add(burst);
 }
 
 // Homing Missiles (weapon 7)
@@ -3020,7 +3034,8 @@ fireHomingMissile(){
     
     if(!target) return;
     
-    const missileGeom = new THREE.ConeGeometry(0.3, 1.5, 6);
+    // Create missile body
+    const missileGeom = new THREE.SphereGeometry(0.4, 8, 8);
     const missileMat = new THREE.MeshBasicMaterial({
         color: 0xfeca57,
         emissive: 0xff9500,
@@ -3030,16 +3045,39 @@ fireHomingMissile(){
     missile.position.copy(this.playerShip.position);
     missile.position.y += 0.5;
     
+    // Create glowing tip
+    const tipGeom = new THREE.SphereGeometry(0.15, 6, 6);
+    const tipMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        emissive: 0xffffff,
+        emissiveIntensity: 1.0
+    });
+    const tip = new THREE.Mesh(tipGeom, tipMat);
+    tip.position.set(0, 0, 0.5); // Position at front of missile
+    missile.add(tip);
+    
+    // Initial forward direction from ship
+    const forwardDirection = new THREE.Vector3(
+        Math.sin(this.playerShip.rotation.y),
+        0,
+        Math.cos(this.playerShip.rotation.y)
+    ).normalize().multiplyScalar(1.8);
+    
     this.homingMissiles = this.homingMissiles || [];
     this.homingMissiles.push({
         mesh: missile,
+        tip: tip,
         target: target,
-        velocity: new THREE.Vector3(),
-        speed: 1.5,
+        velocity: forwardDirection,
+        speed: 1.8,
         life: 120,
-        turnRate: 0.08
+        turnRate: 0.12,
+        damage: 35,
+        homingDelay: 20, // Frames before homing kicks in
+        currentDelay: 20
     });
     this.scene.add(missile);
+    this.audioManager.playBlaster(this.playerShip.position, this.playerShip.position);
 }
 
 // Energy Shield (weapon 8) - Temporary protective barrier

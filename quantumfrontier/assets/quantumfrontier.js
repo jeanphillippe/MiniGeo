@@ -2254,11 +2254,11 @@ showWaypointSetFeedback(x, y) {
           this.createPlanets();
           this.createEnemies();
           this.spawnAlly();
-          this.spawnAlly('i');
-          this.spawnAlly('s');
-          this.spawnAlly('d');
-          this.spawnAlly('p');
-          this.spawnAlly('h');
+          //this.spawnAlly('i');
+          //this.spawnAlly('s');
+          //this.spawnAlly('d');
+          //this.spawnAlly('p');
+          //this.spawnAlly('h');
         }
         createPlayer() {
           this.playerShip = ShipFactory.create('player');
@@ -2772,7 +2772,7 @@ showWaypointSetFeedback(x, y) {
             exploded: !1
           });
           this.scene.add(mine);
-          this.audioManager.playMine()
+          this.audioManager.playWeaponSwitch();//reused because its placing the mine, not exploding
         }
         fireLaser() {
           if (this.laserBeam) {
@@ -2934,6 +2934,7 @@ showWaypointSetFeedback(x, y) {
  updateAllies(){
     this.allies = this.allies.filter(ally => {
         if(ally.health <= 0){
+          this.audioManager.playDamage();
             this.scene.remove(ally.mesh);
             return false;
         }

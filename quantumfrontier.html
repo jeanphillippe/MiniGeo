@@ -1183,47 +1183,53 @@ nebula.position.set(
             this.waypoint = null;
           this.setupEvents()
         }
-        setupEvents(){
+ setupEvents(){
     document.getElementById('minimapToggle').addEventListener('click',()=>{
-        this.toggleExpanded();
+        this.toggleExpanded()
     });
     
-    // Mouse click for desktop
-    this.canvas.addEventListener('click', (e) => {
-        if (this.expanded) { // Only when maximized
+    // Improved click handling for desktop
+    this.canvas.addEventListener('click',(e)=>{
+        if(this.expanded){
+            e.preventDefault();
+            e.stopPropagation();
             this.setWaypoint(e);
         }
     });
     
-    // ADD TOUCH SUPPORT FOR MOBILE (only when expanded)
-    this.canvas.addEventListener('touchend', (e) => {
-        if (this.expanded) { // Only when maximized
+    // Fixed touch handling for mobile
+    this.canvas.addEventListener('touchstart',(e)=>{
+        if(this.expanded){
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    });
+    
+    this.canvas.addEventListener('touchend',(e)=>{
+        if(this.expanded){
             e.preventDefault();
             e.stopPropagation();
             
-            // Use the last touch point
+            // Get the first touch that ended
             const touch = e.changedTouches[0];
-            const fakeEvent = {
-                clientX: touch.clientX,
-                clientY: touch.clientY
-            };
-            this.setWaypoint(fakeEvent);
+            if(touch) {
+                // Create a proper event-like object
+                const touchEvent = {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                };
+                this.setWaypoint(touchEvent);
+            }
         }
     });
     
-    // Prevent scrolling when touching the minimap
-    this.canvas.addEventListener('touchstart', (e) => {
-        if (this.expanded) {
-            e.preventDefault();
-        }
-    });
-    
-    this.canvas.addEventListener('touchmove', (e) => {
-        if (this.expanded) {
+    this.canvas.addEventListener('touchmove',(e)=>{
+        if(this.expanded){
             e.preventDefault();
         }
     });
 }
+
         updateWaypoint() {
     if (this.waypoint && this.waypoint.type === 'planet' && this.waypoint.planet) {
         // Update waypoint position to follow the planet
@@ -1231,55 +1237,51 @@ nebula.position.set(
         this.waypoint.z = this.waypoint.planet.center.z;
     }
 }
- setWaypoint(event) {
-    const rect = this.canvas.getBoundingClientRect();
-    const clickX = event.clientX - rect.left;
-    const clickY = event.clientY - rect.top;
+setWaypoint(event){
+    const rect=this.canvas.getBoundingClientRect();
+    const clickX=event.clientX-rect.left;
+    const clickY=event.clientY-rect.top;
     
-    const size = this.expanded ? 300 : 120;
-    const scale = this.expanded ? 0.8 : 0.3;
-    const centerX = size / 2;
-    const centerY = size / 2;
+    const size=this.expanded?300:120;
+    const scale=this.expanded?0.8:0.3;
+    const centerX=size/2;
+    const centerY=size/2;
     
-    // Convert click coordinates to world coordinates
-    const worldX = (clickX - centerX) / scale + game.playerShip.position.x;
-    const worldZ = (clickY - centerY) / scale + game.playerShip.position.z;
+    const worldX=(clickX-centerX)/scale+game.playerShip.position.x;
+    const worldZ=(clickY-centerY)/scale+game.playerShip.position.z;
     
-    // Check if click is near a planet
-    let targetPlanet = null;
-    let minDistance = Infinity;
+    let targetPlanet=null;
+    let minDistance=Infinity;
     
-    game.planets.forEach(planet => {
-        if (planet.destroyed) return;
-        const distance = Math.sqrt(
-            Math.pow(worldX - planet.center.x, 2) + 
-            Math.pow(worldZ - planet.center.z, 2)
-        );
-        const clickRadius = planet.config.radius + 10; // Give some tolerance
+    // Check for planet clicks with better precision
+    game.planets.forEach(planet=>{
+        if(planet.destroyed) return;
         
-        if (distance < clickRadius && distance < minDistance) {
-            minDistance = distance;
-            targetPlanet = planet;
+        const distance=Math.sqrt(Math.pow(worldX-planet.center.x,2)+Math.pow(worldZ-planet.center.z,2));
+        const clickRadius=Math.max(planet.config.radius+10, 15); // Minimum click radius
+        
+        if(distance<clickRadius && distance<minDistance){
+            minDistance=distance;
+            targetPlanet=planet;
         }
     });
     
-    if (targetPlanet) {
-        this.waypoint = { 
-            x: targetPlanet.center.x, 
-            z: targetPlanet.center.z, 
-            planet: targetPlanet,
-            type: 'planet'
+    if(targetPlanet){
+        this.waypoint={
+            x:targetPlanet.center.x,
+            z:targetPlanet.center.z,
+            planet:targetPlanet,
+            type:'planet'
         };
-    } else {
-        this.waypoint = { 
-            x: worldX, 
-            z: worldZ, 
-            type: 'static'
+    }else{
+        this.waypoint={
+            x:worldX,
+            z:worldZ,
+            type:'static'
         };
     }
     
-    // ADD: Show visual feedback for mobile touch
-    this.showWaypointSetFeedback(event.clientX, event.clientY);
+    this.showWaypointSetFeedback(event.clientX,event.clientY);
 }
         toggleExpanded() {
           this.expanded = !this.expanded;
@@ -1295,152 +1297,149 @@ nebula.position.set(
             this.canvas.width = this.canvas.height = 120
           }
         }
-        update(playerPos, planets, enemies) {
-    const ctx = this.ctx;
-    const size = this.expanded ? 300 : 120;
-    const scale = this.expanded ? 0.8 : 0.3;
-    const centerX = size / 2;
-    const centerY = size / 2;
-
-    ctx.clearRect(0, 0, size, size);
-    ctx.fillStyle = 'rgba(0, 0, 20, 0.9)';
-    ctx.fillRect(0, 0, size, size);
-    ctx.strokeStyle = 'rgba(79, 172, 254, 0.3)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(1, 1, size - 2, size - 2);
-
-    // Draw orbital paths when expanded
-    if (this.expanded) {
-        planets.forEach(planet => {
-            if (planet.destroyed || !planet.config.orbitCenter) return;
+ update(playerPos,planets,enemies){
+    const ctx=this.ctx;
+    const size=this.expanded?300:120;
+    const scale=this.expanded?0.8:0.3;
+    const centerX=size/2;
+    const centerY=size/2;
+    
+    ctx.clearRect(0,0,size,size);
+    ctx.fillStyle='rgba(0, 0, 20, 0.9)';
+    ctx.fillRect(0,0,size,size);
+    ctx.strokeStyle='rgba(79, 172, 254, 0.3)';
+    ctx.lineWidth=1;
+    ctx.strokeRect(1,1,size-2,size-2);
+    
+    // Draw orbits when expanded - fixed to show all orbits
+    if(this.expanded){
+        planets.forEach(planet=>{
+            if(planet.destroyed || !planet.config.orbitCenter) return;
             
-            const orbitCenterX = (planet.config.orbitCenter.x - playerPos.x) * scale + centerX;
-            const orbitCenterY = (planet.config.orbitCenter.z - playerPos.z) * scale + centerY;
-            const orbitRadius = planet.config.orbitDistance * scale;
+            const orbitCenterX=(planet.config.orbitCenter.x-playerPos.x)*scale+centerX;
+            const orbitCenterY=(planet.config.orbitCenter.z-playerPos.z)*scale+centerY;
+            const orbitRadius=planet.config.orbitDistance*scale;
             
-            if (orbitRadius > 5) { // Only draw if orbit is visible
-                ctx.strokeStyle = 'rgba(100, 100, 100, 0.3)';
-                ctx.lineWidth = 1;
-                ctx.setLineDash([2, 2]);
+            // Show orbit if it's visible on screen and not too small
+            if(orbitRadius > 3) {
+                ctx.strokeStyle='rgba(100, 100, 100, 0.2)';
+                ctx.lineWidth=1;
+                ctx.setLineDash([3,3]);
                 ctx.beginPath();
-                ctx.arc(orbitCenterX, orbitCenterY, orbitRadius, 0, Math.PI * 2);
+                ctx.arc(orbitCenterX, orbitCenterY, orbitRadius, 0, Math.PI*2);
                 ctx.stroke();
                 ctx.setLineDash([]);
             }
         });
     }
-
+    
     // Draw planets
-    planets.forEach(planet => {
-        if (planet.destroyed) return;
-        const relX = (planet.center.x - playerPos.x) * scale + centerX;
-        const relY = (planet.center.z - playerPos.z) * scale + centerY;
+    planets.forEach(planet=>{
+        if(planet.destroyed)return;
+        const relX=(planet.center.x-playerPos.x)*scale+centerX;
+        const relY=(planet.center.z-playerPos.z)*scale+centerY;
         
-        if (relX >= -10 && relX <= size + 10 && relY >= -10 && relY <= size + 10) {
-            const radius = Math.max(2, planet.config.radius * scale * 0.3);
-            ctx.fillStyle = `#${planet.config.color.toString(16).padStart(6, '0')}`;
+        if(relX>=-10&&relX<=size+10&&relY>=-10&&relY<=size+10){
+            const radius=Math.max(2,planet.config.radius*scale*0.3);
+            ctx.fillStyle=`#${planet.config.color.toString(16).padStart(6, '0')}`;
             ctx.beginPath();
-            ctx.arc(relX, relY, radius, 0, Math.PI * 2);
+            ctx.arc(relX,relY,radius,0,Math.PI*2);
             ctx.fill();
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-            ctx.lineWidth = 1;
+            ctx.strokeStyle='rgba(255, 255, 255, 0.3)';
+            ctx.lineWidth=1;
             ctx.stroke();
             
-            // Draw planet names when expanded
-            if (this.expanded && planet.config.dialogue) {
-                ctx.fillStyle = '#ffffff';
-                ctx.font = '10px monospace';
-                ctx.textAlign = 'center';
-                ctx.fillText(planet.config.dialogue.name, relX, relY - radius - 5);
+            if(this.expanded&&planet.config.dialogue){
+                ctx.fillStyle='#ffffff';
+                ctx.font='10px monospace';
+                ctx.textAlign='center';
+                ctx.fillText(planet.config.dialogue.name,relX,relY-radius-5);
             }
         }
     });
-
+    
     // Draw enemies
-    enemies.forEach(enemy => {
-        if (enemy.health <= 0) return;
-        const relX = (enemy.mesh.position.x - playerPos.x) * scale + centerX;
-        const relY = (enemy.mesh.position.z - playerPos.z) * scale + centerY;
+    enemies.forEach(enemy=>{
+        if(enemy.health<=0)return;
+        const relX=(enemy.mesh.position.x-playerPos.x)*scale+centerX;
+        const relY=(enemy.mesh.position.z-playerPos.z)*scale+centerY;
         
-        if (relX >= -5 && relX <= size + 5 && relY >= -5 && relY <= size + 5) {
-            ctx.fillStyle = enemy.attacking ? '#ff4757' : '#ff9f43';
+        if(relX>=-5&&relX<=size+5&&relY>=-5&&relY<=size+5){
+            ctx.fillStyle=enemy.attacking?'#ff4757':'#ff9f43';
             ctx.beginPath();
-            ctx.arc(relX, relY, 2, 0, Math.PI * 2);
+            ctx.arc(relX,relY,2,0,Math.PI*2);
             ctx.fill();
         }
     });
-
+    
     // Draw waypoint
-    if (this.waypoint) {
-        const waypointX = (this.waypoint.x - playerPos.x) * scale + centerX;
-        const waypointY = (this.waypoint.z - playerPos.z) * scale + centerY;
+    if(this.waypoint){
+        const waypointX=(this.waypoint.x-playerPos.x)*scale+centerX;
+        const waypointY=(this.waypoint.z-playerPos.z)*scale+centerY;
         
-        // Draw waypoint if in view
-        if (waypointX >= -10 && waypointX <= size + 10 && waypointY >= -10 && waypointY <= size + 10) {
-            ctx.fillStyle = '#feca57';
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2;
+        if(waypointX>=-10&&waypointX<=size+10&&waypointY>=-10&&waypointY<=size+10){
+            ctx.fillStyle='#feca57';
+            ctx.strokeStyle='#ffffff';
+            ctx.lineWidth=2;
             ctx.beginPath();
-            ctx.arc(waypointX, waypointY, 4, 0, Math.PI * 2);
+            ctx.arc(waypointX,waypointY,4,0,Math.PI*2);
             ctx.fill();
             ctx.stroke();
             
-            // Draw X marker
-            ctx.strokeStyle = '#000000';
-            ctx.lineWidth = 1;
+            ctx.strokeStyle='#000000';
+            ctx.lineWidth=1;
             ctx.beginPath();
-            ctx.moveTo(waypointX - 2, waypointY - 2);
-            ctx.lineTo(waypointX + 2, waypointY + 2);
-            ctx.moveTo(waypointX + 2, waypointY - 2);
-            ctx.lineTo(waypointX - 2, waypointY + 2);
+            ctx.moveTo(waypointX-2,waypointY-2);
+            ctx.lineTo(waypointX+2,waypointY+2);
+            ctx.moveTo(waypointX+2,waypointY-2);
+            ctx.lineTo(waypointX-2,waypointY+2);
             ctx.stroke();
         }
         
-        // Draw compass arrow to waypoint (always visible)
-        const dx = this.waypoint.x - playerPos.x;
-        const dz = this.waypoint.z - playerPos.z;
-        const distance = Math.sqrt(dx * dx + dz * dz);
+        // Draw waypoint compass arrow
+        const dx=this.waypoint.x-playerPos.x;
+        const dz=this.waypoint.z-playerPos.z;
+        const distance=Math.sqrt(dx*dx+dz*dz);
         
-        if (distance > 5) { // Only show compass if waypoint is not too close
-            const angle = Math.atan2(dx, dz);
-            const compassRadius = size * 0.35;
-            const arrowX = centerX + Math.sin(angle) * compassRadius;
-            const arrowY = centerY + Math.cos(angle) * compassRadius;
+        if(distance>5){
+            const angle=Math.atan2(dx,dz);
+            const compassRadius=size*0.35;
+            const arrowX=centerX+Math.sin(angle)*compassRadius;
+            const arrowY=centerY+Math.cos(angle)*compassRadius;
             
-            // Draw compass arrow
-            ctx.strokeStyle = '#feca57';
-            ctx.fillStyle = '#feca57';
-            ctx.lineWidth = 2;
-            
-            const arrowSize = 6;
+            ctx.strokeStyle='#feca57';
+            ctx.fillStyle='#feca57';
+            ctx.lineWidth=2;
+            const arrowSize=6;
             ctx.beginPath();
-            ctx.moveTo(arrowX, arrowY);
-            ctx.lineTo(arrowX - arrowSize * Math.sin(angle + 0.5), arrowY - arrowSize * Math.cos(angle + 0.5));
-            ctx.lineTo(arrowX - arrowSize * Math.sin(angle - 0.5), arrowY - arrowSize * Math.cos(angle - 0.5));
+            ctx.moveTo(arrowX,arrowY);
+            ctx.lineTo(arrowX-arrowSize*Math.sin(angle+0.5),arrowY-arrowSize*Math.cos(angle+0.5));
+            ctx.lineTo(arrowX-arrowSize*Math.sin(angle-0.5),arrowY-arrowSize*Math.cos(angle-0.5));
             ctx.closePath();
             ctx.fill();
             ctx.stroke();
         }
     }
-
+    
     // Draw player
-    ctx.fillStyle = '#00f2fe';
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2;
+    ctx.fillStyle='#00f2fe';
+    ctx.strokeStyle='#ffffff';
+    ctx.lineWidth=2;
     ctx.beginPath();
-    ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
+    ctx.arc(centerX,centerY,4,0,Math.PI*2);
     ctx.fill();
     ctx.stroke();
-
-    const angle = Math.atan2(0, 1);
-    const arrowLength = 8;
-    const arrowX = centerX + Math.cos(angle) * arrowLength;
-    const arrowY = centerY + Math.sin(angle) * arrowLength;
-    ctx.strokeStyle = '#00f2fe';
-    ctx.lineWidth = 2;
+    
+    // Draw player direction indicator
+    const angle=Math.atan2(0,1);
+    const arrowLength=8;
+    const arrowX=centerX+Math.cos(angle)*arrowLength;
+    const arrowY=centerY+Math.sin(angle)*arrowLength;
+    ctx.strokeStyle='#00f2fe';
+    ctx.lineWidth=2;
     ctx.beginPath();
-    ctx.moveTo(centerX, centerY);
-    ctx.lineTo(arrowX, arrowY);
+    ctx.moveTo(centerX,centerY);
+    ctx.lineTo(arrowX,arrowY);
     ctx.stroke();
 }
 clearWaypoint() {

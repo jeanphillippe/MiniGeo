@@ -546,8 +546,8 @@
           irregularity: 0,
           health: 150,
           orbitCenter: {
-            x: -30,
-            z: 20
+            x: 0,
+            z: 0
           },
           orbitSpeed: 0.007,
           startAngle: Math.PI,
@@ -571,8 +571,8 @@
           irregularity: 0.2,
           health: 250,
           orbitCenter: {
-            x: 80,
-            z: -40
+            x: 0,
+            z: 0
           },
           orbitSpeed: 0.004,
           startAngle: Math.PI / 3,
@@ -595,8 +595,8 @@
           irregularity: 0,
           health: 180,
           orbitCenter: {
-            x: 70,
-            z: 30
+            x: 0,
+            z: 0
           },
           orbitSpeed: 0.008,
           startAngle: Math.PI / 7,
@@ -619,8 +619,8 @@
           irregularity: 0.3,
           health: 400,
           orbitCenter: {
-            x: -60,
-            z: -60
+            x: 0,
+            z: 0
           },
           orbitSpeed: 0.0015,
           startAngle: Math.PI / 5,
@@ -643,8 +643,8 @@
           enemyType: 'p',
           health: 300,
           orbitCenter: {
-            x: 50,
-            z: 50
+            x: 0,
+            z: 0
           },
           orbitSpeed: 0.002,
           startAngle: Math.PI / 2,
@@ -667,7 +667,7 @@
           irregularity: 0.4,
           health: 450,
           orbitCenter: {
-            x: 100,
+            x: 0,
             z: 0
           },
           orbitSpeed: 0.0008,

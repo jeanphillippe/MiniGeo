@@ -2262,7 +2262,7 @@ this.tractorBeam = null;
           //this.createPlayer();
           this.createPlanets();
           this.createEnemies();
-          this.spawnAlly();
+          //this.spawnAlly();
           //this.spawnAlly('i');
           //this.spawnAlly('s');
           //this.spawnAlly('d');

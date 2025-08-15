@@ -2347,7 +2347,7 @@ this.tractorBeam = null;
     }
 }
         cycleWeapon() {
-          const nextWeapon = this.player.currentWeapon % 7 + 1;
+          const nextWeapon = this.player.currentWeapon % 8 + 1;
           this.switchWeapon(nextWeapon)
         }
         isPlanetLandable(planet){

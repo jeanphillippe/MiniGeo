@@ -4753,7 +4753,7 @@ renderShipPreview(canvas, shipType) {
     scene.add(ambientLight);
     
     // Position camera for good view
-    camera.position.set(10, 6, 10);
+    camera.position.set(8, 4, 8);
     camera.lookAt(0, 0, 0);
     
     // Store scene data for animation

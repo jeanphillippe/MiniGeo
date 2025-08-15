@@ -4247,110 +4247,47 @@ setTimeout(() => {
         }
         createArtifact(position, type) {
     const config = CONFIG.audio[type];
-    const artifactGroup = new THREE.Group();
     
-    // Main cassette body - rectangular with rounded appearance
-    const mainGeom = new THREE.BoxGeometry(2.4, 0.8, 1.6);
-    const mainMat = new THREE.MeshBasicMaterial({
+    // Single optimized geometry - rounded rectangular cassette
+    const artifactGeom = new THREE.BoxGeometry(2.0, 0.6, 1.2);
+    const artifactMat = new THREE.MeshBasicMaterial({
         color: config.color,
         emissive: config.color,
-        emissiveIntensity: 0.2,
+        emissiveIntensity: 0.3,
         transparent: true,
-        opacity: 0.85
+        opacity: 0.9
     });
-    const mainBody = new THREE.Mesh(mainGeom, mainMat);
-    artifactGroup.add(mainBody);
+    const artifact = new THREE.Mesh(artifactGeom, artifactMat);
     
-    // Glow effect - slightly larger, more transparent version
-    const glowGeom = new THREE.BoxGeometry(2.6, 1.0, 1.8);
-    const glowMat = new THREE.MeshBasicMaterial({
-        color: config.color,
-        emissive: config.color,
-        emissiveIntensity: 0.6,
-        transparent: true,
-        opacity: 0.3
-    });
-    const glowMesh = new THREE.Mesh(glowGeom, glowMat);
-    artifactGroup.add(glowMesh);
-    
-    // Border/Edge lines
-    const edgesGeom = new THREE.EdgesGeometry(mainGeom);
+    // Clean border lines for definition
+    const edgesGeom = new THREE.EdgesGeometry(artifactGeom);
     const edgesMat = new THREE.LineBasicMaterial({
         color: config.color,
-        transparent: true,
-        opacity: 0.9,
-        linewidth: 2
+        opacity: 0.8,
+        transparent: true
     });
     const edges = new THREE.LineSegments(edgesGeom, edgesMat);
+    
+    // Group them together
+    const artifactGroup = new THREE.Group();
+    artifactGroup.add(artifact);
     artifactGroup.add(edges);
     
-    // Detail panels (like cassette tape reels/details)
-    const detailGeom = new THREE.BoxGeometry(0.6, 0.6, 0.1);
-    const detailMat = new THREE.MeshBasicMaterial({
-        color: config.color,
-        emissive: config.color,
-        emissiveIntensity: 0.8,
-        transparent: true,
-        opacity: 0.7
-    });
-    
-    // Left detail panel
-    const leftDetail = new THREE.Mesh(detailGeom, detailMat);
-    leftDetail.position.set(-0.7, 0, 0.85);
-    artifactGroup.add(leftDetail);
-    
-    // Right detail panel
-    const rightDetail = new THREE.Mesh(detailGeom, detailMat);
-    rightDetail.position.set(0.7, 0, 0.85);
-    artifactGroup.add(rightDetail);
-    
-    // Center strip (like cassette label area)
-    const stripGeom = new THREE.BoxGeometry(1.8, 0.3, 0.05);
-    const stripMat = new THREE.MeshBasicMaterial({
-        color: config.color,
-        emissive: config.color,
-        emissiveIntensity: 0.9,
-        transparent: true,
-        opacity: 0.8
-    });
-    const centerStrip = new THREE.Mesh(stripGeom, stripMat);
-    centerStrip.position.set(0, 0, 0.82);
-    artifactGroup.add(centerStrip);
-    
-    // Outer glow aura for extra effect
-    const auraGeom = new THREE.BoxGeometry(3.2, 1.4, 2.2);
-    const auraMat = new THREE.MeshBasicMaterial({
-        color: config.color,
-        emissive: config.color,
-        emissiveIntensity: 0.4,
-        transparent: true,
-        opacity: 0.15
-    });
-    const aura = new THREE.Mesh(auraGeom, auraMat);
-    artifactGroup.add(aura);
-    
-    // Position the entire group
+    // Position and rotate
     artifactGroup.position.copy(position);
     artifactGroup.position.y = 1;
-    
-    // Add slight rotation for visual interest
     artifactGroup.rotation.y = Math.random() * Math.PI * 2;
-    artifactGroup.rotation.x = (Math.random() - 0.5) * 0.3;
+    artifactGroup.rotation.x = (Math.random() - 0.5) * 0.2;
     
     const artifactObj = {
-        mesh: artifactGroup,  // Now it's a group instead of single mesh
+        mesh: artifactGroup,
         type: type,
         life: 500,
         bobOffset: Math.random() * Math.PI * 2,
         pulseOffset: Math.random() * Math.PI * 2,
         sparkles: [],
-        // Store references to parts for animation
-        mainBody: mainBody,
-        glowMesh: glowMesh,
-        edges: edges,
-        details: [leftDetail, rightDetail],
-        centerStrip: centerStrip,
-        aura: aura
+        mainBody: artifact,
+        edges: edges
     };
     
     this.artifacts.push(artifactObj);

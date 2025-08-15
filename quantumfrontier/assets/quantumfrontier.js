@@ -2276,8 +2276,12 @@ this.tractorBeam = null;
     this.scene.add(this.playerShip);
 }
 async actuallyStartGame(){
+    // Crear el player con la nave seleccionada
+    this.createPlayer();
+    
     this.audioManager.playPowerUp();
     this.gameStarted = true;
+    
     if(!this.initialWaypointSet){
         const asteriaPlanet = this.findPlanetByName('Asteria Prime');
         if(asteriaPlanet){

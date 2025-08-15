@@ -4849,8 +4849,6 @@ showShipSelection(){
                 ${availableShips.map(ship => `
                     <div class="ship-option" onclick="game.selectShip('${ship.key}')">
                         <div class="ship-preview" id="preview_${ship.key}"></div>
-                        <h3 class="ship-name">${ship.name}</h3>
-                        <p class="ship-description">${ship.description}</p>
                     </div>
                 `).join('')}
             </div>

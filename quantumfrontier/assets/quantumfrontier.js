@@ -3601,6 +3601,7 @@ createAllyBullet(ally, target){
           })
         }
         updatePlayer() {
+           if(!this.playerShip) return;
           let moveX = 0,
             moveZ = 0;
           if (this.keys.KeyW || this.keys.ArrowUp || this.touchControls.moveY < -0.3) moveZ -= 1;

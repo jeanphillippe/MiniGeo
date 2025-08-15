@@ -2220,6 +2220,7 @@ showWaypointSetFeedback(x, y) {
     this.keys={};
     this.bullets=[];
     this.enemyBullets=[];
+    this.selectedShipType = null;
     this.artifacts=[];
     this.mines=[];
     this.enemies=[];
@@ -2268,11 +2269,31 @@ this.tractorBeam = null;
           //this.spawnAlly('p');
           //this.spawnAlly('h');
         }
-        createPlayer() {
-          this.playerShip = ShipFactory.create('player');
-          this.playerShip.position.set(-142, 5, -177);
-          this.scene.add(this.playerShip)
+        createPlayer(){
+    const shipType = this.selectedShipType || 'player';
+    this.playerShip=ShipFactory.create(shipType);
+    this.playerShip.position.set(-142,5,-177);
+    this.scene.add(this.playerShip);
+}
+async actuallyStartGame(){
+    this.audioManager.playPowerUp();
+    this.gameStarted = true;
+    if(!this.initialWaypointSet){
+        const asteriaPlanet = this.findPlanetByName('Asteria Prime');
+        if(asteriaPlanet){
+            this.minimapManager.waypoint = {
+                x: asteriaPlanet.center.x,
+                z: asteriaPlanet.center.z,
+                planet: asteriaPlanet,
+                type: 'planet'
+            };
+            this.initialWaypointSet = true;
+            setTimeout(() => {
+                this.showNavigationNotification('Asteria Prime');
+            }, 500);
         }
+    }
+}
         createPlanets() {
           const sunConfig = {
             radius: 10,
@@ -4644,29 +4665,82 @@ this.enemies.forEach(enemy => {
     });
 }
         async startGame(){
-    document.getElementById('intro').classList.add('hidden');
     await this.audioManager.start();
-    this.audioManager.playPowerUp();
-    this.gameStarted=!0;
+    this.showShipSelection();
+}
+showShipSelection(){
+    const intro = document.getElementById('intro');
+    const availableShips = [
+        {key: 'player', name: 'TIE Fighter', description: 'Nave equilibrada con paneles solares'},
+        {key: 'fighter', name: 'Fighter', description: 'Caza clásico rápido y ágil'},
+        {key: 'interceptor', name: 'Interceptor', description: 'Nave pesada con gran resistencia'},
+        {key: 'heavy', name: 'Heavy Cruiser', description: 'Crucero con múltiples motores'},
+        {key: 'scout', name: 'Scout', description: 'Explorador ligero de largo alcance'},
+        {key: 'purplediamond', name: 'Purple Diamond', description: 'Nave experimental avanzada'},
+        {key: 'doradito', name: 'Doradito', description: 'Interceptor compacto y maniobrable'}
+    ];
+
+    intro.innerHTML = `
+        <h1>Selecciona tu Nave</h1>
+        <div id="shipSelection" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 30px 0;">
+            ${availableShips.map(ship => `
+                <div class="ship-option" onclick="game.selectShip('${ship.key}')" 
+                     style="background: rgba(0,0,0,0.8); border: 2px solid #4facfe; border-radius: 10px; 
+                            padding: 20px; cursor: pointer; transition: all 0.3s ease;
+                            text-align: center;" 
+                     onmouseover="this.style.borderColor='#feca57'; this.style.transform='scale(1.05)'"
+                     onmouseout="this.style.borderColor='#4facfe'; this.style.transform='scale(1)'">
+                    <div id="preview_${ship.key}" style="height: 150px; margin-bottom: 15px;"></div>
+                    <h3 style="color: #4facfe; margin: 10px 0;">${ship.name}</h3>
+                    <p style="color: #ffffff; font-size: 14px;">${ship.description}</p>
+                </div>
+            `).join('')}
+        </div>
+        <button onclick="game.showShipSelection()" style="margin-top: 20px;">← Volver</button>
+    `;
     
-    // Solo setear waypoint inicial si no se ha seteado antes
-    // Esto previene que se setee múltiples veces durante el juego
-    if(!this.initialWaypointSet){
-        const asteriaPlanet=this.findPlanetByName('Asteria Prime');
-        if(asteriaPlanet){
-            this.minimapManager.waypoint={
-                x:asteriaPlanet.center.x,
-                z:asteriaPlanet.center.z,
-                planet:asteriaPlanet,
-                type:'planet'
-            };
-            this.initialWaypointSet=!0; // Marcar como ya seteado
-            
-            setTimeout(()=>{
-                this.showNavigationNotification('Asteria Prime');
-            },500);
-        }
-    }
+    this.createShipPreviews(availableShips);
+}
+
+createShipPreviews(ships){
+    ships.forEach(ship => {
+        const container = document.getElementById(`preview_${ship.key}`);
+        if(!container) return;
+        
+        const scene = new THREE.Scene();
+        const camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
+        
+        renderer.setSize(200, 120);
+        renderer.setClearColor(0x000000, 0);
+        container.appendChild(renderer.domElement);
+        
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(5, 5, 5);
+        scene.add(directionalLight);
+        
+        const shipMesh = ShipFactory.create(ship.key);
+        shipMesh.position.set(0, 0, 0);
+        scene.add(shipMesh);
+        
+        camera.position.set(0, 15, 15);
+        camera.lookAt(0, 0, 0);
+        
+        const animate = () => {
+            shipMesh.rotation.y += 0.02;
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        };
+        animate();
+    });
+}
+selectShip(shipType){
+    this.selectedShipType = shipType;
+    this.audioManager.playWeaponSwitch();
+    document.getElementById('intro').classList.add('hidden');
+    this.actuallyStartGame();
 }
         animate() {
           requestAnimationFrame(() => this.animate());

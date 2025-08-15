@@ -588,7 +588,7 @@
           color: 0x87ceeb,
           distance: 140,
           enemyCount: 4,
-          enemyType: 'f',
+          enemyType: 's',
           irregularity: 0,
           health: 150,
           orbitCenter: {

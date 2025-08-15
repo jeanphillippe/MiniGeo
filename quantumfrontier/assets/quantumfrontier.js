@@ -4024,24 +4024,11 @@ this.audioManager.playSprite(randomSound, this.playerShip.position, this.playerS
         artifact.mesh.rotation.y += 0.08;
         artifact.mesh.rotation.x += 0.03;
         
-        // Pulsing glow effect
-        const pulse = 0.4 + 0.6 * Math.sin(Date.now() * 0.008 + artifact.pulseOffset);
-        artifact.mesh.material.emissiveIntensity = pulse;
-        artifact.mesh.material.opacity = 0.7 + 0.3 * pulse;
-        
-        // Animate sparkles orbiting around the artifact
-        artifact.sparkles.forEach(sparkle => {
-            sparkle.angle += sparkle.speed;
-            const x = artifact.mesh.position.x + Math.cos(sparkle.angle) * sparkle.radius;
-            const z = artifact.mesh.position.z + Math.sin(sparkle.angle) * sparkle.radius;
-            const y = artifact.mesh.position.y + Math.sin(sparkle.angle * 2) * 0.5;
-            sparkle.mesh.position.set(x, y, z);
-            
-            // Sparkle pulsing
-            const sparklePulse = 0.3 + 0.7 * Math.sin(Date.now() * 0.012 + sparkle.angle);
-            sparkle.mesh.material.opacity = sparklePulse;
-            sparkle.mesh.scale.setScalar(0.5 + sparklePulse * 0.5);
-        });
+        // Pulsing effect on the main body and edges
+        const pulse = 0.3 + 0.4 * Math.sin(Date.now() * 0.008 + artifact.pulseOffset);
+        artifact.mainBody.material.emissiveIntensity = pulse;
+        artifact.mainBody.material.opacity = 0.7 + 0.2 * pulse;
+        artifact.edges.material.opacity = 0.6 + 0.3 * pulse;
         
         const playerPosition = this.playerShip.position.clone();
         playerPosition.y = artifact.mesh.position.y;
@@ -4049,15 +4036,11 @@ this.audioManager.playSprite(randomSound, this.playerShip.position, this.playerS
         
         if(distance < 6){
             this.applyArtifactEffect(artifact.type);
-            // Clean up sparkles
-            artifact.sparkles.forEach(sparkle => this.scene.remove(sparkle.mesh));
             this.scene.remove(artifact.mesh);
             return false;
         }
         
         if(artifact.life <= 0){
-            // Clean up sparkles
-            artifact.sparkles.forEach(sparkle => this.scene.remove(sparkle.mesh));
             this.scene.remove(artifact.mesh);
             return false;
         }

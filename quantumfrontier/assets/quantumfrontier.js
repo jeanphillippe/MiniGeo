@@ -4715,32 +4715,98 @@ showShipSelector(){
     selector.appendChild(grid);
     document.body.appendChild(selector);
 }
-renderShipPreview(canvas, shipType){
+renderShipPreview(canvas, shipType) {
     const ctx = canvas.getContext('2d');
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-    const renderer = new THREE.WebGLRenderer({canvas, alpha: true});
-    renderer.setSize(200, 200);
-    renderer.setClearColor(0x000000, 0);
+    ctx.fillStyle = 'rgba(0, 242, 254, 0.1)';
+    ctx.fillRect(0, 0, 200, 200);
     
-    const ship = ShipFactory.create(shipType);
-    ship.rotation.y = Math.PI * 0.25;
-    ship.rotation.x = -Math.PI * 0.1;
-    scene.add(ship);
+    // Create a simple ship representation based on type
+    ctx.save();
+    ctx.translate(100, 100);
+    ctx.strokeStyle = '#00f2fe';
+    ctx.fillStyle = '#00f2fe';
+    ctx.lineWidth = 3;
     
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(1, 1, 1);
-    scene.add(light);
-    
-    camera.position.set(8, 4, 8);
-    camera.lookAt(0, 0, 0);
-    
-    const animate = () => {
-        ship.rotation.y += 0.02;
-        renderer.render(scene, camera);
-        requestAnimationFrame(animate);
+    // Draw different ship silhouettes based on type
+    const shipShapes = {
+        player: () => {
+            // TIE fighter style
+            ctx.fillRect(-15, -3, 30, 6); // cockpit
+            ctx.fillRect(-25, -15, 8, 30); // left panel
+            ctx.fillRect(17, -15, 8, 30); // right panel
+        },
+        fighter: () => {
+            // Classic fighter
+            ctx.beginPath();
+            ctx.moveTo(0, -20);
+            ctx.lineTo(-15, 15);
+            ctx.lineTo(15, 15);
+            ctx.closePath();
+            ctx.fill();
+        },
+        interceptor: () => {
+            // Hexagonal TIE
+            ctx.save();
+            ctx.rotate(Math.PI/6);
+            for(let i = 0; i < 6; i++) {
+                ctx.beginPath();
+                ctx.arc(0, 0, 15, i*Math.PI/3, (i+1)*Math.PI/3);
+                ctx.stroke();
+                ctx.rotate(Math.PI/3);
+            }
+            ctx.restore();
+        },
+        heavy: () => {
+            // Large fighter
+            ctx.fillRect(-20, -8, 40, 16);
+            ctx.fillRect(-25, -5, 10, 10);
+            ctx.fillRect(15, -5, 10, 10);
+        },
+        scout: () => {
+            // Fast scout
+            ctx.beginPath();
+            ctx.moveTo(0, -25);
+            ctx.lineTo(-12, 20);
+            ctx.lineTo(12, 20);
+            ctx.closePath();
+            ctx.fill();
+            ctx.fillRect(-20, 10, 8, 15);
+            ctx.fillRect(12, 10, 8, 15);
+        },
+        purplediamond: () => {
+            // Diamond shape
+            ctx.beginPath();
+            ctx.moveTo(0, -20);
+            ctx.lineTo(15, 0);
+            ctx.lineTo(0, 20);
+            ctx.lineTo(-15, 0);
+            ctx.closePath();
+            ctx.fill();
+        },
+        doradito: () => {
+            // Compact design
+            ctx.fillRect(-8, -8, 16, 16);
+            ctx.fillRect(-20, -12, 6, 24);
+            ctx.fillRect(14, -12, 6, 24);
+        }
     };
-    animate();
+    
+    // Draw the ship shape
+    if(shipShapes[shipType]) {
+        shipShapes[shipType]();
+    }
+    
+    // Add glow effect
+    ctx.shadowColor = '#00f2fe';
+    ctx.shadowBlur = 10;
+    ctx.stroke();
+    
+    // Add ship type indicator (optional)
+    ctx.restore();
+    ctx.fillStyle = '#00f2fe';
+    ctx.font = '12px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText(shipType.toUpperCase(), 100, 190);
 }
 async selectShip(shipType){
     this.selectedShipType = shipType;

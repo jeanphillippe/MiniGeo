@@ -2347,7 +2347,7 @@ this.tractorBeam = null;
     }
 }
         cycleWeapon() {
-          const nextWeapon = this.player.currentWeapon % 11 + 1;
+          const nextWeapon = this.player.currentWeapon % 8 + 1;
           this.switchWeapon(nextWeapon)
         }
         isPlanetLandable(planet){
@@ -3088,29 +3088,6 @@ fireHomingMissile(){
     this.audioManager.playBlaster(this.playerShip.position, this.playerShip.position);
 }
 
-// Energy Shield (weapon 8) - Temporary protective barrier
-deployEnergyShield(){
-    if(this.energyShield) return; // Only one shield at a time
-    
-    const shieldGeom = new THREE.SphereGeometry(8, 16, 16);
-    const shieldMat = new THREE.MeshBasicMaterial({
-        color: 0x00ff88,
-        emissive: 0x004420,
-        emissiveIntensity: 0.3,
-        transparent: true,
-        opacity: 0.3,
-        side: THREE.DoubleSide
-    });
-    const shield = new THREE.Mesh(shieldGeom, shieldMat);
-    shield.position.copy(this.playerShip.position);
-    
-    this.energyShield = {
-        mesh: shield,
-        life: 300, // 5 seconds at 60fps
-        health: 100
-    };
-    this.scene.add(shield);
-}
         fireBlaster() {
     this.createBullet(0);
     this.audioManager.playBlaster(this.playerShip.position, this.playerShip.position); // Same position for player sounds
@@ -4285,32 +4262,11 @@ setTimeout(() => {
     const artifactObj = {
         mesh: artifact,
         type: type,
-        life: 900,
+        life: 500,
         bobOffset: Math.random() * Math.PI * 2,
         pulseOffset: Math.random() * Math.PI * 2,
         sparkles: []
     };
-    
-    // Add sparkle particles around the artifact
-    for(let i = 0; i < 6; i++){
-        const sparkleGeom = new THREE.SphereGeometry(0.1, 6, 6);
-        const sparkleMat = new THREE.MeshBasicMaterial({
-            color: config.color,
-            emissive: config.color,
-            emissiveIntensity: 0.8,
-            transparent: true,
-            opacity: 0.6
-        });
-        const sparkle = new THREE.Mesh(sparkleGeom, sparkleMat);
-        sparkle.position.copy(artifact.position);
-        artifactObj.sparkles.push({
-            mesh: sparkle,
-            angle: (i / 6) * Math.PI * 2,
-            radius: 2.5,
-            speed: 0.02 + Math.random() * 0.02
-        });
-        this.scene.add(sparkle);
-    }
     
     this.artifacts.push(artifactObj);
     this.scene.add(artifact);

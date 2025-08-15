@@ -531,7 +531,7 @@
             name: 'Asteria Prime',
             image: './quantumfrontier/assets/images/planets.jpeg',
              setStoryWaypoint:'Helion IV',
-            baseText: 'Asteria Prime fue una vez el mayor exportador de minerales raros del sector, con flotas de cargueros despegando diariamente hacia los mundos centrales. Ahora solo quedan torres de perforación oxidadas y pueblos fantasma barridos por tormentas de polvo./n Entre los datos fragmentados de las últimas semanas antes del abandono, algo no encaja. Transferencias nocturnas, códigos de embarque alterados, y un patrón que solo alguien con tu experiencia podría reconocer: contrabando a gran escala./nEl rastro apunta hacia los cañones rocosos de Helion IV, donde los mercenarios no hacen preguntas.',
+            baseText: 'Asteria Prime fue una vez el mayor exportador de minerales raros del sector, con flotas de cargueros despegando diariamente hacia los mundos centrales. Ahora solo quedan torres de perforación oxidadas y pueblos fantasma barridos por tormentas de polvo. Entre los datos fragmentados de las últimas semanas antes del abandono, algo no encaja. Transferencias nocturnas, códigos de embarque alterados, y un patrón que solo alguien con tu experiencia podría reconocer: contrabando a gran escala.El rastro apunta hacia los cañones rocosos de Helion IV, donde los mercenarios no hacen preguntas.',
             flagTexts: {
               visited_proxima: 'Energy readings from Proxima Centauri b indicate this planet was part of an interconnected network.',
               visited_trappist: 'The quantum signatures resonate with TRAPPIST-1e readings - confirming the ancient network theory.'
@@ -554,7 +554,7 @@
             name: 'Pyrrhos',
              setStoryWaypoint:'Helion IV',
             image: './quantumfrontier/assets/images/planets44.jpeg',
-            baseText: 'Pyrrhos es un infierno de lava y roca fundida donde los ríos de magma serpentean entre picos de basalto negro. El calor es tan intenso que incluso los drones más resistentes fallan después de pocas horas de exposición. Aquí, la supervivencia se mide en minutos./n Enterrada en las profundidades rocosas, una forja milenaria late con el resplandor de cristales semi-formados. Los grabados en las paredes hablan de una civilización que dominaba energías capaces de abrir puertas entre mundos. Pero también advierten sobre el precio de tal poder./n Las inscripciones apuntan hacia "los guardianes del mundo verde" en Viridara, donde el conocimiento ancestral aguarda entre las ruinas envueltas en vegetación.',
+            baseText: 'Pyrrhos es un infierno de lava y roca fundida donde los ríos de magma serpentean entre picos de basalto negro. El calor es tan intenso que incluso los drones más resistentes fallan después de pocas horas de exposición. Aquí, la supervivencia se mide en minutos. Enterrada en las profundidades rocosas, una forja milenaria late con el resplandor de cristales semi-formados. Los grabados en las paredes hablan de una civilización que dominaba energías capaces de abrir puertas entre mundos. Pero también advierten sobre el precio de tal poder. Las inscripciones apuntan hacia "los guardianes del mundo verde" en Viridara, donde el conocimiento ancestral aguarda entre las ruinas envueltas en vegetación.',
             flagTexts: {
               visited_kepler: 'The crystalline formations here match those found on Kepler-442b - part of the same stellar engineering project.',
               visited_trappist: 'Cross-referencing with TRAPPIST-1e data reveals this is a mining outpost for the ancient network.'
@@ -577,7 +577,7 @@
           dialogue: {
             name: 'Helion IV',
             image: 'quantumfrontier/assets/images/planets3.jpeg',
-            baseText: 'Los cañones de arenisca roja de Helion IV ocultan una de las fortalezas mercenarias más temidas del sector exterior. Durante décadas, estas paredes rocosas han protegido operaciones que los mundos centrales prefieren ignorar: tráfico de armas, información clasificada, y cargamentos que oficialmente nunca existieron./n Las patrullas aéreas que surcan los desfiladeros son solo la primera advertencia. Aquí, la lealtad se compra con créditos y las preguntas equivocadas pueden costarte más que tu nave. Pero los registros de Asteria Prime no mienten: algo importante pasó por esta fortaleza./n Un contacto en las cantinas subterráneas menciona algo perturbador: el FSA intentó un asalto reciente que terminó en desastre. Los mercenarios hablan de "fragmentos cristalinos" y una guerra que apenas está comenzando.',
+            baseText: 'Los cañones de arenisca roja de Helion IV ocultan una de las fortalezas mercenarias más temidas del sector exterior. Durante décadas, estas paredes rocosas han protegido operaciones que los mundos centrales prefieren ignorar: tráfico de armas, información clasificada, y cargamentos que oficialmente nunca existieron. Las patrullas aéreas que surcan los desfiladeros son solo la primera advertencia. Aquí, la lealtad se compra con créditos y las preguntas equivocadas pueden costarte más que tu nave. Pero los registros de Asteria Prime no mienten: algo importante pasó por esta fortaleza. Un contacto en las cantinas subterráneas menciona algo perturbador: el FSA intentó un asalto reciente que terminó en desastre. Los mercenarios hablan de "fragmentos cristalinos" y una guerra que apenas está comenzando.',
             flagTexts: {
               visited_kepler: 'The quantum signatures here resonate with similar readings from Kepler-442b. This confirms the ancient network theory.',
               visited_proxima: 'Data correlation with Proxima Centauri b suggests this was the central hub of an ancient civilization.'
@@ -601,7 +601,7 @@
             name: 'Glacialis',
             image: './quantumfrontier/assets/images/planets.jpeg',
             setStoryWaypoint: 'Asteria Prime',
-            baseText: 'Glacialis es un mundo de hielo eterno donde las temperaturas nunca superan los -200°C. Vastas llanuras de hielo azul se extienden hasta el horizonte, interrumpidas por imponentes cordilleras cristalinas que brillan bajo la luz de estrellas distantes./n Bajo la superficie helada, antiguos complejos de investigación permanecen preservados en el tiempo. Los laboratorios criogénicos aún funcionan con energía geotérmica, manteniendo muestras de civilizaciones perdidas y experimentos que desafían la comprensión actual./n Los registros hablan de "muestras de Asteria Prime" almacenadas en las bóvedas más profundas.',
+            baseText: 'Glacialis es un mundo de hielo eterno donde las temperaturas nunca superan los -200°C. Vastas llanuras de hielo azul se extienden hasta el horizonte, interrumpidas por imponentes cordilleras cristalinas que brillan bajo la luz de estrellas distantes. Bajo la superficie helada, antiguos complejos de investigación permanecen preservados en el tiempo. Los laboratorios criogénicos aún funcionan con energía geotérmica, manteniendo muestras de civilizaciones perdidas y experimentos que desafían la comprensión actual. Los registros hablan de "muestras de Asteria Prime" almacenadas en las bóvedas más profundas.',
             flagTexts: {
               visited_asteria: 'Cryogenic logs confirm mineral samples from Asteria Prime were stored here before the evacuation.',
               visited_pyrrhos: 'Temperature differential studies between this ice world and Pyrrhos reveal connected research projects.'
@@ -625,7 +625,7 @@
             name: 'Tempest Major',
             image: './quantumfrontier/assets/images/planets44.jpeg',
             setStoryWaypoint: 'Pyrrhos',
-            baseText: 'Tempest Major es un gigante gaseoso de tormentas perpetuas donde vientos de 2000 km/h crean un ballet caótico de nubes violetas y relámpagos plasmáticos. Sus tres lunas principales orbitan en formación, cada una equipada con estaciones de investigación atmosférica abandonadas./n En las capas superiores de la atmósfera, plataformas flotantes extraen gases raros utilizados en la fabricación de cristales de energía. Los trabajadores que sobrevivieron al abandono masivo hablan de extrañas resonancias que emergían desde las profundidades del planeta./n Las frecuencias registradas coinciden con las emanaciones cristalinas de Pyrrhos.',
+            baseText: 'Tempest Major es un gigante gaseoso de tormentas perpetuas donde vientos de 2000 km/h crean un ballet caótico de nubes violetas y relámpagos plasmáticos. Sus tres lunas principales orbitan en formación, cada una equipada con estaciones de investigación atmosférica abandonadas. En las capas superiores de la atmósfera, plataformas flotantes extraen gases raros utilizados en la fabricación de cristales de energía. Los trabajadores que sobrevivieron al abandono masivo hablan de extrañas resonancias que emergían desde las profundidades del planeta. Las frecuencias registradas coinciden con las emanaciones cristalinas de Pyrrhos.',
             flagTexts: {
               visited_pyrrhos: 'Atmospheric resonance patterns match the crystal formations found on Pyrrhos.',
               visited_helion: 'Gas extraction records show shipments to mercenary bases on Helion IV.'
@@ -650,7 +650,7 @@
             name: 'Aridus',
             image: './quantumfrontier/assets/images/planets3.jpeg',
             setStoryWaypoint: 'Glacialis',
-            baseText: 'Aridus es un desierto sin fin de dunas doradas que cambian con los vientos solares. Dos soles gemelos baten este mundo durante 30 horas al día, creando un paisaje de espejismos y oasis efímeros donde la realidad se distorsiona./n Ocultas entre las dunas, estructuras piramidales de metal oxidado emergen ocasionalmente después de las tormentas. Estas ruinas contienen archivos holográficos de una civilización nómada que dominaba la navegación interdimensional./n Los archivos mencionan "refugios de hielo" donde guardaban sus descubrimientos más valiosos.',
+            baseText: 'Aridus es un desierto sin fin de dunas doradas que cambian con los vientos solares. Dos soles gemelos baten este mundo durante 30 horas al día, creando un paisaje de espejismos y oasis efímeros donde la realidad se distorsiona. Ocultas entre las dunas, estructuras piramidales de metal oxidado emergen ocasionalmente después de las tormentas. Estas ruinas contienen archivos holográficos de una civilización nómada que dominaba la navegación interdimensional. Los archivos mencionan "refugios de hielo" donde guardaban sus descubrimientos más valiosos.',
             flagTexts: {
               visited_glacialis: 'Archive cross-references confirm research caches were hidden on the ice world Glacialis.',
               visited_tempest: 'Navigation records show this civilization used gas giant gravitational fields for interdimensional travel.'
@@ -1937,7 +1937,7 @@ showNavigationNotification(targetName){
         pointer-events: none;
         backdrop-filter: blur(5px);
     `;
-    notification.textContent = `Navigate to: ${targetName}`;
+    notification.textContent = `Ve a: ${targetName}`;
     document.body.appendChild(notification);
     
     setTimeout(() => {
@@ -4124,7 +4124,7 @@ this.audioManager.playSprite(randomSound, this.playerShip.position, this.playerS
               this.player.effects.speed.active = !1
             } else {
               const remaining = Math.ceil((this.player.effects.speed.endTime - currentTime) / 1000);
-              effectsText += `SPEED BOOST: ${remaining}s
+              effectsText += `VELOCIDAD: ${remaining}s
                                                                                                                   
               <br>`
             }
@@ -4134,7 +4134,7 @@ this.audioManager.playSprite(randomSound, this.playerShip.position, this.playerS
               this.player.effects.damage.active = !1
             } else {
               const remaining = Math.ceil((this.player.effects.damage.endTime - currentTime) / 1000);
-              effectsText += `DAMAGE BOOST: ${remaining}s
+              effectsText += `DAÑO EXTRA: ${remaining}s
                                                                                                                     
                 <br>`
             }

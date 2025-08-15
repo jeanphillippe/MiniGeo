@@ -4391,7 +4391,7 @@ setTimeout(() => {
                                                                                                                                   
                   <h1>Game Over</h1>
                   <div style="font-size: 2rem; color: #feca57; margin: 20px 0; text-shadow: 0 0 15px rgba(254,202,87,0.8);">
-            Puntuación Final: ${this.player.score}
+            Puntaje: ${this.player.score}
         </div>
                   <p>Tu misión terminó. La galaxia recuerda tu coraje.</p>
                   <button id="playAgainBtn">Juega de Nuevo</button>

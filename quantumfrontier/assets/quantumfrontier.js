@@ -4668,6 +4668,7 @@ this.enemies.forEach(enemy => {
     await this.audioManager.start();
     this.showShipSelection();
 }
+
 showShipSelection(){
     const intro = document.getElementById('intro');
     const availableShips = [
@@ -4681,22 +4682,181 @@ showShipSelection(){
     ];
 
     intro.innerHTML = `
-        <h1>Selecciona tu Nave</h1>
-        <div id="shipSelection" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 30px 0;">
-            ${availableShips.map(ship => `
-                <div class="ship-option" onclick="game.selectShip('${ship.key}')" 
-                     style="background: rgba(0,0,0,0.8); border: 2px solid #4facfe; border-radius: 10px; 
-                            padding: 20px; cursor: pointer; transition: all 0.3s ease;
-                            text-align: center;" 
-                     onmouseover="this.style.borderColor='#feca57'; this.style.transform='scale(1.05)'"
-                     onmouseout="this.style.borderColor='#4facfe'; this.style.transform='scale(1)'">
-                    <div id="preview_${ship.key}" style="height: 150px; margin-bottom: 15px;"></div>
-                    <h3 style="color: #4facfe; margin: 10px 0;">${ship.name}</h3>
-                    <p style="color: #ffffff; font-size: 14px;">${ship.description}</p>
-                </div>
-            `).join('')}
+        <style>
+            .ship-selection-container {
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                padding: 20px;
+                box-sizing: border-box;
+            }
+            
+            .ship-selection-title {
+                color: #4facfe;
+                font-size: 2.5rem;
+                margin-bottom: 30px;
+                text-shadow: 0 0 20px rgba(79, 172, 254, 0.8);
+            }
+            
+            .ship-grid {
+                display: grid;
+                gap: 15px;
+                width: 100%;
+                max-width: 1200px;
+                grid-template-columns: repeat(4, 1fr);
+                margin-bottom: 20px;
+            }
+            
+            @media (max-width: 1024px) {
+                .ship-grid {
+                    grid-template-columns: repeat(3, 1fr);
+                    max-width: 900px;
+                }
+            }
+            
+            @media (max-width: 768px) {
+                .ship-grid {
+                    grid-template-columns: repeat(2, 1fr);
+                    max-width: 600px;
+                    gap: 12px;
+                }
+                
+                .ship-selection-title {
+                    font-size: 2rem;
+                    margin-bottom: 20px;
+                }
+            }
+            
+            @media (max-width: 480px) {
+                .ship-grid {
+                    gap: 10px;
+                    max-width: 380px;
+                }
+                
+                .ship-selection-title {
+                    font-size: 1.7rem;
+                    margin-bottom: 15px;
+                }
+            }
+            
+            .ship-option {
+                background: rgba(0,0,0,0.8);
+                border: 2px solid #4facfe;
+                border-radius: 10px;
+                padding: 15px;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                text-align: center;
+                backdrop-filter: blur(5px);
+                min-height: 200px;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+            }
+            
+            .ship-option:hover {
+                border-color: #feca57;
+                transform: scale(1.05);
+                box-shadow: 0 0 25px rgba(254, 202, 87, 0.6);
+            }
+            
+            .ship-preview {
+                height: 100px;
+                margin-bottom: 10px;
+                flex-grow: 1;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            
+            .ship-name {
+                color: #4facfe;
+                margin: 8px 0 5px 0;
+                font-size: 1.1rem;
+                font-weight: bold;
+            }
+            
+            .ship-description {
+                color: #ffffff;
+                font-size: 0.85rem;
+                line-height: 1.3;
+                opacity: 0.9;
+            }
+            
+            @media (max-width: 768px) {
+                .ship-option {
+                    padding: 12px;
+                    min-height: 180px;
+                }
+                
+                .ship-preview {
+                    height: 80px;
+                }
+                
+                .ship-name {
+                    font-size: 1rem;
+                    margin: 6px 0 4px 0;
+                }
+                
+                .ship-description {
+                    font-size: 0.8rem;
+                }
+            }
+            
+            @media (max-width: 480px) {
+                .ship-option {
+                    padding: 10px;
+                    min-height: 160px;
+                }
+                
+                .ship-preview {
+                    height: 70px;
+                }
+                
+                .ship-name {
+                    font-size: 0.9rem;
+                }
+                
+                .ship-description {
+                    font-size: 0.75rem;
+                }
+            }
+            
+            .back-button {
+                background: rgba(255, 71, 87, 0.2);
+                border: 2px solid #ff4757;
+                color: #ff4757;
+                padding: 12px 24px;
+                border-radius: 8px;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                font-size: 1rem;
+                font-family: 'Courier New', monospace;
+            }
+            
+            .back-button:hover {
+                background: rgba(255, 71, 87, 0.4);
+                transform: scale(1.05);
+            }
+        </style>
+        
+        <div class="ship-selection-container">
+            <h1 class="ship-selection-title">Selecciona tu Nave</h1>
+            
+            <div class="ship-grid">
+                ${availableShips.map(ship => `
+                    <div class="ship-option" onclick="game.selectShip('${ship.key}')">
+                        <div class="ship-preview" id="preview_${ship.key}"></div>
+                        <h3 class="ship-name">${ship.name}</h3>
+                        <p class="ship-description">${ship.description}</p>
+                    </div>
+                `).join('')}
+            </div>
+            
+            <button class="back-button" onclick="location.reload()">← Volver al Menú</button>
         </div>
-        <button onclick="game.showShipSelection()" style="margin-top: 20px;">← Volver</button>
     `;
     
     this.createShipPreviews(availableShips);

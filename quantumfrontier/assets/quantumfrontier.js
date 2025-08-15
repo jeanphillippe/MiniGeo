@@ -2225,6 +2225,8 @@ showWaypointSetFeedback(x, y) {
     this.enemies=[];
     this.planets=[];
     this.previewRenderer = null;
+this.previewScenes = new Map();
+this.previewAnimationId = null;
     this.stars=[];
     this.collisionCooldown=0;
     this.shootPressed=!1;
@@ -4716,7 +4718,8 @@ showShipSelector(){
     selector.appendChild(grid);
     document.body.appendChild(selector);
 }
-async renderShipPreview(canvas, shipType) {
+
+renderShipPreview(canvas, shipType) {
     // Create shared renderer only once
     if (!this.previewRenderer) {
         this.previewRenderer = new THREE.WebGLRenderer({ 
@@ -4731,32 +4734,88 @@ async renderShipPreview(canvas, shipType) {
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
     
     const ship = ShipFactory.create(shipType);
-    ship.rotation.y = Math.PI * 0.25;
-    ship.rotation.x = -Math.PI * 0.1;
+    // Nice angled view
+    ship.rotation.x = -Math.PI * 0.15;  // Slight downward tilt
+    ship.rotation.y = Math.PI * 0.3;    // Angled to show detail
+    ship.rotation.z = Math.PI * 0.05;   // Slight roll
     scene.add(ship);
     
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(1, 1, 1);
-    scene.add(light);
+    // Add some dramatic lighting
+    const mainLight = new THREE.DirectionalLight(0x00f2fe, 0.8);
+    mainLight.position.set(2, 3, 2);
+    scene.add(mainLight);
     
-    camera.position.set(8, 4, 8);
+    const fillLight = new THREE.DirectionalLight(0x4080ff, 0.4);
+    fillLight.position.set(-2, 1, -1);
+    scene.add(fillLight);
+    
+    const ambientLight = new THREE.AmbientLight(0x002040, 0.3);
+    scene.add(ambientLight);
+    
+    // Position camera for good view
+    camera.position.set(10, 6, 10);
     camera.lookAt(0, 0, 0);
     
-    // Render once and copy to canvas
-    this.previewRenderer.render(scene, camera);
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(this.previewRenderer.domElement, 0, 0);
+    // Store scene data for animation
+    this.previewScenes.set(canvas, {
+        scene: scene,
+        camera: camera,
+        ship: ship,
+        canvas: canvas,
+        rotationSpeed: 0.008 + Math.random() * 0.004 // Vary rotation speeds slightly
+    });
+    
+    // Start animation if not already running
+    if (!this.previewAnimationId) {
+        this.animatePreviewsLoop();
+    }
 }
+animatePreviewsLoop() {
+    this.previewAnimationId = requestAnimationFrame(() => {
+        this.animatePreviewsLoop();
+    });
+    
+    // Update and render each preview
+    this.previewScenes.forEach(({scene, camera, ship, canvas, rotationSpeed}) => {
+        // Spin the ship
+        ship.rotation.y += rotationSpeed;
+        
+        // Add subtle bobbing motion
+        ship.position.y = Math.sin(Date.now() * 0.002 + ship.rotation.y * 10) * 0.3;
+        
+        // Render to shared renderer
+        this.previewRenderer.render(scene, camera);
+        
+        // Copy to the specific canvas
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, 200, 200);
+        ctx.drawImage(this.previewRenderer.domElement, 0, 0);
+    });
+}
+stopPreviewAnimations() {
+    if (this.previewAnimationId) {
+        cancelAnimationFrame(this.previewAnimationId);
+        this.previewAnimationId = null;
+    }
+    this.previewScenes.clear();
+}
+
 async selectShip(shipType){
     this.selectedShipType = shipType;
-     if(!this.playerShip) {
-        this.createPlayer();
-    }
-    // Remover selector
+    
+    // Stop preview animations
+    this.stopPreviewAnimations();
+    
+    // Remove selector
     const selector = document.getElementById('shipSelector');
     if(selector) selector.remove();
     
-    // Continuar con el inicio del juego
+    // Create player ship now that we have selection
+    if(!this.playerShip) {
+        this.createPlayer();
+    }
+    
+    // Continue with game start
     await this.audioManager.start();
     this.audioManager.playPowerUp();
     this.gameStarted = true;
@@ -4777,6 +4836,7 @@ async selectShip(shipType){
         }
     }
 }
+
         animate() {
           requestAnimationFrame(() => this.animate());
           this.update();

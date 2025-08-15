@@ -4667,7 +4667,7 @@ showShipSelector(){
     `;
     
     const title = document.createElement('h2');
-    title.textContent = 'SELECT YOUR SHIP';
+    title.textContent = 'ELIGE TU NAVE';
     title.style.cssText = `
         color: #00f2fe; font-family: 'Courier New', monospace;
         font-size: clamp(24px, 4vw, 48px); margin-bottom: 40px;
@@ -4676,7 +4676,7 @@ showShipSelector(){
     
     const grid = document.createElement('div');
     grid.style.cssText = `
-        display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
         gap: 20px; max-width: 90vw; width: 800px;
     `;
     

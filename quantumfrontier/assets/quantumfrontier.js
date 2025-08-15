@@ -2124,8 +2124,8 @@ showWaypointReachedNotification(waypoint) {
     `;
     
     const message = waypoint.type === 'planet' && waypoint.planet?.config.dialogue ?
-        `Reached: ${waypoint.planet.config.dialogue.name}` :
-        'Waypoint Reached';
+        `Llegaste a: ${waypoint.planet.config.dialogue.name}` :
+        'Haz llegado';
     
     notification.textContent = message;
     document.body.appendChild(notification);

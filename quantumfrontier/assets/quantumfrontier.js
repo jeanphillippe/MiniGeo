@@ -4733,15 +4733,15 @@ async renderShipPreview(canvas, shipType) {
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
     
     const ship = ShipFactory.create(shipType);
-    ship.rotation.y = Math.PI * 0.15;
-    ship.rotation.x = -Math.PI * 0.1;
+    ship.rotation.y = Math.PI * 0.3;
+    ship.rotation.x = 0;
     scene.add(ship);
     
     const light = new THREE.DirectionalLight(0xffffff, 1);
     light.position.set(1, 1, 1);
     scene.add(light);
     
-    camera.position.set(10, 6, 4);
+    camera.position.set(5, 10, 7);
     camera.lookAt(0, 0, 0);
     
     // Render once and copy to canvas

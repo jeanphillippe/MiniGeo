@@ -2330,7 +2330,7 @@ this.tractorBeam = null;
     if(weaponNumber >= 1 && weaponNumber <= 8){
         this.player.currentWeapon = weaponNumber;
         const weaponNames = ['Blaster', 'Scatter', 'Shotgun', 'Mines', 'Laser', 'EMP', 'Homing', 'Tractor'];
-        document.getElementById('currentWeapon').textContent = `${weaponNumber}-${weaponNames[weaponNumber-1]}`;
+        document.getElementById('currentWeapon').textContent = `${weaponNames[weaponNumber-1]}`;
         document.getElementById('weaponBtn').innerHTML = `W<br>${weaponNumber}`;
         
         if(this.laserBeam){
@@ -4386,11 +4386,11 @@ setTimeout(() => {
                                                                                                                                   
                   <h1>Game Over</h1>
                   <div style="font-size: 2rem; color: #feca57; margin: 20px 0; text-shadow: 0 0 15px rgba(254,202,87,0.8);">
-            Final Score: ${this.player.score}
+            Puntuación Final: ${this.player.score}
         </div>
-                  <p>Your mission has ended. The galaxy remembers your courage.</p>
-                  <button id="playAgainBtn">Play Again</button>
-                  <button id="backToMenuBtn">Main Menu</button>
+                  <p>Tu misión terminó. La galaxia recuerda tu coraje.</p>
+                  <button id="playAgainBtn">Juega de Nuevo</button>
+                  <button id="backToMenuBtn">Menu Principal</button>
     `;
           intro.classList.remove('hidden');
           document.getElementById('playAgainBtn').addEventListener('click', () => {

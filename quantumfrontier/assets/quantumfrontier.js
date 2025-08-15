@@ -2220,7 +2220,6 @@ showWaypointSetFeedback(x, y) {
     this.keys={};
     this.bullets=[];
     this.enemyBullets=[];
-    this.selectedShipType = null;
     this.artifacts=[];
     this.mines=[];
     this.enemies=[];
@@ -2259,45 +2258,21 @@ this.tractorBeam = null;
           directionalLight.position.set(1, 10, 5);
           this.scene.add(directionalLight);
           this.backgroundManager = new BackgroundManager(this.scene);
-          //this.createPlayer();
+          this.createPlayer();
           this.createPlanets();
           this.createEnemies();
-          //this.spawnAlly();
+          this.spawnAlly();
           //this.spawnAlly('i');
           //this.spawnAlly('s');
           //this.spawnAlly('d');
           //this.spawnAlly('p');
           //this.spawnAlly('h');
         }
-        createPlayer(){
-    const shipType = this.selectedShipType || 'player';
-    this.playerShip=ShipFactory.create(shipType);
-    this.playerShip.position.set(-142,5,-177);
-    this.scene.add(this.playerShip);
-}
-async actuallyStartGame(){
-    // Crear el player con la nave seleccionada
-    this.createPlayer();
-    
-    this.audioManager.playPowerUp();
-    this.gameStarted = true;
-    
-    if(!this.initialWaypointSet){
-        const asteriaPlanet = this.findPlanetByName('Asteria Prime');
-        if(asteriaPlanet){
-            this.minimapManager.waypoint = {
-                x: asteriaPlanet.center.x,
-                z: asteriaPlanet.center.z,
-                planet: asteriaPlanet,
-                type: 'planet'
-            };
-            this.initialWaypointSet = true;
-            setTimeout(() => {
-                this.showNavigationNotification('Asteria Prime');
-            }, 500);
+        createPlayer() {
+          this.playerShip = ShipFactory.create('player');
+          this.playerShip.position.set(-142, 5, -177);
+          this.scene.add(this.playerShip)
         }
-    }
-}
         createPlanets() {
           const sunConfig = {
             radius: 10,
@@ -3601,7 +3576,6 @@ createAllyBullet(ally, target){
           })
         }
         updatePlayer() {
-           if(!this.playerShip) return;
           let moveX = 0,
             moveZ = 0;
           if (this.keys.KeyW || this.keys.ArrowUp || this.touchControls.moveY < -0.3) moveZ -= 1;
@@ -4670,240 +4644,29 @@ this.enemies.forEach(enemy => {
     });
 }
         async startGame(){
-    await this.audioManager.start();
-    this.showShipSelection();
-}
-
-showShipSelection(){
-    const intro = document.getElementById('intro');
-    const availableShips = [
-        {key: 'player', name: 'TIE Fighter', description: 'Nave equilibrada con paneles solares'},
-        {key: 'fighter', name: 'Fighter', description: 'Caza clásico rápido y ágil'},
-        {key: 'interceptor', name: 'Interceptor', description: 'Nave pesada con gran resistencia'},
-        {key: 'heavy', name: 'Heavy Cruiser', description: 'Crucero con múltiples motores'},
-        {key: 'scout', name: 'Scout', description: 'Explorador ligero de largo alcance'},
-        {key: 'purplediamond', name: 'Purple Diamond', description: 'Nave experimental avanzada'},
-        {key: 'doradito', name: 'Doradito', description: 'Interceptor compacto y maniobrable'}
-    ];
-
-    intro.innerHTML = `
-        <style>
-            .ship-selection-container {
-                height: 100vh;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
-                padding: 20px;
-                box-sizing: border-box;
-            }
-            
-            .ship-selection-title {
-                color: #4facfe;
-                font-size: 2.5rem;
-                margin-bottom: 30px;
-                text-shadow: 0 0 20px rgba(79, 172, 254, 0.8);
-            }
-            
-            .ship-grid {
-                display: grid;
-                gap: 15px;
-                width: 100%;
-                max-width: 1200px;
-                grid-template-columns: repeat(4, 1fr);
-                margin-bottom: 20px;
-            }
-            
-            @media (max-width: 1024px) {
-                .ship-grid {
-                    grid-template-columns: repeat(3, 1fr);
-                    max-width: 900px;
-                }
-            }
-            
-            @media (max-width: 768px) {
-                .ship-grid {
-                    grid-template-columns: repeat(2, 1fr);
-                    max-width: 600px;
-                    gap: 12px;
-                }
-                
-                .ship-selection-title {
-                    font-size: 2rem;
-                    margin-bottom: 20px;
-                }
-            }
-            
-            @media (max-width: 480px) {
-                .ship-grid {
-                    gap: 10px;
-                    max-width: 380px;
-                }
-                
-                .ship-selection-title {
-                    font-size: 1.7rem;
-                    margin-bottom: 15px;
-                }
-            }
-            
-            .ship-option {
-                background: rgba(0,0,0,0.8);
-                border: 2px solid #4facfe;
-                border-radius: 10px;
-                padding: 15px;
-                cursor: pointer;
-                transition: all 0.3s ease;
-                text-align: center;
-                backdrop-filter: blur(5px);
-                min-height: 200px;
-                display: flex;
-                flex-direction: column;
-                justify-content: space-between;
-            }
-            
-            .ship-option:hover {
-                border-color: #feca57;
-                transform: scale(1.05);
-                box-shadow: 0 0 25px rgba(254, 202, 87, 0.6);
-            }
-            
-            .ship-preview {
-                height: 100px;
-                margin-bottom: 10px;
-                flex-grow: 1;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-            
-            .ship-name {
-                color: #4facfe;
-                margin: 8px 0 5px 0;
-                font-size: 1.1rem;
-                font-weight: bold;
-            }
-            
-            .ship-description {
-                color: #ffffff;
-                font-size: 0.85rem;
-                line-height: 1.3;
-                opacity: 0.9;
-            }
-            
-            @media (max-width: 768px) {
-                .ship-option {
-                    padding: 12px;
-                    min-height: 180px;
-                }
-                
-                .ship-preview {
-                    height: 80px;
-                }
-                
-                .ship-name {
-                    font-size: 1rem;
-                    margin: 6px 0 4px 0;
-                }
-                
-                .ship-description {
-                    font-size: 0.8rem;
-                }
-            }
-            
-            @media (max-width: 480px) {
-                .ship-option {
-                    padding: 10px;
-                    min-height: 160px;
-                }
-                
-                .ship-preview {
-                    height: 70px;
-                }
-                
-                .ship-name {
-                    font-size: 0.9rem;
-                }
-                
-                .ship-description {
-                    font-size: 0.75rem;
-                }
-            }
-            
-            .back-button {
-                background: rgba(255, 71, 87, 0.2);
-                border: 2px solid #ff4757;
-                color: #ff4757;
-                padding: 12px 24px;
-                border-radius: 8px;
-                cursor: pointer;
-                transition: all 0.3s ease;
-                font-size: 1rem;
-                font-family: 'Courier New', monospace;
-            }
-            
-            .back-button:hover {
-                background: rgba(255, 71, 87, 0.4);
-                transform: scale(1.05);
-            }
-        </style>
-        
-        <div class="ship-selection-container">
-            <h1 class="ship-selection-title">Selecciona tu Nave</h1>
-            
-            <div class="ship-grid">
-                ${availableShips.map(ship => `
-                    <div class="ship-option" onclick="game.selectShip('${ship.key}')">
-                        <div class="ship-preview" id="preview_${ship.key}"></div>
-                    </div>
-                `).join('')}
-            </div>
-            
-            <button class="back-button" onclick="location.reload()">← Volver al Menú</button>
-        </div>
-    `;
-    
-    this.createShipPreviews(availableShips);
-}
-
-createShipPreviews(ships){
-    ships.forEach(ship => {
-        const container = document.getElementById(`preview_${ship.key}`);
-        if(!container) return;
-        
-        const scene = new THREE.Scene();
-        const camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
-        
-        renderer.setSize(200, 120);
-        renderer.setClearColor(0x000000, 0);
-        container.appendChild(renderer.domElement);
-        
-        const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
-        scene.add(ambientLight);
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(5, 5, 5);
-        scene.add(directionalLight);
-        
-        const shipMesh = ShipFactory.create(ship.key);
-        shipMesh.position.set(0, 0, 0);
-        scene.add(shipMesh);
-        
-        camera.position.set(0, 15, 15);
-        camera.lookAt(0, 0, 0);
-        
-        const animate = () => {
-            shipMesh.rotation.y += 0.02;
-            renderer.render(scene, camera);
-            requestAnimationFrame(animate);
-        };
-        animate();
-    });
-}
-selectShip(shipType){
-    this.selectedShipType = shipType;
-    this.audioManager.playWeaponSwitch();
     document.getElementById('intro').classList.add('hidden');
-    this.actuallyStartGame();
+    await this.audioManager.start();
+    this.audioManager.playPowerUp();
+    this.gameStarted=!0;
+    
+    // Solo setear waypoint inicial si no se ha seteado antes
+    // Esto previene que se setee múltiples veces durante el juego
+    if(!this.initialWaypointSet){
+        const asteriaPlanet=this.findPlanetByName('Asteria Prime');
+        if(asteriaPlanet){
+            this.minimapManager.waypoint={
+                x:asteriaPlanet.center.x,
+                z:asteriaPlanet.center.z,
+                planet:asteriaPlanet,
+                type:'planet'
+            };
+            this.initialWaypointSet=!0; // Marcar como ya seteado
+            
+            setTimeout(()=>{
+                this.showNavigationNotification('Asteria Prime');
+            },500);
+        }
+    }
 }
         animate() {
           requestAnimationFrame(() => this.animate());

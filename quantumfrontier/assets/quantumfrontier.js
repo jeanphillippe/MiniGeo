@@ -2247,7 +2247,8 @@ this.tractorBeam = null;
     this.landingStartTime=0;
     this.wasPlayerVisible=!0;
     this.visitedPlanets=new Set();
-    this.typewriterSpeed=7;
+    this.typewriterSpeed=7
+    this.selectedShipType = 'player'; ;
 }
         initializeScene() {
           this.camera.position.set(0, 60, 60);
@@ -2258,7 +2259,7 @@ this.tractorBeam = null;
           directionalLight.position.set(1, 10, 5);
           this.scene.add(directionalLight);
           this.backgroundManager = new BackgroundManager(this.scene);
-          this.createPlayer();
+          //this.createPlayer();
           this.createPlanets();
           this.createEnemies();
           this.spawnAlly();
@@ -2268,11 +2269,12 @@ this.tractorBeam = null;
           //this.spawnAlly('p');
           //this.spawnAlly('h');
         }
-        createPlayer() {
-          this.playerShip = ShipFactory.create('player');
-          this.playerShip.position.set(-142, 5, -177);
-          this.scene.add(this.playerShip)
-        }
+        createPlayer(){
+    this.playerShip = ShipFactory.create(this.selectedShipType);
+    this.playerShip.userData.shipType = this.selectedShipType; // Add this line
+    this.playerShip.position.set(-142, 5, -177);
+    this.scene.add(this.playerShip);
+}
         createPlanets() {
           const sunConfig = {
             radius: 10,
@@ -4527,7 +4529,11 @@ this.enemies.forEach(enemy => {
     if(landingPrompts){
         landingPrompts.innerHTML='';
     }
-    
+    // Recrear nave si cambió
+if(this.playerShip && this.playerShip.userData.shipType !== this.selectedShipType){
+    this.scene.remove(this.playerShip);
+    this.createPlayer();
+}
     this.updateHUD();
 }
         setupEventListeners() {
@@ -4645,26 +4651,124 @@ this.enemies.forEach(enemy => {
 }
         async startGame(){
     document.getElementById('intro').classList.add('hidden');
+    this.showShipSelector(); // Mostrar selector en lugar de empezar directamente
+}
+showShipSelector(){
+    const selector = document.createElement('div');
+    selector.id = 'shipSelector';
+    selector.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: linear-gradient(45deg, #0a0a0a, #1a1a2e);
+        display: flex; flex-direction: column; align-items: center;
+        justify-content: center; z-index: 1000;
+    `;
+    
+    const title = document.createElement('h2');
+    title.textContent = 'SELECT YOUR SHIP';
+    title.style.cssText = `
+        color: #00f2fe; font-family: 'Courier New', monospace;
+        font-size: clamp(24px, 4vw, 48px); margin-bottom: 40px;
+        text-shadow: 0 0 20px rgba(0,242,254,0.8);
+    `;
+    
+    const grid = document.createElement('div');
+    grid.style.cssText = `
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 20px; max-width: 90vw; width: 800px;
+    `;
+    
+    const ships = ['player', 'fighter', 'interceptor', 'heavy', 'scout', 'purplediamond', 'doradito'];
+    
+    ships.forEach(shipType => {
+        const shipCard = document.createElement('div');
+        shipCard.style.cssText = `
+            aspect-ratio: 1; background: rgba(0,242,254,0.1);
+            border: 2px solid rgba(0,242,254,0.3); border-radius: 15px;
+            cursor: pointer; position: relative; overflow: hidden;
+            transition: all 0.3s ease;
+        `;
+        
+        shipCard.addEventListener('mouseenter', () => {
+            shipCard.style.borderColor = '#00f2fe';
+            shipCard.style.transform = 'scale(1.05)';
+            shipCard.style.boxShadow = '0 0 30px rgba(0,242,254,0.6)';
+        });
+        
+        shipCard.addEventListener('mouseleave', () => {
+            shipCard.style.borderColor = 'rgba(0,242,254,0.3)';
+            shipCard.style.transform = 'scale(1)';
+            shipCard.style.boxShadow = 'none';
+        });
+        
+        shipCard.addEventListener('click', () => this.selectShip(shipType));
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 200;
+        canvas.style.cssText = 'width: 100%; height: 100%; object-fit: contain;';
+        
+        this.renderShipPreview(canvas, shipType);
+        shipCard.appendChild(canvas);
+        grid.appendChild(shipCard);
+    });
+    
+    selector.appendChild(title);
+    selector.appendChild(grid);
+    document.body.appendChild(selector);
+}
+renderShipPreview(canvas, shipType){
+    const ctx = canvas.getContext('2d');
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+    const renderer = new THREE.WebGLRenderer({canvas, alpha: true});
+    renderer.setSize(200, 200);
+    renderer.setClearColor(0x000000, 0);
+    
+    const ship = ShipFactory.create(shipType);
+    ship.rotation.y = Math.PI * 0.25;
+    ship.rotation.x = -Math.PI * 0.1;
+    scene.add(ship);
+    
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(1, 1, 1);
+    scene.add(light);
+    
+    camera.position.set(8, 4, 8);
+    camera.lookAt(0, 0, 0);
+    
+    const animate = () => {
+        ship.rotation.y += 0.02;
+        renderer.render(scene, camera);
+        requestAnimationFrame(animate);
+    };
+    animate();
+}
+async selectShip(shipType){
+    this.selectedShipType = shipType;
+     if(!this.playerShip) {
+        this.createPlayer();
+    }
+    // Remover selector
+    const selector = document.getElementById('shipSelector');
+    if(selector) selector.remove();
+    
+    // Continuar con el inicio del juego
     await this.audioManager.start();
     this.audioManager.playPowerUp();
-    this.gameStarted=!0;
+    this.gameStarted = true;
     
-    // Solo setear waypoint inicial si no se ha seteado antes
-    // Esto previene que se setee múltiples veces durante el juego
     if(!this.initialWaypointSet){
-        const asteriaPlanet=this.findPlanetByName('Asteria Prime');
+        const asteriaPlanet = this.findPlanetByName('Asteria Prime');
         if(asteriaPlanet){
-            this.minimapManager.waypoint={
-                x:asteriaPlanet.center.x,
-                z:asteriaPlanet.center.z,
-                planet:asteriaPlanet,
-                type:'planet'
+            this.minimapManager.waypoint = {
+                x: asteriaPlanet.center.x, 
+                z: asteriaPlanet.center.z, 
+                planet: asteriaPlanet, 
+                type: 'planet'
             };
-            this.initialWaypointSet=!0; // Marcar como ya seteado
-            
-            setTimeout(()=>{
+            this.initialWaypointSet = true;
+            setTimeout(() => {
                 this.showNavigationNotification('Asteria Prime');
-            },500);
+            }, 500);
         }
     }
 }

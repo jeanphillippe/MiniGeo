@@ -2299,25 +2299,32 @@ class MultiplayerManager {
     }
 
     setupEventListeners() {
-        document.getElementById('mpToggle').addEventListener('click', () => {
-            const panel = document.getElementById('mpPanel');
-            panel.classList.toggle('mp-hidden');
-        });
+    document.getElementById('mpToggle').addEventListener('click', () => {
+        const panel = document.getElementById('mpPanel');
+        panel.classList.toggle('mp-hidden');
+    });
 
-        document.getElementById('hostGameBtn').addEventListener('click', () => {
-            this.hostGame();
-        });
+    document.getElementById('hostGameBtn').addEventListener('click', () => {
+        console.log('Host game button clicked');
+        this.hostGame();
+    });
 
-        document.getElementById('joinGameBtn').addEventListener('click', () => {
-            const code = document.getElementById('gameCodeInput').value.trim();
-            if (code) this.joinGame(code);
-        });
+    document.getElementById('joinGameBtn').addEventListener('click', () => {
+        const code = document.getElementById('gameCodeInput').value.trim();
+        console.log('Join game button clicked, code:', code);
+        if (code) {
+            this.joinGame(code);
+        } else {
+            this.updateStatus('Error: Ingresa un código válido');
+        }
+    });
 
-        document.getElementById('copyCodeBtn').addEventListener('click', () => {
-            const code = document.getElementById('gameCode').textContent;
-            navigator.clipboard.writeText(code);
-        });
-    }
+    document.getElementById('copyCodeBtn').addEventListener('click', () => {
+        const code = document.getElementById('gameCode').textContent;
+        navigator.clipboard.writeText(code);
+        console.log('Code copied:', code);
+    });
+}
 
     async hostGame() {
     try {
@@ -2360,20 +2367,61 @@ class MultiplayerManager {
 
 
     async joinGame(hostId) {
-        try {
-            this.peer = new Peer();
+    try {
+        console.log('Attempting to join game with host ID:', hostId);
+        this.updateStatus('Conectando...', false);
+        
+        this.peer = new Peer();
+        
+        this.peer.on('open', (id) => {
+            console.log('My peer ID:', id);
+            this.myPlayerId = id;
+            this.updateStatus('Conectando al host...', false);
             
-            this.peer.on('open', (id) => {
-                this.myPlayerId = id;
-                const conn = this.peer.connect(hostId);
-                this.handleNewPlayer(conn);
+            // Connect to host
+            const conn = this.peer.connect(hostId);
+            console.log('Connection object created:', conn);
+            
+            conn.on('open', () => {
+                console.log('Connection to host opened');
+                this.updateStatus('Conectado!', true);
+                this.connections.set(conn.peer, conn);
+                this.updatePlayersList();
+                this.game.eventLogger.logSystem('Conectado a la partida');
             });
+            
+            conn.on('error', (error) => {
+                console.error('Connection error:', error);
+                this.updateStatus('Error: No se pudo conectar al host');
+            });
+            
+            conn.on('data', (data) => {
+                this.handleMessage(data, conn.peer);
+            });
+            
+            conn.on('close', () => {
+                console.log('Connection to host closed');
+                this.handlePlayerDisconnect(conn.peer);
+            });
+        });
 
-        } catch (error) {
-            console.error('Error joining game:', error);
-            this.updateStatus('Error al unirse a la partida');
-        }
+        this.peer.on('error', (error) => {
+            console.error('Peer error:', error);
+            this.updateStatus('Error: ' + error.type);
+        });
+
+        // Timeout check
+        setTimeout(() => {
+            if (!this.myPlayerId) {
+                this.updateStatus('Error: Timeout al conectar');
+            }
+        }, 10000);
+
+    } catch (error) {
+        console.error('Error joining game:', error);
+        this.updateStatus('Error al unirse a la partida');
     }
+}
 
     handleNewPlayer(conn) {
         conn.on('open', () => {

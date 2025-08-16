@@ -2148,16 +2148,19 @@ class EventLogger {
     }
 }
 class MultiplayerManager {
-    constructor(game) {
+     constructor(game) {
         this.game = game;
         this.peer = null;
-        this.connections = new Map(); // playerId -> connection
+        this.connections = new Map();
         this.isHost = false;
         this.myPlayerId = null;
-        this.remotePlayers = new Map(); // playerId -> player data
-        this.lastSentPosition = { x: 0, z: 0, rotation: 0 };
+        this.remotePlayers = new Map();
+        this.lastSentPosition = {x: 0, z: 0, rotation: 0};
+        this.connectionAttempts = 0;
+        this.maxConnectionAttempts = 3;
         this.setupUI();
     }
+
 
     setupUI() {
         // Create multiplayer UI
@@ -2326,102 +2329,233 @@ class MultiplayerManager {
     });
 }
 
-    async hostGame() {
-    try {
-        // Add loading state
-        this.updateStatus('Conectando...', false);
-        
-        this.peer = new Peer();
-        this.isHost = true;
-        
-        this.peer.on('open', (id) => {
-            console.log('Peer ID generated:', id); // Debug log
-            this.myPlayerId = id;
-            this.updateStatus('Esperando jugadores...', true);
-            this.showGameCode(id);
-            this.game.eventLogger.logSystem('Partida multijugador creada');
-        });
+  async hostGame() {
+        try {
+            this.updateStatus('Conectando...', false);
+            
+            // Create peer with configuration
+            this.peer = new Peer({
+                config: {
+                    'iceServers': [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
+                }
+            });
+            
+            this.isHost = true;
 
-        this.peer.on('error', (error) => {
-            console.error('Peer error:', error);
-            this.updateStatus('Error: ' + error.type);
-        });
+            this.peer.on('open', (id) => {
+                console.log('Host Peer ID generated:', id);
+                this.myPlayerId = id;
+                this.updateStatus('Esperando jugadores...', true);
+                this.showGameCode(id);
+                this.game.eventLogger.logSystem('Partida multijugador creada');
+            });
 
-        this.peer.on('connection', (conn) => {
-            this.handleNewPlayer(conn);
-        });
+            this.peer.on('error', (error) => {
+                console.error('Peer error:', error);
+                this.handlePeerError(error);
+            });
 
-        // Fallback: if peer doesn't open in 10 seconds, show error
-        setTimeout(() => {
-            if (!this.myPlayerId) {
-                this.updateStatus('Error: No se pudo conectar');
-                console.error('Peer failed to generate ID');
+            this.peer.on('connection', (conn) => {
+                this.handleNewPlayer(conn);
+            });
+
+            // Timeout with retry mechanism
+            setTimeout(() => {
+                if (!this.myPlayerId && this.connectionAttempts < this.maxConnectionAttempts) {
+                    this.connectionAttempts++;
+                    this.updateStatus(`Reintentando... (${this.connectionAttempts}/${this.maxConnectionAttempts})`);
+                    this.hostGame();
+                } else if (!this.myPlayerId) {
+                    this.updateStatus('Error: No se pudo crear la partida');
+                    this.cleanup();
+                }
+            }, 10000);
+
+        } catch (error) {
+            console.error('Error hosting game:', error);
+            this.updateStatus('Error al crear partida');
+            this.handlePeerError(error);
+        }
+    }
+ cleanup() {
+        try {
+            // Stop laser audio if playing
+            if (this.game.audioManager) {
+                this.game.audioManager.stopLaser();
             }
+
+            // Clean up remote players
+            this.remotePlayers.forEach((player, playerId) => {
+                if (player.ship && this.game.scene) {
+                    this.game.scene.remove(player.ship);
+                }
+            });
+            this.remotePlayers.clear();
+
+            // Close all connections
+            this.connections.forEach(conn => {
+                try {
+                    conn.close();
+                } catch (e) {
+                    console.warn('Error closing connection:', e);
+                }
+            });
+            this.connections.clear();
+
+            // Close peer
+            if (this.peer && !this.peer.destroyed) {
+                this.peer.destroy();
+            }
+            this.peer = null;
+
+            // Reset state
+            this.isHost = false;
+            this.myPlayerId = null;
+            this.connectionAttempts = 0;
+            
+            // Update UI
+            this.updateStatus('Desconectado');
+            this.updatePlayersList();
+            
+            // Hide game code if showing
+            const gameCodeDisplay = document.getElementById('gameCodeDisplay');
+            const mpControls = document.getElementById('mpControls');
+            if (gameCodeDisplay) gameCodeDisplay.style.display = 'none';
+            if (mpControls) mpControls.style.display = 'block';
+            
+        } catch (error) {
+            console.error('Error during cleanup:', error);
+        }
+    }
+    isConnected() {
+        return this.peer && this.peer.open && !this.peer.destroyed;
+    }
+
+  async joinGame(hostId) {
+        if (!hostId || hostId.trim() === '') {
+            this.updateStatus('Error: Código inválido');
+            return;
+        }
+
+        try {
+            console.log('Attempting to join game with host ID:', hostId);
+            this.updateStatus('Conectando...', false);
+            
+            this.peer = new Peer({
+                config: {
+                    'iceServers': [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
+                }
+            });
+
+            this.peer.on('open', (id) => {
+                console.log('Client peer ID:', id);
+                this.myPlayerId = id;
+                this.updateStatus('Conectando al host...', false);
+                
+                const conn = this.peer.connect(hostId, {
+                    reliable: true
+                });
+                
+                this.setupConnection(conn, hostId);
+            });
+
+            this.peer.on('error', (error) => {
+                console.error('Peer error:', error);
+                this.handlePeerError(error);
+            });
+
+            // Timeout with retry
+            setTimeout(() => {
+                if (!this.myPlayerId && this.connectionAttempts < this.maxConnectionAttempts) {
+                    this.connectionAttempts++;
+                    this.updateStatus(`Reintentando... (${this.connectionAttempts}/${this.maxConnectionAttempts})`);
+                    this.joinGame(hostId);
+                } else if (!this.myPlayerId) {
+                    this.updateStatus('Error: Timeout al conectar');
+                    this.cleanup();
+                }
+            }, 15000);
+
+        } catch (error) {
+            console.error('Error joining game:', error);
+            this.updateStatus('Error al unirse a la partida');
+            this.handlePeerError(error);
+        }
+    }
+setupConnection(conn, hostId) {
+        const connectionTimeout = setTimeout(() => {
+            this.updateStatus('Error: Timeout de conexión');
+            conn.close();
         }, 10000);
 
-    } catch (error) {
-        console.error('Error hosting game:', error);
-        this.updateStatus('Error al crear partida');
-    }
-}
-
-
-    async joinGame(hostId) {
-    try {
-        console.log('Attempting to join game with host ID:', hostId);
-        this.updateStatus('Conectando...', false);
-        
-        this.peer = new Peer();
-        
-        this.peer.on('open', (id) => {
-            console.log('My peer ID:', id);
-            this.myPlayerId = id;
-            this.updateStatus('Conectando al host...', false);
-            
-            // Connect to host
-            const conn = this.peer.connect(hostId);
-            console.log('Connection object created:', conn);
-            
-            conn.on('open', () => {
-                console.log('Connection to host opened');
-                this.updateStatus('Conectado!', true);
-                this.connections.set(conn.peer, conn);
-                this.updatePlayersList();
-                this.game.eventLogger.logSystem('Conectado a la partida');
-            });
-            
-            conn.on('error', (error) => {
-                console.error('Connection error:', error);
-                this.updateStatus('Error: No se pudo conectar al host');
-            });
-            
-            conn.on('data', (data) => {
-                this.handleMessage(data, conn.peer);
-            });
-            
-            conn.on('close', () => {
-                console.log('Connection to host closed');
-                this.handlePlayerDisconnect(conn.peer);
-            });
+        conn.on('open', () => {
+            clearTimeout(connectionTimeout);
+            console.log('Connection to host opened');
+            this.updateStatus('Conectado!', true);
+            this.connections.set(conn.peer, conn);
+            this.updatePlayersList();
+            this.game.eventLogger.logSystem('Conectado a la partida');
         });
 
-        this.peer.on('error', (error) => {
-            console.error('Peer error:', error);
-            this.updateStatus('Error: ' + error.type);
+        conn.on('error', (error) => {
+            clearTimeout(connectionTimeout);
+            console.error('Connection error:', error);
+            this.updateStatus('Error: No se pudo conectar al host');
         });
 
-        // Timeout check
-        setTimeout(() => {
-            if (!this.myPlayerId) {
-                this.updateStatus('Error: Timeout al conectar');
-            }
-        }, 10000);
+        conn.on('data', (data) => {
+            this.handleMessage(data, conn.peer);
+        });
 
-    } catch (error) {
-        console.error('Error joining game:', error);
-        this.updateStatus('Error al unirse a la partida');
+        conn.on('close', () => {
+            clearTimeout(connectionTimeout);
+            console.log('Connection to host closed');
+            this.handlePlayerDisconnect(conn.peer);
+        });
     }
-}
+
+     handlePeerError(error) {
+        let errorMessage = 'Error de conexión';
+        
+        switch (error.type) {
+            case 'peer-unavailable':
+                errorMessage = 'Código de partida no encontrado';
+                break;
+            case 'network':
+                errorMessage = 'Error de red - verifica tu conexión';
+                break;
+            case 'server-error':
+                errorMessage = 'Error del servidor - intenta más tarde';
+                break;
+            case 'unavailable-id':
+                errorMessage = 'ID no disponible - reintentando...';
+                if (this.connectionAttempts < this.maxConnectionAttempts) {
+                    setTimeout(() => {
+                        this.connectionAttempts++;
+                        if (this.isHost) {
+                            this.hostGame();
+                        }
+                    }, 2000);
+                    return;
+                }
+                break;
+            default:
+                errorMessage = `Error: ${error.type || 'Desconocido'}`;
+        }
+        
+        this.updateStatus(errorMessage);
+        
+        // Auto-cleanup after serious errors
+        if (['peer-unavailable', 'network', 'server-error'].includes(error.type)) {
+            setTimeout(() => this.cleanup(), 5000);
+        }
+    }
 
     handleNewPlayer(conn) {
         conn.on('open', () => {
@@ -2444,32 +2578,56 @@ class MultiplayerManager {
             this.handlePlayerDisconnect(conn.peer);
         });
     }
+ handleMessage(data, playerId) {
+        // Validate message structure
+        if (!data || typeof data !== 'object' || !data.type) {
+            console.warn('Invalid message received:', data);
+            return;
+        }
 
-    handleMessage(data, playerId) {
-    switch (data.type) {
-        case 'playerUpdate':
-            this.updateRemotePlayer(playerId, data);
-            break;
-        case 'bulletFired':
-            this.handleRemoteBullet(data);
-            break;
-        case 'enemyDamaged':
-            this.handleEnemyDamage(data);
-            break;
-        case 'planetDamaged':
-            this.handlePlanetDamage(data);
-            break;
-        case 'artifactPickup':
-            this.handleArtifactPickup(data);
-            break;
-        case 'chatMessage':
-            this.game.eventLogger.logSystem(`${playerId.substring(0, 8)}: ${data.message}`);
-            break;
-        case 'gameState':
-            this.handleGameState(data);
-            break;
+        try {
+            switch (data.type) {
+                case 'playerUpdate':
+                    if (data.player && data.player.position && typeof data.player.rotation === 'number') {
+                        this.updateRemotePlayer(playerId, data);
+                    }
+                    break;
+                case 'bulletFired':
+                    if (data.position && data.direction && typeof data.speed === 'number') {
+                        this.handleRemoteBullet(data);
+                    }
+                    break;
+                case 'enemyDamaged':
+                    if (data.enemyPosition && typeof data.damage === 'number') {
+                        this.handleEnemyDamage(data);
+                    }
+                    break;
+                case 'planetDamaged':
+                    if (data.planetPosition && typeof data.damage === 'number') {
+                        this.handlePlanetDamage(data);
+                    }
+                    break;
+                case 'artifactPickup':
+                    if (data.position) {
+                        this.handleArtifactPickup(data);
+                    }
+                    break;
+                case 'chatMessage':
+                    if (data.message && typeof data.message === 'string') {
+                        this.game.eventLogger.logSystem(`${playerId.substring(0, 8)}: ${data.message}`);
+                    }
+                    break;
+                case 'gameState':
+                    this.handleGameState(data);
+                    break;
+                default:
+                    console.warn('Unknown message type:', data.type);
+            }
+        } catch (error) {
+            console.error('Error handling message:', error, data);
+        }
     }
-}
+
 handleRemoteBullet(data) {
     // Create bullet from remote player
     const bulletGeom = new THREE.SphereGeometry(0.2, 8, 8);
@@ -2736,9 +2894,18 @@ broadcastArtifactPickup(position) {
     }
 
     update() {
-        if (this.peer && this.peer.open) {
+        if (this.isConnected()) {
             this.broadcastPlayerUpdate();
             this.cleanupStaleRemotePlayers();
+        } else if (this.peer && this.peer.disconnected) {
+            // Attempt reconnection
+            console.log('Peer disconnected, attempting reconnection...');
+            try {
+                this.peer.reconnect();
+            } catch (error) {
+                console.error('Reconnection failed:', error);
+                this.cleanup();
+            }
         }
     }
 
@@ -2772,6 +2939,11 @@ broadcastArtifactPickup(position) {
           this.animate()
         }
 
+cleanupMultiplayer() {
+    if (this.multiplayerManager) {
+        this.multiplayerManager.cleanup();
+    }
+}
         
 // 2. Add helper method to find planet by name (add to SpaceShooter class)
 findPlanetByName(planetName){
@@ -5383,6 +5555,7 @@ setTimeout(() => {
     this.waypointReachedCooldown=0;
     this.initialWaypointSet=!1; // Resetear bandera de waypoint inicial para permitir nuevo seteo
     
+    this.cleanupMultiplayer();
     // Clean up allies
     this.allies.forEach(ally=>this.scene.remove(ally.mesh));
     this.allies=[];

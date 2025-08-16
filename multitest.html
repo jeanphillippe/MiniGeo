@@ -114,6 +114,7 @@
     <div id="gameContainer">
         <div id="ui">
             <div id="status">Disconnected</div>
+            <button id="testBtn">Test Connection</button>
             <button id="hostBtn">Host Game</button>
             <div>
                 <input id="gameCodeInput" placeholder="Game Code" style="width: 120px;">
@@ -126,6 +127,9 @@
             <div class="player-list">
                 <div>Players:</div>
                 <div id="playersList"></div>
+            </div>
+            <div id="debugInfo" style="margin-top: 10px; font-size: 10px; color: #888;">
+                Debug info will appear here
             </div>
         </div>
         
@@ -171,6 +175,12 @@
                 
                 this.init();
                 this.setupEventListeners();
+                
+                // Initialize with helpful message
+                setTimeout(() => {
+                    this.updateDebugInfo('🎮 Ready to test multiplayer! Click "Test Connection" first.');
+                }, 1000);
+                
                 this.animate();
             }
             
@@ -279,75 +289,190 @@
             async hostGame() {
                 try {
                     this.updateStatus('Starting server...', false);
+                    this.updateDebugInfo('🚀 Creating peer for hosting...');
+                    console.log('Creating peer for hosting...');
                     
                     this.peer = new Peer({
-                        debug: 0,
+                        debug: 2, // Enable debug for troubleshooting
                         config: {
                             iceServers: [
                                 { urls: 'stun:stun.l.google.com:19302' },
-                                { urls: 'stun:stun1.l.google.com:19302' }
-                            ]
+                                { urls: 'stun:stun1.l.google.com:19302' },
+                                { urls: 'stun:global.stun.twilio.com:3478' },
+                                { urls: 'stun:stun.cloudflare.com:3478' }
+                            ],
+                            iceCandidatePoolSize: 10
                         }
                     });
                     
                     this.peer.on('open', (id) => {
                         this.myPlayerId = id;
                         this.isHost = true;
-                        this.updateStatus('Server active', true);
+                        this.updateStatus('Server active - Ready for connections', true);
                         this.showGameCode(id);
-                        console.log('Server active:', id);
+                        this.updateDebugInfo(`✅ Server active with ID: ${id.substring(0, 8)}...`);
+                        console.log('✅ Server active with ID:', id);
                     });
                     
                     this.peer.on('connection', (conn) => {
-                        console.log('Incoming connection from:', conn.peer);
-                        this.handleNewConnection(conn);
+                        this.updateDebugInfo(`📞 Incoming connection from: ${conn.peer.substring(0, 8)}`);
+                        console.log('📞 Incoming connection from:', conn.peer);
+                        this.updateStatus('Player connecting...', true);
+                        
+                        // Add a small delay to ensure connection is stable
+                        setTimeout(() => {
+                            this.handleNewConnection(conn);
+                        }, 500);
                     });
                     
                     this.peer.on('error', (error) => {
-                        console.error('Peer error:', error);
-                        this.updateStatus(`Error: ${error.type || 'unknown'}`);
+                        this.updateDebugInfo(`❌ Peer error: ${error.type || error.message || 'unknown'}`);
+                        console.error('❌ Peer error:', error);
+                        this.updateStatus(`Error: ${error.type || error.message || 'unknown'}`, false);
+                        
+                        // Retry for certain errors
+                        if (error.type === 'network' || error.type === 'server-error') {
+                            this.updateDebugInfo('🔄 Retrying in 3 seconds...');
+                            console.log('🔄 Retrying in 3 seconds...');
+                            setTimeout(() => this.hostGame(), 3000);
+                        }
+                    });
+                    
+                    this.peer.on('disconnected', () => {
+                        this.updateDebugInfo('⚠️ Peer disconnected, attempting to reconnect...');
+                        console.log('⚠️ Peer disconnected, attempting to reconnect...');
+                        this.peer.reconnect();
                     });
                     
                 } catch (error) {
-                    console.error('Host error:', error);
-                    this.updateStatus('Host failed');
+                    this.updateDebugInfo(`💥 Host error: ${error.message}`);
+                    console.error('💥 Host error:', error);
+                    this.updateStatus('Host failed - Try again');
                 }
             }
             
             async joinGame(hostId) {
                 try {
-                    this.updateStatus('Connecting...', false);
+                    if (!hostId || hostId.trim() === '') {
+                        this.updateStatus('Please enter a valid game code');
+                        this.updateDebugInfo('❌ No game code provided');
+                        return;
+                    }
+                    
+                    this.updateStatus('Initializing connection...', false);
+                    this.updateDebugInfo(`🔗 Attempting to join: ${hostId.substring(0, 8)}...`);
+                    console.log('🔗 Attempting to join:', hostId);
                     
                     this.peer = new Peer({
-                        debug: 0,
+                        debug: 2,
                         config: {
                             iceServers: [
                                 { urls: 'stun:stun.l.google.com:19302' },
-                                { urls: 'stun:stun1.l.google.com:19302' }
-                            ]
+                                { urls: 'stun:stun1.l.google.com:19302' },
+                                { urls: 'stun:global.stun.twilio.com:3478' },
+                                { urls: 'stun:stun.cloudflare.com:3478' }
+                            ],
+                            iceCandidatePoolSize: 10
                         }
                     });
                     
                     this.peer.on('open', (id) => {
                         this.myPlayerId = id;
-                        console.log('Client ready:', id);
+                        this.updateDebugInfo(`✅ Client peer ready: ${id.substring(0, 8)}...`);
+                        console.log('✅ Client peer ready:', id);
+                        this.updateStatus('Connecting to host...', false);
                         
-                        const conn = this.peer.connect(hostId, {
-                            reliable: true,
-                            serialization: 'json'
-                        });
-                        
-                        this.handleNewConnection(conn);
+                        // Wait a moment before attempting connection
+                        setTimeout(() => {
+                            this.attemptConnection(hostId, 1);
+                        }, 1000);
                     });
                     
                     this.peer.on('error', (error) => {
-                        console.error('Join error:', error);
-                        this.updateStatus(`Error: ${error.type || 'unknown'}`);
+                        this.updateDebugInfo(`❌ Client peer error: ${error.type || error.message || 'unknown'}`);
+                        console.error('❌ Client peer error:', error);
+                        this.updateStatus(`Error: ${error.type || error.message || 'unknown'}`, false);
+                    });
+                    
+                    this.peer.on('disconnected', () => {
+                        this.updateDebugInfo('⚠️ Client disconnected, attempting to reconnect...');
+                        console.log('⚠️ Client disconnected, attempting to reconnect...');
+                        this.peer.reconnect();
                     });
                     
                 } catch (error) {
-                    console.error('Join error:', error);
-                    this.updateStatus('Join failed');
+                    this.updateDebugInfo(`💥 Join error: ${error.message}`);
+                    console.error('💥 Join error:', error);
+                    this.updateStatus('Join failed - Try again');
+                }
+            }
+            
+            attemptConnection(hostId, attempt) {
+                const maxAttempts = 3;
+                this.updateDebugInfo(`🔄 Connection attempt ${attempt}/${maxAttempts} to: ${hostId.substring(0, 8)}...`);
+                console.log(`🔄 Connection attempt ${attempt}/${maxAttempts} to: ${hostId}`);
+                this.updateStatus(`Connecting... (${attempt}/${maxAttempts})`, false);
+                
+                try {
+                    const conn = this.peer.connect(hostId, {
+                        reliable: true,
+                        serialization: 'json',
+                        metadata: { attempt: attempt }
+                    });
+                    
+                    const timeout = setTimeout(() => {
+                        this.updateDebugInfo(`⏰ Connection attempt ${attempt} timed out`);
+                        console.log(`⏰ Connection attempt ${attempt} timed out`);
+                        if (attempt < maxAttempts) {
+                            this.updateDebugInfo(`🔄 Retrying in ${attempt * 2} seconds...`);
+                            console.log(`🔄 Retrying in ${attempt * 2} seconds...`);
+                            setTimeout(() => {
+                                this.attemptConnection(hostId, attempt + 1);
+                            }, attempt * 2000);
+                        } else {
+                            this.updateStatus('Connection failed - Host unreachable');
+                            this.updateDebugInfo('❌ All connection attempts failed');
+                            console.log('❌ All connection attempts failed');
+                        }
+                    }, 10000 + (attempt * 5000)); // Increase timeout with each attempt
+                    
+                    conn.on('open', () => {
+                        clearTimeout(timeout);
+                        this.updateDebugInfo(`🎉 Connected successfully on attempt ${attempt}!`);
+                        console.log(`🎉 Connected successfully on attempt ${attempt}!`);
+                        this.updateStatus('Connected!', true);
+                        this.handleNewConnection(conn);
+                    });
+                    
+                    conn.on('error', (error) => {
+                        clearTimeout(timeout);
+                        this.updateDebugInfo(`❌ Connection error on attempt ${attempt}: ${error.type || error.message}`);
+                        console.error(`❌ Connection error on attempt ${attempt}:`, error);
+                        
+                        if (error.type === 'peer-unavailable') {
+                            this.updateStatus('Host not found - Check the code');
+                            this.updateDebugInfo('💡 Make sure the host clicked "Host Game" first');
+                        } else if (attempt < maxAttempts) {
+                            this.updateDebugInfo(`🔄 Retrying in ${attempt * 2} seconds...`);
+                            console.log(`🔄 Retrying in ${attempt * 2} seconds...`);
+                            setTimeout(() => {
+                                this.attemptConnection(hostId, attempt + 1);
+                            }, attempt * 2000);
+                        } else {
+                            this.updateStatus(`Connection failed: ${error.type || 'unknown'}`);
+                        }
+                    });
+                    
+                } catch (connectError) {
+                    this.updateDebugInfo(`💥 Error creating connection on attempt ${attempt}: ${connectError.message}`);
+                    console.error(`💥 Error creating connection on attempt ${attempt}:`, connectError);
+                    if (attempt < maxAttempts) {
+                        setTimeout(() => {
+                            this.attemptConnection(hostId, attempt + 1);
+                        }, attempt * 2000);
+                    } else {
+                        this.updateStatus('Connection error');
+                    }
                 }
             }
             
@@ -356,6 +481,7 @@
                     this.connections.set(conn.peer, conn);
                     this.updateStatus(`Connected (${this.connections.size + 1} players)`, true);
                     this.updatePlayersList();
+                    this.updateDebugInfo(`✅ Connection established with: ${conn.peer.substring(0, 8)}`);
                     console.log('Connection opened with:', conn.peer);
                 });
                 
@@ -364,11 +490,13 @@
                 });
                 
                 conn.on('close', () => {
+                    this.updateDebugInfo(`📴 Connection closed: ${conn.peer.substring(0, 8)}`);
                     console.log('Connection closed:', conn.peer);
                     this.handlePlayerDisconnect(conn.peer);
                 });
                 
                 conn.on('error', (error) => {
+                    this.updateDebugInfo(`❌ Connection error: ${error.type || error.message}`);
                     console.error('Connection error:', error);
                 });
             }
@@ -607,6 +735,10 @@
                 });
                 
                 // UI buttons
+                document.getElementById('testBtn').addEventListener('click', () => {
+                    this.testConnection();
+                });
+                
                 document.getElementById('hostBtn').addEventListener('click', () => {
                     this.hostGame();
                 });
@@ -621,7 +753,16 @@
                 document.getElementById('copyBtn').addEventListener('click', () => {
                     const code = document.getElementById('codeText').textContent;
                     navigator.clipboard.writeText(code).then(() => {
-                        console.log('Code copied to clipboard');
+                        this.updateDebugInfo('Code copied to clipboard');
+                    }).catch(() => {
+                        // Fallback for older browsers
+                        const textArea = document.createElement('textarea');
+                        textArea.value = code;
+                        document.body.appendChild(textArea);
+                        textArea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(textArea);
+                        this.updateDebugInfo('Code copied to clipboard (fallback)');
                     });
                 });
                 
@@ -631,6 +772,73 @@
                     this.camera.updateProjectionMatrix();
                     this.renderer.setSize(window.innerWidth, window.innerHeight);
                 });
+            }
+            
+            // Debug and utility functions
+            testConnection() {
+                this.updateStatus('Testing connection...', false);
+                this.updateDebugInfo('Starting connection test...');
+                
+                // Test basic internet connectivity
+                fetch('https://www.google.com/favicon.ico', { mode: 'no-cors' })
+                    .then(() => {
+                        this.updateDebugInfo('✅ Internet connection OK');
+                        this.testPeerJS();
+                    })
+                    .catch(() => {
+                        this.updateDebugInfo('❌ No internet connection');
+                        this.updateStatus('No internet connection');
+                    });
+            }
+            
+            testPeerJS() {
+                this.updateDebugInfo('Testing PeerJS...');
+                
+                const testPeer = new Peer({
+                    debug: 1,
+                    config: {
+                        iceServers: [
+                            { urls: 'stun:stun.l.google.com:19302' }
+                        ]
+                    }
+                });
+                
+                testPeer.on('open', (id) => {
+                    this.updateDebugInfo(`✅ PeerJS working - ID: ${id.substring(0, 8)}...`);
+                    this.updateStatus('Connection test passed!', true);
+                    testPeer.destroy();
+                    setTimeout(() => {
+                        this.updateStatus('Ready to host or join');
+                    }, 2000);
+                });
+                
+                testPeer.on('error', (error) => {
+                    this.updateDebugInfo(`❌ PeerJS error: ${error.type || error.message}`);
+                    this.updateStatus('Connection test failed');
+                    testPeer.destroy();
+                });
+                
+                // Timeout the test
+                setTimeout(() => {
+                    if (testPeer && !testPeer.destroyed) {
+                        this.updateDebugInfo('⏰ Connection test timed out');
+                        this.updateStatus('Connection test timed out');
+                        testPeer.destroy();
+                    }
+                }, 10000);
+            }
+            
+            updateDebugInfo(message) {
+                const debugDiv = document.getElementById('debugInfo');
+                const timestamp = new Date().toLocaleTimeString();
+                debugDiv.innerHTML = `[${timestamp}] ${message}<br>` + debugDiv.innerHTML;
+                console.log(`[${timestamp}] ${message}`);
+                
+                // Keep only last 10 messages
+                const lines = debugDiv.innerHTML.split('<br>');
+                if (lines.length > 10) {
+                    debugDiv.innerHTML = lines.slice(0, 10).join('<br>');
+                }
             }
             
             animate() {

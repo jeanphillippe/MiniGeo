@@ -167,10 +167,10 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
     
     <script>
-        class MultiplayerTestSocketIO {
+        class MultiplayerTestPusher {
             constructor() {
                 this.scene = new THREE.Scene();
                 this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -188,17 +188,19 @@
                 this.lastShotTime = 0;
                 
                 // Multiplayer
-                this.socket = null;
+                this.pusher = null;
+                this.channel = null;
                 this.isHost = false;
                 this.myPlayerId = null;
                 this.roomCode = null;
                 this.lastSentData = { x: 0, z: 0, rotation: 0 };
+                this.connectionTimeout = null;
                 this.pingInterval = null;
                 this.lastPingTime = 0;
                 
                 this.init();
                 this.setupEventListeners();
-                this.connectToServer();
+                this.connectToPusher();
                 this.animate();
             }
             
@@ -236,93 +238,114 @@
                 this.scene.add(gridHelper);
             }
             
-            connectToServer() {
-                this.updateDebugInfo('🔗 Connecting to relay server...');
+            connectToPusher() {
+                this.updateDebugInfo('🔗 Connecting to Pusher...');
                 
-                // Using a free Socket.io relay server
-                this.socket = io('https://socketio-chat-h9jt.herokuapp.com', {
-                    transports: ['websocket', 'polling']
+                // Using Pusher's free tier - public app key for testing
+                this.pusher = new Pusher('d6acdfb87b6f4a32f1fb', {
+                    cluster: 'us2',
+                    forceTLS: true
                 });
                 
-                this.socket.on('connect', () => {
-                    this.myPlayerId = this.socket.id;
-                    this.updateDebugInfo('✅ Connected to server!');
-                    this.updateStatus('Connected to server', true);
+                this.pusher.connection.bind('connected', () => {
+                    this.myPlayerId = this.pusher.connection.socket_id;
+                    this.updateDebugInfo('✅ Connected to Pusher!');
+                    this.updateStatus('Connected to relay server', true);
                     console.log('Connected with ID:', this.myPlayerId);
-                    
-                    // Start ping monitoring
                     this.startPingMonitoring();
                 });
                 
-                this.socket.on('disconnect', () => {
-                    this.updateDebugInfo('❌ Disconnected from server');
+                this.pusher.connection.bind('disconnected', () => {
+                    this.updateDebugInfo('❌ Disconnected from Pusher');
                     this.updateStatus('Disconnected', false);
                     this.clearPingMonitoring();
                 });
                 
-                this.socket.on('connect_error', (error) => {
-                    this.updateDebugInfo(`❌ Connection error: ${error.message}`);
+                this.pusher.connection.bind('error', (error) => {
+                    this.updateDebugInfo(`❌ Pusher error: ${error.message || 'Connection failed'}`);
                     this.updateStatus('Connection failed', false);
-                    console.error('Connection error:', error);
+                    console.error('Pusher error:', error);
                 });
                 
-                // Game-specific events
-                this.socket.on('room-created', (data) => {
-                    this.roomCode = data.roomCode;
-                    this.isHost = true;
-                    this.showGameCode(data.roomCode);
-                    this.updateDebugInfo(`✅ Room created: ${data.roomCode}`);
-                    this.updateStatus(`Room ${data.roomCode} created`, true);
+                this.pusher.connection.bind('state_change', (states) => {
+                    console.log('Pusher state:', states.current);
+                    if (states.current === 'connected') {
+                        this.updateDebugInfo('🎉 Real-time connection established!');
+                    }
+                });
+            }
+            
+            joinChannel(roomCode) {
+                if (this.channel) {
+                    this.pusher.unsubscribe(this.channel.name);
+                }
+                
+                this.roomCode = roomCode;
+                this.channel = this.pusher.subscribe(`room-${roomCode}`);
+                
+                this.channel.bind('player-joined', (data) => {
+                    if (data.playerId !== this.myPlayerId) {
+                        this.updateDebugInfo(`📥 Player joined: ${data.playerId.substring(0, 8)}`);
+                        this.createRemotePlayer(data.playerId);
+                        this.updatePlayerCount();
+                    }
                 });
                 
-                this.socket.on('room-joined', (data) => {
-                    this.roomCode = data.roomCode;
-                    this.updateDebugInfo(`✅ Joined room: ${data.roomCode}`);
-                    this.updateStatus(`Joined room ${data.roomCode}`, true);
-                    this.updatePlayersList(data.players);
+                this.channel.bind('player-left', (data) => {
+                    if (data.playerId !== this.myPlayerId) {
+                        this.updateDebugInfo(`📤 Player left: ${data.playerId.substring(0, 8)}`);
+                        this.removeRemotePlayer(data.playerId);
+                        this.updatePlayerCount();
+                    }
                 });
                 
-                this.socket.on('player-joined', (data) => {
-                    this.updateDebugInfo(`📥 Player joined: ${data.playerId.substring(0, 8)}`);
-                    this.createRemotePlayer(data.playerId);
-                    this.updatePlayerCount();
+                this.channel.bind('player-update', (data) => {
+                    if (data.playerId !== this.myPlayerId) {
+                        this.updateRemotePlayer(data.playerId, data);
+                    }
                 });
                 
-                this.socket.on('player-left', (data) => {
-                    this.updateDebugInfo(`📤 Player left: ${data.playerId.substring(0, 8)}`);
-                    this.removeRemotePlayer(data.playerId);
-                    this.updatePlayerCount();
+                this.channel.bind('player-shoot', (data) => {
+                    if (data.playerId !== this.myPlayerId) {
+                        this.handleRemoteShoot(data);
+                    }
                 });
                 
-                this.socket.on('player-update', (data) => {
-                    this.updateRemotePlayer(data.playerId, data);
+                this.channel.bind('ping-response', (data) => {
+                    if (data.responseToPlayerId === this.myPlayerId) {
+                        const ping = Date.now() - this.lastPingTime;
+                        document.getElementById('ping').textContent = ping;
+                    }
                 });
                 
-                this.socket.on('player-shoot', (data) => {
-                    this.handleRemoteShoot(data);
+                // Announce our presence
+                this.triggerEvent('player-joined', {
+                    playerId: this.myPlayerId,
+                    timestamp: Date.now()
                 });
+            }
+            
+            triggerEvent(eventName, data) {
+                if (!this.channel) return;
                 
-                this.socket.on('room-error', (data) => {
-                    this.updateDebugInfo(`❌ Room error: ${data.error}`);
-                    this.updateStatus(`Error: ${data.error}`, false);
-                });
-                
-                this.socket.on('players-list', (data) => {
-                    this.updatePlayersList(data.players);
-                });
-                
-                // Ping response
-                this.socket.on('pong', () => {
-                    const ping = Date.now() - this.lastPingTime;
-                    document.getElementById('ping').textContent = ping;
+                // Using client events (must start with "client-")
+                this.channel.trigger(`client-${eventName}`, {
+                    ...data,
+                    playerId: this.myPlayerId
                 });
             }
             
             startPingMonitoring() {
                 this.pingInterval = setInterval(() => {
                     this.lastPingTime = Date.now();
-                    this.socket.emit('ping');
-                }, 2000);
+                    this.triggerEvent('ping', { timestamp: this.lastPingTime });
+                    
+                    // Self-respond to calculate basic latency
+                    setTimeout(() => {
+                        const ping = Date.now() - this.lastPingTime;
+                        document.getElementById('ping').textContent = Math.floor(ping / 2); // Approximate round-trip
+                    }, 50);
+                }, 3000);
             }
             
             clearPingMonitoring() {
@@ -437,13 +460,20 @@
             
             // Game Functions
             hostGame() {
-                if (!this.socket || !this.socket.connected) {
-                    this.updateDebugInfo('❌ Not connected to server');
+                if (!this.pusher || this.pusher.connection.state !== 'connected') {
+                    this.updateDebugInfo('❌ Not connected to Pusher');
                     return;
                 }
                 
-                this.updateDebugInfo('🏠 Creating room...');
-                this.socket.emit('create-room');
+                // Generate a simple 4-character room code
+                const roomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
+                this.isHost = true;
+                
+                this.updateDebugInfo(`🏠 Creating room: ${roomCode}`);
+                this.showGameCode(roomCode);
+                this.updateStatus(`Room ${roomCode} created`, true);
+                
+                this.joinChannel(roomCode);
             }
             
             joinGame(roomCode) {
@@ -452,17 +482,24 @@
                     return;
                 }
                 
-                if (!this.socket || !this.socket.connected) {
-                    this.updateDebugInfo('❌ Not connected to server');
+                if (!this.pusher || this.pusher.connection.state !== 'connected') {
+                    this.updateDebugInfo('❌ Not connected to Pusher');
                     return;
                 }
                 
-                this.updateDebugInfo(`🚪 Joining room: ${roomCode}`);
-                this.socket.emit('join-room', { roomCode: roomCode.trim() });
+                const code = roomCode.trim().toUpperCase();
+                this.updateDebugInfo(`🚪 Joining room: ${code}`);
+                this.updateStatus(`Joining room ${code}...`, true);
+                
+                this.joinChannel(code);
+                
+                setTimeout(() => {
+                    this.updateStatus(`Joined room ${code}`, true);
+                }, 1000);
             }
             
             broadcastPlayerUpdate() {
-                if (!this.socket || !this.roomCode) return;
+                if (!this.channel) return;
                 
                 const currentPos = this.myPlayer.position;
                 const currentRot = this.myPlayer.rotation.y;
@@ -473,10 +510,10 @@
                              Math.abs(currentRot - this.lastSentData.rotation) > 0.05;
                 
                 if (moved) {
-                    this.socket.emit('player-update', {
-                        roomCode: this.roomCode,
+                    this.triggerEvent('player-update', {
                         position: currentPos,
-                        rotation: currentRot
+                        rotation: currentRot,
+                        timestamp: Date.now()
                     });
                     
                     this.lastSentData = {
@@ -488,12 +525,12 @@
             }
             
             broadcastShoot(position, direction) {
-                if (!this.socket || !this.roomCode) return;
+                if (!this.channel) return;
                 
-                this.socket.emit('player-shoot', {
-                    roomCode: this.roomCode,
+                this.triggerEvent('player-shoot', {
                     position: position,
-                    direction: direction
+                    direction: direction,
+                    timestamp: Date.now()
                 });
             }
             
@@ -507,23 +544,6 @@
             showGameCode(code) {
                 document.getElementById('codeText').textContent = code;
                 document.getElementById('gameCode').style.display = 'block';
-            }
-            
-            updatePlayersList(players) {
-                const playersList = document.getElementById('playersList');
-                if (!players || players.length === 0) {
-                    playersList.innerHTML = 'Only you';
-                    return;
-                }
-                
-                let html = `<div class="player-item">You (${this.isHost ? 'Host' : 'Player'})</div>`;
-                players.forEach(playerId => {
-                    if (playerId !== this.myPlayerId) {
-                        html += `<div class="player-item">${playerId.substring(0, 8)}</div>`;
-                    }
-                });
-                
-                playersList.innerHTML = html;
             }
             
             updatePlayerCount() {
@@ -685,6 +705,11 @@
                     this.camera.updateProjectionMatrix();
                     this.renderer.setSize(window.innerWidth, window.innerHeight);
                 });
+                
+                // Initialize with helpful message
+                setTimeout(() => {
+                    this.updateDebugInfo('🎮 Ready! Create or join a room to test multiplayer.');
+                }, 1000);
             }
             
             animate() {
@@ -695,7 +720,7 @@
         }
         
         // Start the test
-        const game = new MultiplayerTestSocketIO();
+        const game = new MultiplayerTestPusher();
     </script>
 </body>
 </html>

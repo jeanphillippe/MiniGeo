@@ -2158,7 +2158,22 @@ class MultiplayerManager {
         this.lastSentPosition = { x: 0, z: 0, rotation: 0 };
         this.setupUI();
     }
-
+broadcastMessage(message) {
+    this.connections.forEach(conn => {
+        if (conn.open) {
+            try {
+                conn.send(message);
+            } catch (error) {
+                console.warn('Failed to broadcast message:', error);
+            }
+        }
+    });
+}
+handleGameState(data) {
+    if (data.player && data.player.id !== this.myPlayerId) {
+        this.updateRemotePlayer(data.player.id, { player: data.player });
+    }
+}
     setupUI() {
         const mpUI = document.createElement('div');
         mpUI.id = 'multiplayerUI';
@@ -2495,49 +2510,59 @@ class MultiplayerManager {
     }
 
     handleMessage(data, playerId) {
-        switch (data.type) {
-            case 'playerUpdate':
-                this.updateRemotePlayer(playerId, data);
-                break;
-            case 'chatMessage':
-                this.game.eventLogger.logSystem(`${playerId.substring(0, 8)}: ${data.message}`);
-                break;
-            case 'gameState':
-                this.handleGameState(data);
-                break;
-        }
+    switch (data.type) {
+        case 'playerUpdate':
+            this.updateRemotePlayer(playerId, data);
+            break;
+        case 'playerJoined':
+            this.updateRemotePlayer(playerId, data);
+            this.game.eventLogger.logSystem(`Jugador ${playerId.substring(0, 8)} se unió`);
+            break;
+        case 'chatMessage':
+            this.game.eventLogger.logSystem(`${playerId.substring(0, 8)}: ${data.message}`);
+            break;
+        case 'gameState':
+            this.handleGameState(data);
+            break;
     }
+}
 
     sendGameState(conn) {
-        const gameState = {
-            type: 'gameState',
-            player: {
-                id: this.myPlayerId,
-                position: this.game.playerShip.position,
-                rotation: this.game.playerShip.rotation.y,
-                health: this.game.player.health,
-                score: this.game.player.score
-            }
-        };
-        conn.send(gameState);
-    }
+    const gameState = {
+        type: 'gameState',
+        player: {
+            id: this.myPlayerId,
+            position: this.game.playerShip.position,
+            rotation: this.game.playerShip.rotation.y,
+            health: this.game.player.health,
+            score: this.game.player.score,
+            shipType: this.game.selectedShipType
+        }
+    };
+    conn.send(gameState);
+}
 
     updateRemotePlayer(playerId, data) {
-        if (!this.remotePlayers.has(playerId)) {
-            const remoteShip = this.game.createRemotePlayerShip();
-            this.remotePlayers.set(playerId, {
-                ship: remoteShip,
-                lastUpdate: Date.now(),
-                ...data.player
-            });
-            this.game.scene.add(remoteShip);
-        }
-
-        const remotePlayer = this.remotePlayers.get(playerId);
-        remotePlayer.ship.position.copy(data.player.position);
-        remotePlayer.ship.rotation.y = data.player.rotation;
-        remotePlayer.lastUpdate = Date.now();
+    if (!this.remotePlayers.has(playerId)) {
+        const shipType = data.player.shipType || 'player';
+        const remoteShip = this.game.createRemotePlayerShip(shipType);
+        this.remotePlayers.set(playerId, {
+            ship: remoteShip,
+            lastUpdate: Date.now(),
+            ...data.player
+        });
+        this.game.scene.add(remoteShip);
     }
+
+    const remotePlayer = this.remotePlayers.get(playerId);
+    if (data.player.position) {
+        remotePlayer.ship.position.copy(data.player.position);
+    }
+    if (data.player.rotation !== undefined) {
+        remotePlayer.ship.rotation.y = data.player.rotation;
+    }
+    remotePlayer.lastUpdate = Date.now();
+}
 
     broadcastPlayerUpdate() {
         if (this.connections.size === 0) return;
@@ -2640,25 +2665,20 @@ class MultiplayerManager {
           this.animate()
         }
 
-      createRemotePlayerShip() {
-    const remoteShip = ShipFactory.create(this.selectedShipType || 'player');
+      createRemotePlayerShip(shipType = 'player') {
+    const remoteShip = ShipFactory.create(shipType);
     remoteShip.userData.isRemotePlayer = true;
-    
-    // Make remote players slightly transparent and different colored to distinguish them
     remoteShip.traverse((child) => {
         if (child.isMesh) {
             child.material = child.material.clone();
             child.material.transparent = true;
             child.material.opacity = 0.8;
-            
-            // Tint remote players with a different color
             if (child.material.color) {
                 child.material.color.multiplyScalar(0.7);
-                child.material.color.r += 0.3; // Add some red tint
+                child.material.color.r += 0.3;
             }
         }
     });
-    
     return remoteShip;
 }  
 // 2. Add helper method to find planet by name (add to SpaceShooter class)
@@ -5527,31 +5547,26 @@ async selectShip(shipType){
     this.audioManager.playPowerUp();
     this.gameStarted = true;
       if (this.multiplayerManager && this.multiplayerManager.connections.size > 0) {
-        console.log('🎮 Game started, notifying other players');
-        
-        // Enviar estado inicial a todos
-        this.multiplayerManager.connections.forEach(conn => {
-            setTimeout(() => {
-                this.multiplayerManager.sendGameState(conn);
-            }, 1000);
-        });
-        
-        // Broadcast que entramos al juego
-        this.multiplayerManager.broadcastMessage({
-            type: 'playerJoined',
-            player: {
-                id: this.multiplayerManager.myPlayerId,
-                position: {
-                    x: this.playerShip.position.x,
-                    y: this.playerShip.position.y,
-                    z: this.playerShip.position.z
-                },
-                rotation: this.playerShip.rotation.y
-            }
-        });
-        
-        this.eventLogger.logSystem('🌐 Sincronizando con otros jugadores...');
-    }
+    console.log('🎮 Game started, notifying other players');
+    this.multiplayerManager.connections.forEach(conn => {
+        setTimeout(() => {
+            this.multiplayerManager.sendGameState(conn);
+        }, 1000);
+    });
+    
+    // Send player joined message
+    const joinMessage = {
+        type: 'playerJoined',
+        player: {
+            id: this.multiplayerManager.myPlayerId,
+            position: this.playerShip.position,
+            rotation: this.playerShip.rotation.y,
+            shipType: this.selectedShipType
+        }
+    };
+    this.multiplayerManager.broadcastMessage(joinMessage);
+    this.eventLogger.logSystem('🌐 Sincronizando con otros jugadores...');
+}
     if(!this.initialWaypointSet){
         const asteriaPlanet = this.findPlanetByName('Asteria Prime');
         if(asteriaPlanet){

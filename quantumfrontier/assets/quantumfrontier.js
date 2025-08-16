@@ -2979,7 +2979,7 @@ showWaypointSetFeedback(x, y) {
     this.enemies=[];
     this.planets=[];
     this.previewRenderer = null;
-       this.multiplayerManager = new MultiplayerManager(this);
+       
 this.previewScenes = new Map();
 this.previewAnimationId = null;
     this.stars=[];
@@ -3007,7 +3007,8 @@ this.tractorBeam = null;
     this.wasPlayerVisible=!0;
     this.visitedPlanets=new Set();
     this.typewriterSpeed=7
-    this.selectedShipType = 'player'; ;
+    this.selectedShipType = 'player'; 
+      this.multiplayerManager = new MultiplayerManager(this);
 }
         initializeScene() {
           this.camera.position.set(0, 60, 60);
@@ -5525,7 +5526,32 @@ async selectShip(shipType){
     await this.audioManager.start();
     this.audioManager.playPowerUp();
     this.gameStarted = true;
-    
+      if (this.multiplayerManager && this.multiplayerManager.connections.size > 0) {
+        console.log('🎮 Game started, notifying other players');
+        
+        // Enviar estado inicial a todos
+        this.multiplayerManager.connections.forEach(conn => {
+            setTimeout(() => {
+                this.multiplayerManager.sendGameState(conn);
+            }, 1000);
+        });
+        
+        // Broadcast que entramos al juego
+        this.multiplayerManager.broadcastMessage({
+            type: 'playerJoined',
+            player: {
+                id: this.multiplayerManager.myPlayerId,
+                position: {
+                    x: this.playerShip.position.x,
+                    y: this.playerShip.position.y,
+                    z: this.playerShip.position.z
+                },
+                rotation: this.playerShip.rotation.y
+            }
+        });
+        
+        this.eventLogger.logSystem('🌐 Sincronizando con otros jugadores...');
+    }
     if(!this.initialWaypointSet){
         const asteriaPlanet = this.findPlanetByName('Asteria Prime');
         if(asteriaPlanet){

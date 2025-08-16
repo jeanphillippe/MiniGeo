@@ -2170,7 +2170,7 @@ class MultiplayerManager {
                 <div id="mpControls">
                     <button id="hostGameBtn">Crear Partida</button>
                     <div id="joinGameDiv">
-                        <input id="gameCodeInput" placeholder="Código de partida" maxlength="10">
+                        <input id="gameCodeInput" placeholder="Código de partida">
                         <button id="joinGameBtn">Unirse</button>
                     </div>
                     <div id="gameCodeDisplay" style="display:none;">

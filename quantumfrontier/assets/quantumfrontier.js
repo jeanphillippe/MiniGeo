@@ -2156,8 +2156,6 @@ class MultiplayerManager {
         this.myPlayerId = null;
         this.remotePlayers = new Map();
         this.lastSentPosition = { x: 0, z: 0, rotation: 0 };
-        this.connectionRetries = 0;
-        this.maxRetries = 3;
         this.setupUI();
     }
 
@@ -2171,13 +2169,15 @@ class MultiplayerManager {
                 <div id="mpControls">
                     <button id="hostGameBtn">Crear Partida</button>
                     <div id="joinGameDiv">
-                        <input id="gameCodeInput" placeholder="Código de partida" maxlength="20">
+                        <input id="gameCodeInput" placeholder="Código de partida">
                         <button id="joinGameBtn">Unirse</button>
                     </div>
                     <div id="gameCodeDisplay" style="display:none;">
                         <strong>Código: <span id="gameCode"></span></strong>
-                        <button id="copyCodeBtn">Copiar</button>
-                        <button id="shareLinkBtn">Compartir Link</button>
+                        <div>
+                            <button id="copyCodeBtn">Copiar</button>
+                            <button id="shareLinkBtn">Compartir Link</button>
+                        </div>
                     </div>
                 </div>
                 <div id="playersList">
@@ -2266,6 +2266,46 @@ class MultiplayerManager {
                 margin: 2px 0;
                 font-family: 'Courier New', monospace;
                 font-size: 11px;
+                box-sizing: border-box;
+            }
+            
+            #gameCodeDisplay {
+                background: rgba(0, 255, 136, 0.1);
+                border: 1px solid rgba(0, 255, 136, 0.3);
+                border-radius: 8px;
+                padding: 10px;
+                margin: 10px 0;
+                text-align: center;
+            }
+            
+            #gameCodeDisplay strong {
+                display: block;
+                margin-bottom: 8px;
+                color: #00ff88;
+                font-size: 12px;
+            }
+            
+            #gameCode {
+                font-family: monospace;
+                font-size: 14px;
+                color: #ffffff;
+                background: rgba(0, 0, 0, 0.3);
+                padding: 4px 8px;
+                border-radius: 4px;
+                word-break: break-all;
+            }
+            
+            #gameCodeDisplay button {
+                background: rgba(0, 242, 254, 0.2);
+                border: 1px solid rgba(0, 242, 254, 0.6);
+                color: #00f2fe;
+                padding: 6px 12px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 11px;
+                margin: 2px;
+                width: calc(50% - 4px);
+                display: inline-block;
             }
             
             #playersList {
@@ -2284,12 +2324,6 @@ class MultiplayerManager {
                 margin: 2px 0;
                 border-radius: 3px;
                 font-size: 11px;
-            }
-            
-            .remote-player {
-                position: absolute;
-                pointer-events: none;
-                transform-origin: center;
             }
         `;
         
@@ -2317,13 +2351,20 @@ class MultiplayerManager {
         document.getElementById('copyCodeBtn').addEventListener('click', () => {
             const code = document.getElementById('gameCode').textContent;
             this.copyToClipboard(code);
+            this.updateStatus('¡Código copiado!', true);
+            setTimeout(() => {
+                this.updateStatus(`Conectado (${this.connections.size + 1} jugadores)`, true);
+            }, 2000);
         });
 
         document.getElementById('shareLinkBtn').addEventListener('click', () => {
             const code = document.getElementById('gameCode').textContent;
             const gameUrl = `${window.location.origin}${window.location.pathname}?game=${code}`;
             this.copyToClipboard(gameUrl);
-            this.updateStatus('¡Link copiado al portapapeles!', true);
+            this.updateStatus('¡Link copiado!', true);
+            setTimeout(() => {
+                this.updateStatus(`Conectado (${this.connections.size + 1} jugadores)`, true);
+            }, 2000);
         });
     }
 
@@ -2332,9 +2373,8 @@ class MultiplayerManager {
         const gameCode = urlParams.get('game');
         if (gameCode) {
             document.getElementById('gameCodeInput').value = gameCode;
-            // Auto-join after a short delay to ensure everything is loaded
             setTimeout(() => {
-                if (confirm(`¿Unirse a la partida ${gameCode}?`)) {
+                if (confirm(`¿Unirse a la partida?\nCódigo: ${gameCode.substring(0, 8)}...`)) {
                     this.joinGame(gameCode);
                 }
             }, 1000);
@@ -2346,7 +2386,6 @@ class MultiplayerManager {
             if (navigator.clipboard && window.isSecureContext) {
                 await navigator.clipboard.writeText(text);
             } else {
-                // Fallback for older browsers or non-HTTPS
                 const textArea = document.createElement('textarea');
                 textArea.value = text;
                 textArea.style.position = 'fixed';
@@ -2363,89 +2402,28 @@ class MultiplayerManager {
         }
     }
 
-    createPeerWithRetry() {
-        return new Promise((resolve, reject) => {
-            const tryCreate = (retryCount = 0) => {
-                try {
-                    // Use multiple reliable PeerJS servers as fallbacks
-                    const servers = [
-                        { host: '0.peerjs.com', port: 443, secure: true },
-                        // Local fallback - you can add your own server here
-                        null // Will use default PeerJS cloud
-                    ];
-
-                    const serverConfig = servers[retryCount % servers.length];
-                    
-                    const peerConfig = {
-                        debug: 2,
-                        config: {
-                            iceServers: [
-                                { urls: 'stun:stun.l.google.com:19302' },
-                                { urls: 'stun:stun1.l.google.com:19302' }
-                            ]
-                        }
-                    };
-
-                    if (serverConfig) {
-                        Object.assign(peerConfig, serverConfig);
-                    }
-
-                    const peer = new Peer(peerConfig);
-                    
-                    const timeout = setTimeout(() => {
-                        peer.destroy();
-                        if (retryCount < this.maxRetries - 1) {
-                            console.log(`Retry attempt ${retryCount + 1}`);
-                            tryCreate(retryCount + 1);
-                        } else {
-                            reject(new Error('Failed to create peer after all retries'));
-                        }
-                    }, 10000); // 10 second timeout
-
-                    peer.on('open', (id) => {
-                        clearTimeout(timeout);
-                        resolve({ peer, id });
-                    });
-
-                    peer.on('error', (error) => {
-                        clearTimeout(timeout);
-                        console.error('Peer error:', error);
-                        peer.destroy();
-                        
-                        if (retryCount < this.maxRetries - 1) {
-                            console.log(`Retry attempt ${retryCount + 1} due to error:`, error);
-                            setTimeout(() => tryCreate(retryCount + 1), 2000);
-                        } else {
-                            reject(error);
-                        }
-                    });
-
-                } catch (error) {
-                    console.error('Error creating peer:', error);
-                    if (retryCount < this.maxRetries - 1) {
-                        setTimeout(() => tryCreate(retryCount + 1), 2000);
-                    } else {
-                        reject(error);
-                    }
-                }
-            };
-
-            tryCreate();
-        });
-    }
-
     async hostGame() {
         try {
             this.updateStatus('Conectando...', false);
             
-            const { peer, id } = await this.createPeerWithRetry();
-            this.peer = peer;
-            this.isHost = true;
-            this.myPlayerId = id;
+            this.peer = new Peer({
+                debug: 1,
+                config: {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
+                }
+            });
             
-            this.updateStatus('Esperando jugadores...', true);
-            this.showGameCode(id);
-            this.game.eventLogger.logSystem('Partida multijugador creada');
+            this.isHost = true;
+
+            this.peer.on('open', (id) => {
+                this.myPlayerId = id;
+                this.updateStatus('Esperando jugadores...', true);
+                this.showGameCode(id);
+                this.game.eventLogger.logSystem('Partida multijugador creada');
+            });
 
             this.peer.on('connection', (conn) => {
                 this.handleNewPlayer(conn);
@@ -2453,12 +2431,12 @@ class MultiplayerManager {
 
             this.peer.on('error', (error) => {
                 console.error('Host peer error:', error);
-                this.updateStatus(`Error: ${error.message}`);
+                this.updateStatus('Error al crear partida');
             });
 
         } catch (error) {
             console.error('Error hosting game:', error);
-            this.updateStatus('Error al crear partida. Verifica tu conexión.');
+            this.updateStatus('Error al crear partida');
         }
     }
 
@@ -2466,27 +2444,30 @@ class MultiplayerManager {
         try {
             this.updateStatus('Conectando...', false);
             
-            const { peer, id } = await this.createPeerWithRetry();
-            this.peer = peer;
-            this.myPlayerId = id;
-            
+            this.peer = new Peer({
+                debug: 1,
+                config: {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
+                }
+            });
+
+            this.peer.on('open', (id) => {
+                this.myPlayerId = id;
+                const conn = this.peer.connect(hostId);
+                this.handleNewPlayer(conn);
+            });
+
             this.peer.on('error', (error) => {
                 console.error('Join peer error:', error);
-                this.updateStatus(`Error: ${error.message}`);
+                this.updateStatus('Error al conectar');
             });
-
-            const conn = this.peer.connect(hostId);
-            
-            conn.on('error', (error) => {
-                console.error('Connection error:', error);
-                this.updateStatus('Error al conectar con el host');
-            });
-
-            this.handleNewPlayer(conn);
 
         } catch (error) {
             console.error('Error joining game:', error);
-            this.updateStatus('Error al unirse. Verifica el código.');
+            this.updateStatus('Error al unirse');
         }
     }
 
@@ -2584,7 +2565,7 @@ class MultiplayerManager {
                     try {
                         conn.send(updateData);
                     } catch (error) {
-                        console.warn('Failed to send update to player:', error);
+                        console.warn('Failed to send update:', error);
                     }
                 }
             });
@@ -2619,7 +2600,8 @@ class MultiplayerManager {
     showGameCode(code) {
         document.getElementById('gameCode').textContent = code;
         document.getElementById('gameCodeDisplay').style.display = 'block';
-        document.getElementById('mpControls').style.display = 'none';
+        document.getElementById('joinGameDiv').style.display = 'none';
+        document.getElementById('hostGameBtn').style.display = 'none';
     }
 
     updatePlayersList() {
@@ -2647,42 +2629,6 @@ class MultiplayerManager {
                 this.handlePlayerDisconnect(playerId);
             }
         });
-    }
-
-    sendChatMessage(message) {
-        const chatData = {
-            type: 'chatMessage',
-            message: message,
-            timestamp: Date.now()
-        };
-        
-        this.connections.forEach(conn => {
-            if (conn.open) {
-                try {
-                    conn.send(chatData);
-                } catch (error) {
-                    console.warn('Failed to send chat message:', error);
-                }
-            }
-        });
-    }
-
-    // Add method to create remote player ship (needed by the main game)
-    createRemotePlayerShip() {
-        // This should be added to your main SpaceShooter class
-        const remoteShip = ShipFactory.create(this.selectedShipType || 'player');
-        remoteShip.userData.isRemotePlayer = true;
-        
-        // Make remote players slightly transparent to distinguish them
-        remoteShip.traverse((child) => {
-            if (child.isMesh) {
-                child.material = child.material.clone();
-                child.material.transparent = true;
-                child.material.opacity = 0.8;
-            }
-        });
-        
-        return remoteShip;
     }
 }
       class SpaceShooter {

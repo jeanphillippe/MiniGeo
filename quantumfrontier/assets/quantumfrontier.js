@@ -2320,26 +2320,44 @@ class MultiplayerManager {
     }
 
     async hostGame() {
-        try {
-            this.peer = new Peer();
-            this.isHost = true;
-            
-            this.peer.on('open', (id) => {
-                this.myPlayerId = id;
-                this.updateStatus('Esperando jugadores...', true);
-                this.showGameCode(id);
-                this.game.eventLogger.logSystem('Partida multijugador creada');
-            });
+    try {
+        // Add loading state
+        this.updateStatus('Conectando...', false);
+        
+        this.peer = new Peer();
+        this.isHost = true;
+        
+        this.peer.on('open', (id) => {
+            console.log('Peer ID generated:', id); // Debug log
+            this.myPlayerId = id;
+            this.updateStatus('Esperando jugadores...', true);
+            this.showGameCode(id);
+            this.game.eventLogger.logSystem('Partida multijugador creada');
+        });
 
-            this.peer.on('connection', (conn) => {
-                this.handleNewPlayer(conn);
-            });
+        this.peer.on('error', (error) => {
+            console.error('Peer error:', error);
+            this.updateStatus('Error: ' + error.type);
+        });
 
-        } catch (error) {
-            console.error('Error hosting game:', error);
-            this.updateStatus('Error al crear partida');
-        }
+        this.peer.on('connection', (conn) => {
+            this.handleNewPlayer(conn);
+        });
+
+        // Fallback: if peer doesn't open in 10 seconds, show error
+        setTimeout(() => {
+            if (!this.myPlayerId) {
+                this.updateStatus('Error: No se pudo conectar');
+                console.error('Peer failed to generate ID');
+            }
+        }, 10000);
+
+    } catch (error) {
+        console.error('Error hosting game:', error);
+        this.updateStatus('Error al crear partida');
     }
+}
+
 
     async joinGame(hostId) {
         try {
@@ -2637,10 +2655,26 @@ broadcastArtifactPickup(position) {
     }
 
     showGameCode(code) {
-        document.getElementById('gameCode').textContent = code;
-        document.getElementById('gameCodeDisplay').style.display = 'block';
-        document.getElementById('mpControls').style.display = 'none';
+    console.log('Showing game code:', code); // Debug log
+    
+    // Make sure the code is displayed
+    const gameCodeElement = document.getElementById('gameCode');
+    const gameCodeDisplay = document.getElementById('gameCodeDisplay');
+    const mpControls = document.getElementById('mpControls');
+    
+    if (gameCodeElement) {
+        gameCodeElement.textContent = code;
     }
+    if (gameCodeDisplay) {
+        gameCodeDisplay.style.display = 'block';
+    }
+    if (mpControls) {
+        mpControls.style.display = 'none';
+    }
+    
+    // Also show in status for clarity
+    this.updateStatus(`Código: ${code} - Esperando jugadores...`, true);
+}
 
     updatePlayersList() {
         const content = document.getElementById('playersContent');

@@ -1204,8 +1204,7 @@ nebula.position.set(
           }
         }
       }
-   
-// WebRTC Multiplayer Manager using PeerJS
+      // WebRTC Multiplayer Manager using PeerJS
 class MultiplayerManager {
     constructor(game) {
         this.game = game;
@@ -1218,71 +1217,21 @@ class MultiplayerManager {
         this.lastSyncTime = 0;
         this.syncRate = 1000 / 20; // 20 FPS sync rate
         
-        // Log multiplayer initialization
-        this.game.eventLogger?.logSystem(`🌐 Inicializando multijugador...`);
-        this.game.eventLogger?.logSystem(`🏠 Sala: ${this.roomId}`);
-        
         this.setupPeer();
     }
-
-    getRoomId() {
-        // Check URL parameter first
-        const urlParams = new URLSearchParams(window.location.search);
-        const roomParam = urlParams.get('room');
-        if (roomParam) return roomParam;
-        
-        // Check hash
-        const hash = window.location.hash.substring(1);
-        if (hash) return hash;
-        
-        // Generate a simple shared room based on current hour to help players find each other
-        const now = new Date();
-        const hourlyRoom = `lobby-${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${now.getHours()}`;
-        
-        return hourlyRoom;
-    }
-
-    // Force refresh peer discovery
-    refreshPeerDiscovery() {
-        this.game.eventLogger?.logSystem(`🔄 Actualizando búsqueda de jugadores...`);
-        this.announcePresence();
-        
-        // Try to connect to any peers we might have missed
-        const presenceKey = `mp_presence_${this.roomId}`;
-        const presence = JSON.parse(localStorage.getItem(presenceKey) || '{}');
-        
-        Object.keys(presence).forEach(async (peerId) => {
-            if (peerId !== this.myId && !this.connections.has(peerId)) {
-                await this.connectToPeerWithRetry(peerId, 2);
-            }
-        });
-    }
-
-    // Manual connection method for troubleshooting
-    manualConnect() {
-        const myId = this.myId;
-        if (!myId) {
-            alert('Not connected to signaling server yet. Wait a moment and try again.');
-            return;
-        }
-        
-        const peerId = prompt(`Your ID: ${myId}\n\nShare this ID with other player and get their ID.\n\nEnter other player's ID to connect:`);
-        if (peerId && peerId !== myId && peerId.length > 5) {
-            this.game.eventLogger?.logSystem(`🔧 Conexión manual con ${peerId.substring(0, 8)}...`);
-            this.connectToPeerWithRetry(peerId, 5);
-        }
-    }
-
-    // Get connection diagnostics
-    getDiagnostics() {
-        return {
-            myId: this.myId,
-            roomId: this.roomId,
-            connections: this.connections.size,
-            players: this.players.size,
-            peerState: this.peer ? this.peer._open : 'closed'
-        };
-    }
+getRoomId() {
+    // Check URL parameter first
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomParam = urlParams.get('room');
+    if (roomParam) return roomParam;
+    
+    // Check hash
+    const hash = window.location.hash.substring(1);
+    if (hash) return hash;
+    
+    // Default room
+    return 'main-lobby';
+}
 
     async setupPeer() {
         // Import PeerJS from CDN
@@ -1290,38 +1239,16 @@ class MultiplayerManager {
             await this.loadPeerJS();
         }
 
-        // Create peer with STUN servers for NAT traversal
+        // Create peer with room-based ID discovery
         this.peer = new Peer(null, {
-            debug: 1, // Uses PeerJS's official free cloud service
-            config: {
-                'iceServers': [
-                    // Google's free STUN servers
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-                    { urls: 'stun:stun2.l.google.com:19302' },
-                    // Cloudflare's free STUN server
-                    { urls: 'stun:stun.cloudflare.com:3478' },
-                    // Additional backup STUN servers
-                    { urls: 'stun:stun.relay.metered.ca:80' }
-                ],
-                'iceCandidatePoolSize': 10
-            }
+           debug:1
         });
 
         this.peer.on('open', (id) => {
             this.myId = id;
             console.log('Connected with ID:', id);
-            this.game.eventLogger?.logSystem(`🔗 Conectado al servidor multijugador`);
-            this.game.eventLogger?.logSystem(`🆔 Tu ID: ${id.substring(0, 8)}...`);
             this.discoverPeers();
             this.startSyncLoop();
-            
-            // Auto-refresh peer discovery every 30 seconds to find new players
-            setInterval(() => {
-                if (this.connections.size === 0) {
-                    this.refreshPeerDiscovery();
-                }
-            }, 30000);
         });
 
         this.peer.on('connection', (conn) => {
@@ -1330,7 +1257,6 @@ class MultiplayerManager {
 
         this.peer.on('error', (err) => {
             console.warn('Peer error:', err);
-            this.game.eventLogger?.logSystem(`❌ Error de conexión: ${err.type || 'Desconocido'}`);
         });
     }
 
@@ -1345,167 +1271,42 @@ class MultiplayerManager {
     }
 
     async discoverPeers() {
-        // Enhanced peer discovery using multiple methods
-        this.game.eventLogger?.logSystem(`🏠 Buscando jugadores en sala: ${this.roomId}`);
-        
-        // Method 1: Try localStorage first (same device/browser)
+        // Simple peer discovery using localStorage for same-origin coordination
         const storageKey = `mp_room_${this.roomId}`;
-        const localPeers = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        const existingPeers = JSON.parse(localStorage.getItem(storageKey) || '[]');
         
-        // Method 2: Use PeerJS room discovery with periodic announcements
-        this.announcePresence();
-        this.startRoomBroadcast();
-        
-        // Add our ID to local storage
-        const updatedPeers = [...localPeers.filter(id => id !== this.myId), this.myId];
+        // Add our ID to the room
+        const updatedPeers = [...existingPeers.filter(id => id !== this.myId), this.myId];
         localStorage.setItem(storageKey, JSON.stringify(updatedPeers));
         
-        if (localPeers.length > 0) {
-            this.game.eventLogger?.logSystem(`👥 Encontrados ${localPeers.length} jugadores locales`);
-            
-            // Connect to local peers
-            for (const peerId of localPeers) {
-                if (peerId !== this.myId && !this.connections.has(peerId)) {
-                    this.game.eventLogger?.logSystem(`📡 Conectando con ${peerId.substring(0, 8)}...`);
-                    await this.connectToPeerWithRetry(peerId);
-                }
+        // Connect to existing peers
+        for (const peerId of existingPeers) {
+            if (peerId !== this.myId && !this.connections.has(peerId)) {
+                await this.connectToPeer(peerId);
             }
-        } else {
-            this.game.eventLogger?.logSystem(`🔍 Esperando otros jugadores...`);
         }
 
         // Clean up disconnected peers periodically
         setInterval(() => this.cleanupPeers(), 10000);
     }
 
-    // Announce presence in the room using a known pattern
-    announcePresence() {
-        // Create a room announcement peer ID that others can discover
-        const roomAnnouncement = `room_${this.roomId}_${Date.now()}`;
-        
-        // Try to connect to predictable room IDs that other players might be using
-        const roomPatterns = [
-            `${this.roomId}_host`,
-            `${this.roomId}_player1`,
-            `${this.roomId}_player2`,
-            `${this.roomId}_player3`
-        ];
-        
-        roomPatterns.forEach(async (pattern) => {
-            if (pattern !== this.myId) {
-                setTimeout(() => {
-                    this.tryConnectToRoomPeer(pattern);
-                }, Math.random() * 2000); // Random delay to avoid collision
-            }
-        });
-    }
-
-    async tryConnectToRoomPeer(peerId) {
+    async connectToPeer(peerId) {
         try {
-            const conn = this.peer.connect(peerId, { 
-                reliable: true,
-                serialization: 'json'
-            });
-            
-            conn.on('open', () => {
-                this.game.eventLogger?.logSystem(`🎯 Encontrado jugador en sala: ${peerId.substring(0, 8)}`);
-            });
-            
+            const conn = this.peer.connect(peerId, { reliable: true });
             this.handleConnection(conn);
         } catch (err) {
-            // Silently fail for room discovery attempts
-            console.log('Room discovery attempt failed:', peerId);
+            console.warn('Failed to connect to peer:', peerId, err);
         }
-    }
-
-    startRoomBroadcast() {
-        // Periodically announce our presence for new players to find us
-        this.roomBroadcastInterval = setInterval(() => {
-            // Update our presence in localStorage with timestamp
-            const storageKey = `mp_presence_${this.roomId}`;
-            const presence = JSON.parse(localStorage.getItem(storageKey) || '{}');
-            presence[this.myId] = Date.now();
-            
-            // Remove old presence records (older than 30 seconds)
-            const now = Date.now();
-            Object.keys(presence).forEach(id => {
-                if (now - presence[id] > 30000) {
-                    delete presence[id];
-                }
-            });
-            
-            localStorage.setItem(storageKey, JSON.stringify(presence));
-            
-            // Try to connect to any new peers we discover
-            Object.keys(presence).forEach(async (peerId) => {
-                if (peerId !== this.myId && !this.connections.has(peerId)) {
-                    await this.connectToPeerWithRetry(peerId);
-                }
-            });
-        }, 5000); // Every 5 seconds
-    }
-
-    async connectToPeerWithRetry(peerId, maxRetries = 3) {
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-                this.game.eventLogger?.logSystem(`📡 Intento ${attempt}/${maxRetries} conectando con ${peerId.substring(0, 8)}`);
-                
-                const conn = this.peer.connect(peerId, { 
-                    reliable: true,
-                    serialization: 'json'
-                });
-                
-                // Set up connection timeout
-                const timeout = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Connection timeout')), 10000)
-                );
-                
-                const connection = new Promise((resolve) => {
-                    conn.on('open', () => resolve(conn));
-                    conn.on('error', (err) => {
-                        throw new Error(`Connection error: ${err.type || err.message}`);
-                    });
-                });
-                
-                // Race between connection and timeout
-                await Promise.race([connection, timeout]);
-                
-                this.handleConnection(conn);
-                this.game.eventLogger?.logSystem(`✅ Conectado con ${peerId.substring(0, 8)} (intento ${attempt})`);
-                return true;
-                
-            } catch (err) {
-                console.warn(`Connection attempt ${attempt} failed:`, err);
-                
-                if (attempt === maxRetries) {
-                    this.game.eventLogger?.logSystem(`❌ Falló conexión con ${peerId.substring(0, 8)} (${maxRetries} intentos)`);
-                    return false;
-                } else {
-                    // Wait before retry with exponential backoff
-                    await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-                }
-            }
-        }
-        return false;
-    }
-
-    async connectToPeer(peerId) {
-        return this.connectToPeerWithRetry(peerId, 1);
     }
 
     handleIncomingConnection(conn) {
-        this.game.eventLogger?.logSystem(`📞 Conexión entrante de ${conn.peer.substring(0, 8)}`);
         this.handleConnection(conn);
     }
 
     handleConnection(conn) {
-        // Add connection state logging
         conn.on('open', () => {
             console.log('Connected to peer:', conn.peer);
             this.connections.set(conn.peer, conn);
-            
-            // Log successful connection locally
-            this.game.eventLogger?.logSystem(`✅ Conectado con ${conn.peer.substring(0, 8)}`);
             
             // Send initial player data
             this.sendToPlayer(conn.peer, {
@@ -1513,8 +1314,8 @@ class MultiplayerManager {
                 player: this.getMyPlayerData()
             });
 
-            // Broadcast connection to all other players
-            this.broadcastEvent(`🔗 ${conn.peer.substring(0, 8)} se conectó`, 'system');
+            // Log the connection
+            this.game.eventLogger?.logSystem(`Jugador ${conn.peer.substring(0, 8)} se unió`);
         });
 
         conn.on('data', (data) => {
@@ -1522,36 +1323,13 @@ class MultiplayerManager {
         });
 
         conn.on('close', () => {
-            console.log('Connection closed with:', conn.peer);
-            this.game.eventLogger?.logSystem(`🔌 ${conn.peer.substring(0, 8)} se desconectó`);
-            this.broadcastEvent(`📴 ${conn.peer.substring(0, 8)} se desconectó`, 'system');
             this.handlePlayerLeave(conn.peer);
         });
 
         conn.on('error', (err) => {
             console.warn('Connection error:', err);
-            this.game.eventLogger?.logSystem(`⚠️ Error con ${conn.peer.substring(0, 8)}: ${err.type || 'Desconocido'}`);
             this.handlePlayerLeave(conn.peer);
         });
-
-        // Add ICE connection state monitoring
-        if (conn.peerConnection) {
-            conn.peerConnection.oniceconnectionstatechange = () => {
-                const state = conn.peerConnection.iceConnectionState;
-                console.log(`ICE connection state with ${conn.peer}:`, state);
-                
-                if (state === 'failed' || state === 'disconnected') {
-                    this.game.eventLogger?.logSystem(`🧊 ICE falló con ${conn.peer.substring(0, 8)} (${state})`);
-                    setTimeout(() => {
-                        if (conn.peerConnection.iceConnectionState === 'failed') {
-                            this.handlePlayerLeave(conn.peer);
-                        }
-                    }, 5000); // Give it 5 seconds to recover
-                } else if (state === 'connected') {
-                    this.game.eventLogger?.logSystem(`🧊 ICE conectado con ${conn.peer.substring(0, 8)}`);
-                }
-            };
-        }
     }
 
     handleMessage(fromPeer, data) {
@@ -1582,11 +1360,6 @@ class MultiplayerManager {
         
         this.players.set(peerId, remotePlayer);
         this.game.scene.add(remotePlayer.ship);
-        
-        // Log player join locally and broadcast to others
-        const shipType = playerData.shipType || 'desconocida';
-        this.game.eventLogger?.logSystem(`🚀 ${peerId.substring(0, 8)} se unió (${shipType})`);
-        this.broadcastEvent(`👋 ${peerId.substring(0, 8)} entró al juego`, 'player-join');
         
         // Send our data back if we haven't already
         if (!this.connections.has(peerId)) return;
@@ -1627,9 +1400,7 @@ class MultiplayerManager {
                 this.game.scene.remove(player.ship);
             }
             this.players.delete(peerId);
-            
-            // Log player leave locally only (don't broadcast as they might not receive it)
-            this.game.eventLogger?.logSystem(`👋 ${peerId.substring(0, 8)} salió del juego`);
+            this.game.eventLogger?.logSystem(`Jugador ${peerId.substring(0, 8)} se desconectó`);
         }
         
         this.connections.delete(peerId);
@@ -1698,17 +1469,7 @@ class MultiplayerManager {
                 this.broadcastPlayerUpdate();
             }
             this.cleanupStaleePlayers();
-            this.logConnectionStatus();
         }, this.syncRate);
-    }
-
-    // Log connection status every 30 seconds
-    logConnectionStatus() {
-        if (Date.now() % 30000 < this.syncRate) { // Every ~30 seconds
-            if (this.connections.size > 0) {
-                this.game.eventLogger?.logSystem(`📊 ${this.connections.size + 1} jugadores conectados`);
-            }
-        }
     }
 
     broadcastPlayerUpdate() {
@@ -1755,7 +1516,6 @@ class MultiplayerManager {
 
         this.players.forEach((player, peerId) => {
             if (now - player.lastUpdate > timeout) {
-                this.game.eventLogger?.logSystem(`⏰ ${peerId.substring(0, 8)} desconectado (timeout)`);
                 this.handlePlayerLeave(peerId);
             }
         });
@@ -1795,10 +1555,6 @@ class MultiplayerManager {
         if (this.syncInterval) {
             clearInterval(this.syncInterval);
         }
-        
-        if (this.roomBroadcastInterval) {
-            clearInterval(this.roomBroadcastInterval);
-        }
 
         // Notify others we're leaving
         this.broadcast({
@@ -1820,14 +1576,6 @@ class MultiplayerManager {
         const peers = JSON.parse(localStorage.getItem(storageKey) || '[]');
         const updatedPeers = peers.filter(id => id !== this.myId);
         localStorage.setItem(storageKey, JSON.stringify(updatedPeers));
-        
-        // Clean up presence
-        const presenceKey = `mp_presence_${this.roomId}`;
-        const presence = JSON.parse(localStorage.getItem(presenceKey) || '{}');
-        delete presence[this.myId];
-        localStorage.setItem(presenceKey, JSON.stringify(presence));
-        
-        this.game.eventLogger?.logSystem(`👋 Desconectado del multijugador`);
     }
 }
       class MinimapManager {
@@ -4232,19 +3980,6 @@ updateMultiplayerStatus() {
         const connectedCount = this.multiplayerManager.connections.size;
         statusElement.textContent = `Jugadores: ${connectedCount + 1}`;
     }
-    
-    // Update debug info if visible
-    const debugElement = document.getElementById('debugInfo');
-    if (debugElement && this.multiplayerManager) {
-        const diagnostics = this.multiplayerManager.getDiagnostics();
-        debugElement.innerHTML = `
-            ID: ${diagnostics.myId ? diagnostics.myId.substring(0, 8) : 'None'}<br>
-            Room: ${diagnostics.roomId}<br>
-            Connections: ${diagnostics.connections}<br>
-            State: ${diagnostics.peerState}<br>
-            Players: ${diagnostics.players}
-        `;
-    }
 }
         update() {
           if (!this.gameStarted) return;
@@ -5511,12 +5246,6 @@ if(this.playerShip && this.playerShip.userData.shipType !== this.selectedShipTyp
             if (e.code === 'KeyE') {
               this.startLanding()
             }
-            if (e.code === 'KeyR' && e.ctrlKey) {
-        e.preventDefault();
-        if (this.multiplayerManager) {
-            this.multiplayerManager.refreshPeerDiscovery();
-        }
-    }
             if (e.code === 'KeyF') {
     this.spawnAlly();
 }

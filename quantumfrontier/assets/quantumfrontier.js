@@ -2251,30 +2251,7 @@ this.tractorBeam = null;
     this.wasPlayerVisible=!0;
     this.visitedPlanets=new Set();
     this.typewriterSpeed=7
-    this.selectedShipType = 'player';
-    this.sharedNoise = new PerlinNoise(Math.random());
-    this.fireCooldownIndicator = null;
-this.fireCooldownText = null;
-this.weaponCooldowns = {
-    1: 0, // blaster
-    2: 0, // scatter  
-    3: 0, // shotgun
-    4: 0, // mines
-    5: 0, // laser
-    6: 0, // emp
-    7: 0, // homing
-    8: 0  // tractor
-};
-this.weaponCooldownDurations = {
-    1: 8,   // blaster - fast
-    2: 12,  // scatter - medium
-    3: 18,  // shotgun - slower
-    4: 45,  // mines - slow
-    5: 1,   // laser - continuous
-    6: 90,  // emp - very slow (mobile strain)
-    7: 60,  // homing - slow
-    8: 1    // tractor - continuous
-};
+    this.selectedShipType = 'player'; ;
 }
         initializeScene() {
           this.camera.position.set(0, 60, 60);
@@ -2371,8 +2348,6 @@ this.weaponCooldownDurations = {
             this.tractorBeam = null;
             this.audioManager.stopLaser();
         }
-
-if (this.gameStarted){this.updateFireButtonCooldown();}
         this.audioManager.playWeaponSwitch();
     }
 }
@@ -2737,19 +2712,8 @@ if (this.gameStarted){this.updateFireButtonCooldown();}
         getPlanetName(planet) {
           return planet.config.dialogue?.name || `Planet ${this.planets.indexOf(planet) + 1}`
         }
-        canFireWeapon(weaponType) {
-    return this.weaponCooldowns[weaponType] <= 0;
-}
        fireWeapon(){
-    const currentWeapon = this.player.currentWeapon;
-    
-    // Check if weapon is on cooldown
-    if (!this.canFireWeapon(currentWeapon)) {
-        return; // Don't fire if on cooldown
-    }
-    
-    // Fire the weapon
-    switch(currentWeapon){
+    switch(this.player.currentWeapon){
         case 1: this.fireBlaster(); break;
         case 2: this.fireScatter(3); break;
         case 3: this.fireScatter(5); break;
@@ -2758,11 +2722,6 @@ if (this.gameStarted){this.updateFireButtonCooldown();}
         case 6: this.fireEMPBurst(); break;
         case 7: this.fireHomingMissile(); break;
         case 8: this.activateTractorBeam(); break;
-    }
-    
-    // Set cooldown (except for continuous weapons like laser/tractor)
-    if (currentWeapon !== 5 && currentWeapon !== 8) {
-        this.weaponCooldowns[currentWeapon] = this.weaponCooldownDurations[currentWeapon];
     }
 }
 fireEMPBurst(){
@@ -3359,8 +3318,6 @@ this.updateEMPBursts();
 this.updateHomingMissiles(); 
 this.updateTractorBeam();
 this.updateEnemyEMPRecovery();
-this.updateWeaponCooldowns();
-this.updateFireButtonCooldown();
           this.updateCollisions();
           this.updateBackground();
           this.updateEffects();
@@ -3370,14 +3327,6 @@ this.updateFireButtonCooldown();
           this.updateMinimap();
           this.updateExplosions()
         }
-        updateWeaponCooldowns() {
-    // Decrease all weapon cooldowns
-    for (let weapon in this.weaponCooldowns) {
-        if (this.weaponCooldowns[weapon] > 0) {
-            this.weaponCooldowns[weapon]--;
-        }
-    }
-}
  updateAllies(){
     this.allies = this.allies.filter(ally => {
         if(ally.health <= 0){
@@ -3587,46 +3536,33 @@ createAllyBullet(ally, target){
     this.audioManager.playBlaster(ally.mesh.position, this.playerShip.position);
 }
 
- createTrail(){
-    // Remove random chance - trails always create when moving fast enough
-    if(this.playerVelocity.length() < 0.15) return; // Only skip if moving too slowly
-    
-    const trailCount = 3;
-    const coneAngle = Math.PI/4;
-    const behindDistance = 3;
-    
-    for(let i = 0; i < trailCount; i++){
-        const spreadAngle = (Math.random()-0.5) * coneAngle;
-        const playerAngle = this.playerShip.rotation.y + Math.PI;
-        const finalAngle = playerAngle + spreadAngle;
-        const distance = behindDistance + Math.random() * 2;
-        
-        const x = this.playerShip.position.x + Math.sin(finalAngle) * distance;
-        const z = this.playerShip.position.z + Math.cos(finalAngle) * distance;
-        
-        // Use cached noise instead of creating new instance
-        const noiseValue = this.sharedNoise.noise(x * 0.1, z * 0.1, Date.now() * 0.001);
-        const intensity = Math.abs(noiseValue);
-        
-        const trailGeom = new THREE.SphereGeometry(0.3 + intensity * 0.5, 6, 6);
-        const hue = (intensity * 360 + 200) % 360;
-        const trailMat = new THREE.MeshBasicMaterial({
-            color: new THREE.Color().setHSL(hue/360, 0.8, 0.6),
-            transparent: true,
-            opacity: 0.7,
-            depthTest: true,
-            depthWrite: false
+        createTrail(){
+    if(Math.random()>0.3)return;
+    const trailCount=3;
+    const coneAngle=Math.PI/4;
+    const behindDistance=3;
+    for(let i=0;i<trailCount;i++){
+        const spreadAngle=(Math.random()-0.5)*coneAngle;
+        const playerAngle=this.playerShip.rotation.y+Math.PI;
+        const finalAngle=playerAngle+spreadAngle;
+        const distance=behindDistance+Math.random()*2;
+        const x=this.playerShip.position.x+Math.sin(finalAngle)*distance;
+        const z=this.playerShip.position.z+Math.cos(finalAngle)*distance;
+        const noiseValue=new PerlinNoise().noise(x*0.1,z*0.1,Date.now()*0.001);
+        const intensity=Math.abs(noiseValue);
+        const trailGeom=new THREE.SphereGeometry(0.3+intensity*0.5,6,6);
+        const hue=(intensity*360+200)%360;
+        const trailMat=new THREE.MeshBasicMaterial({
+            color:new THREE.Color().setHSL(hue/360,0.8,0.6),
+            transparent:!0,
+            opacity:0.7,
+            depthTest: true,  // ✅ Ensure proper depth testing
+            depthWrite: false // ✅ Prevent z-fighting
         });
-        
-        const trail = new THREE.Mesh(trailGeom, trailMat);
+        const trail=new THREE.Mesh(trailGeom,trailMat);
         trail.position.set(x, 3.5 + Math.random() * 0.5, z);
-        trail.renderOrder = 50;
-        
-        this.trails.push({
-            mesh: trail,
-            life: 60 + Math.random() * 40,
-            maxLife: 60 + Math.random() * 40
-        });
+        trail.renderOrder = 50; 
+        this.trails.push({mesh:trail,life:60+Math.random()*40,maxLife:60+Math.random()*40});
         this.scene.add(trail);
     }
 }
@@ -4570,9 +4506,6 @@ this.enemies.forEach(enemy => {
     this.trails.forEach(trail=>this.scene.remove(trail.mesh));
     this.trails=[];
     this.collisionEnabled=!0;
-    for (let weapon in this.weaponCooldowns) {
-    this.weaponCooldowns[weapon] = 0;
-}
     this.bullets.forEach(bullet=>this.scene.remove(bullet.mesh));
     this.bullets=[];
     this.enemyBullets.forEach(bullet=>this.scene.remove(bullet.mesh));
@@ -4641,66 +4574,7 @@ if(this.playerShip && this.playerShip.userData.shipType !== this.selectedShipTyp
         setupMobileControls(){
     const dpad=document.getElementById('dpad');
     const dpadInner=document.getElementById('dpadInner');
-    const fireBtn = document.getElementById('fireBtn');
-
-// Add cooldown indicator to fire button
-const cooldownIndicator = document.createElement('div');
-cooldownIndicator.id = 'fireCooldownIndicator';
-cooldownIndicator.style.cssText = `
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: 0%;
-    background: linear-gradient(45deg, #00f2fe, #4facfe);
-    border-radius: inherit;
-    transition: height 0.1s ease-out;
-    pointer-events: none;
-    z-index: 1;
-`;
-
-// Add cooldown text overlay
-const cooldownText = document.createElement('div');
-cooldownText.id = 'fireCooldownText';
-cooldownText.style.cssText = `
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: #ff4757;
-    font-family: 'Courier New', monospace;
-    font-size: 12px;
-    font-weight: bold;
-    text-shadow: 0 0 5px rgba(255, 71, 87, 0.8);
-    pointer-events: none;
-    z-index: 2;
-    display: none;
-`;
-
-// Make fire button position relative to contain the indicator
-fireBtn.style.position = 'relative';
-fireBtn.style.overflow = 'hidden';
-
-// Add indicators to fire button
-fireBtn.appendChild(cooldownIndicator);
-fireBtn.appendChild(cooldownText);
-
-// Store references for later use
-this.fireCooldownIndicator = cooldownIndicator;
-this.fireCooldownText = cooldownText;
-
-fireBtn.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    this.touchControls.firing = true;
-});
-
-fireBtn.addEventListener('touchend', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    this.touchControls.firing = false;
-});
-
+    const fireBtn=document.getElementById('fireBtn');
     const weaponBtn=document.getElementById('weaponBtn');
     let dpadPressed=!1;
     
@@ -4781,61 +4655,6 @@ fireBtn.addEventListener('touchend', (e) => {
         async startGame(){
     document.getElementById('intro').classList.add('hidden');
     this.showShipSelector(); // Mostrar selector en lugar de empezar directamente
-}
-
-updateFireButtonCooldown() {
-    if (!this.fireCooldownIndicator || !this.fireCooldownText) return;
-    
-    const currentWeapon = this.player.currentWeapon;
-    const currentCooldown = this.weaponCooldowns[currentWeapon] || 0;
-    const maxCooldown = this.weaponCooldownDurations[currentWeapon] || 1;
-    
-    // Calculate progress (0 = on cooldown, 1 = ready to fire)
-    const progress = Math.max(0, 1 - (currentCooldown / maxCooldown));
-    
-    // Update the fill indicator
-    this.fireCooldownIndicator.style.height = `${progress * 100}%`;
-    
-    // Update button appearance based on state
-    const fireBtn = document.getElementById('fireBtn');
-    if (currentCooldown > 0) {
-        // On cooldown - show disabled state
-        fireBtn.style.opacity = '0.6';
-        fireBtn.style.borderColor = 'rgba(255, 71, 87, 0.8)';
-        
-        // Show cooldown text for longer cooldowns
-        if (maxCooldown >= 30) { // Show text for weapons with cooldown >= 30 frames
-            const seconds = Math.ceil(currentCooldown / 60); // Assuming 60 FPS
-            this.fireCooldownText.textContent = seconds > 0 ? `${seconds}s` : '';
-            this.fireCooldownText.style.display = seconds > 0 ? 'block' : 'none';
-        } else {
-            this.fireCooldownText.style.display = 'none';
-        }
-        
-        // Change indicator color based on weapon type
-        const weaponColors = {
-            1: '#00f2fe', // blaster - cyan
-            2: '#feca57', // scatter - yellow  
-            3: '#ff9f43', // shotgun - orange
-            4: '#ff6b6b', // mines - red
-            5: '#00ff00', // laser - green
-            6: '#9c88ff', // emp - purple
-            7: '#ff9ff3', // homing - pink
-            8: '#ff69b4'  // tractor - hot pink
-        };
-        
-        const weaponColor = weaponColors[currentWeapon] || '#00f2fe';
-        this.fireCooldownIndicator.style.background = `linear-gradient(45deg, ${weaponColor}, ${weaponColor}88)`;
-        
-    } else {
-        // Ready to fire - show normal state
-        fireBtn.style.opacity = '1';
-        fireBtn.style.borderColor = 'rgba(0, 242, 254, 0.8)';
-        this.fireCooldownText.style.display = 'none';
-        
-        // Ready state - bright cyan fill
-        this.fireCooldownIndicator.style.background = 'linear-gradient(45deg, #00f2fe, #4facfe)';
-    }
 }
 showShipSelector(){
     const selector = document.createElement('div');

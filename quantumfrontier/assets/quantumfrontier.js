@@ -2148,19 +2148,16 @@ class EventLogger {
     }
 }
 class MultiplayerManager {
-     constructor(game) {
+    constructor(game) {
         this.game = game;
         this.peer = null;
-        this.connections = new Map();
+        this.connections = new Map(); // playerId -> connection
         this.isHost = false;
         this.myPlayerId = null;
-        this.remotePlayers = new Map();
-        this.lastSentPosition = {x: 0, z: 0, rotation: 0};
-        this.connectionAttempts = 0;
-        this.maxConnectionAttempts = 3;
+        this.remotePlayers = new Map(); // playerId -> player data
+        this.lastSentPosition = { x: 0, z: 0, rotation: 0 };
         this.setupUI();
     }
-
 
     setupUI() {
         // Create multiplayer UI
@@ -2173,7 +2170,7 @@ class MultiplayerManager {
                 <div id="mpControls">
                     <button id="hostGameBtn">Crear Partida</button>
                     <div id="joinGameDiv">
-                        <input id="gameCodeInput" placeholder="Código de partida">
+                        <input id="gameCodeInput" placeholder="Código de partida" maxlength="10">
                         <button id="joinGameBtn">Unirse</button>
                     </div>
                     <div id="gameCodeDisplay" style="display:none;">
@@ -2302,258 +2299,61 @@ class MultiplayerManager {
     }
 
     setupEventListeners() {
-    document.getElementById('mpToggle').addEventListener('click', () => {
-        const panel = document.getElementById('mpPanel');
-        panel.classList.toggle('mp-hidden');
-    });
+        document.getElementById('mpToggle').addEventListener('click', () => {
+            const panel = document.getElementById('mpPanel');
+            panel.classList.toggle('mp-hidden');
+        });
 
-    document.getElementById('hostGameBtn').addEventListener('click', () => {
-        console.log('Host game button clicked');
-        this.hostGame();
-    });
+        document.getElementById('hostGameBtn').addEventListener('click', () => {
+            this.hostGame();
+        });
 
-    document.getElementById('joinGameBtn').addEventListener('click', () => {
-        const code = document.getElementById('gameCodeInput').value.trim();
-        console.log('Join game button clicked, code:', code);
-        if (code) {
-            this.joinGame(code);
-        } else {
-            this.updateStatus('Error: Ingresa un código válido');
-        }
-    });
+        document.getElementById('joinGameBtn').addEventListener('click', () => {
+            const code = document.getElementById('gameCodeInput').value.trim();
+            if (code) this.joinGame(code);
+        });
 
-    document.getElementById('copyCodeBtn').addEventListener('click', () => {
-        const code = document.getElementById('gameCode').textContent;
-        navigator.clipboard.writeText(code);
-        console.log('Code copied:', code);
-    });
-}
+        document.getElementById('copyCodeBtn').addEventListener('click', () => {
+            const code = document.getElementById('gameCode').textContent;
+            navigator.clipboard.writeText(code);
+        });
+    }
 
-  async hostGame() {
+    async hostGame() {
         try {
-            this.updateStatus('Conectando...', false);
-            
-            // Create peer with configuration
-            this.peer = new Peer({
-                config: {
-                    'iceServers': [
-                        { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun1.l.google.com:19302' }
-                    ]
-                }
-            });
-            
+            this.peer = new Peer();
             this.isHost = true;
-
+            
             this.peer.on('open', (id) => {
-                console.log('Host Peer ID generated:', id);
                 this.myPlayerId = id;
                 this.updateStatus('Esperando jugadores...', true);
                 this.showGameCode(id);
                 this.game.eventLogger.logSystem('Partida multijugador creada');
             });
 
-            this.peer.on('error', (error) => {
-                console.error('Peer error:', error);
-                this.handlePeerError(error);
-            });
-
             this.peer.on('connection', (conn) => {
                 this.handleNewPlayer(conn);
             });
 
-            // Timeout with retry mechanism
-            setTimeout(() => {
-                if (!this.myPlayerId && this.connectionAttempts < this.maxConnectionAttempts) {
-                    this.connectionAttempts++;
-                    this.updateStatus(`Reintentando... (${this.connectionAttempts}/${this.maxConnectionAttempts})`);
-                    this.hostGame();
-                } else if (!this.myPlayerId) {
-                    this.updateStatus('Error: No se pudo crear la partida');
-                    this.cleanup();
-                }
-            }, 10000);
-
         } catch (error) {
             console.error('Error hosting game:', error);
             this.updateStatus('Error al crear partida');
-            this.handlePeerError(error);
         }
     }
- cleanup() {
+
+    async joinGame(hostId) {
         try {
-            // Stop laser audio if playing
-            if (this.game.audioManager) {
-                this.game.audioManager.stopLaser();
-            }
-
-            // Clean up remote players
-            this.remotePlayers.forEach((player, playerId) => {
-                if (player.ship && this.game.scene) {
-                    this.game.scene.remove(player.ship);
-                }
-            });
-            this.remotePlayers.clear();
-
-            // Close all connections
-            this.connections.forEach(conn => {
-                try {
-                    conn.close();
-                } catch (e) {
-                    console.warn('Error closing connection:', e);
-                }
-            });
-            this.connections.clear();
-
-            // Close peer
-            if (this.peer && !this.peer.destroyed) {
-                this.peer.destroy();
-            }
-            this.peer = null;
-
-            // Reset state
-            this.isHost = false;
-            this.myPlayerId = null;
-            this.connectionAttempts = 0;
+            this.peer = new Peer();
             
-            // Update UI
-            this.updateStatus('Desconectado');
-            this.updatePlayersList();
-            
-            // Hide game code if showing
-            const gameCodeDisplay = document.getElementById('gameCodeDisplay');
-            const mpControls = document.getElementById('mpControls');
-            if (gameCodeDisplay) gameCodeDisplay.style.display = 'none';
-            if (mpControls) mpControls.style.display = 'block';
-            
-        } catch (error) {
-            console.error('Error during cleanup:', error);
-        }
-    }
-    isConnected() {
-        return this.peer && this.peer.open && !this.peer.destroyed;
-    }
-
-  async joinGame(hostId) {
-        if (!hostId || hostId.trim() === '') {
-            this.updateStatus('Error: Código inválido');
-            return;
-        }
-
-        try {
-            console.log('Attempting to join game with host ID:', hostId);
-            this.updateStatus('Conectando...', false);
-            
-            this.peer = new Peer({
-                config: {
-                    'iceServers': [
-                        { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun1.l.google.com:19302' }
-                    ]
-                }
-            });
-
             this.peer.on('open', (id) => {
-                console.log('Client peer ID:', id);
                 this.myPlayerId = id;
-                this.updateStatus('Conectando al host...', false);
-                
-                const conn = this.peer.connect(hostId, {
-                    reliable: true
-                });
-                
-                this.setupConnection(conn, hostId);
+                const conn = this.peer.connect(hostId);
+                this.handleNewPlayer(conn);
             });
-
-            this.peer.on('error', (error) => {
-                console.error('Peer error:', error);
-                this.handlePeerError(error);
-            });
-
-            // Timeout with retry
-            setTimeout(() => {
-                if (!this.myPlayerId && this.connectionAttempts < this.maxConnectionAttempts) {
-                    this.connectionAttempts++;
-                    this.updateStatus(`Reintentando... (${this.connectionAttempts}/${this.maxConnectionAttempts})`);
-                    this.joinGame(hostId);
-                } else if (!this.myPlayerId) {
-                    this.updateStatus('Error: Timeout al conectar');
-                    this.cleanup();
-                }
-            }, 15000);
 
         } catch (error) {
             console.error('Error joining game:', error);
             this.updateStatus('Error al unirse a la partida');
-            this.handlePeerError(error);
-        }
-    }
-setupConnection(conn, hostId) {
-        const connectionTimeout = setTimeout(() => {
-            this.updateStatus('Error: Timeout de conexión');
-            conn.close();
-        }, 10000);
-
-        conn.on('open', () => {
-            clearTimeout(connectionTimeout);
-            console.log('Connection to host opened');
-            this.updateStatus('Conectado!', true);
-            this.connections.set(conn.peer, conn);
-            this.updatePlayersList();
-            this.game.eventLogger.logSystem('Conectado a la partida');
-        });
-
-        conn.on('error', (error) => {
-            clearTimeout(connectionTimeout);
-            console.error('Connection error:', error);
-            this.updateStatus('Error: No se pudo conectar al host');
-        });
-
-        conn.on('data', (data) => {
-            this.handleMessage(data, conn.peer);
-        });
-
-        conn.on('close', () => {
-            clearTimeout(connectionTimeout);
-            console.log('Connection to host closed');
-            this.handlePlayerDisconnect(conn.peer);
-        });
-    }
-
-     handlePeerError(error) {
-        let errorMessage = 'Error de conexión';
-        
-        switch (error.type) {
-            case 'peer-unavailable':
-                errorMessage = 'Código de partida no encontrado';
-                break;
-            case 'network':
-                errorMessage = 'Error de red - verifica tu conexión';
-                break;
-            case 'server-error':
-                errorMessage = 'Error del servidor - intenta más tarde';
-                break;
-            case 'unavailable-id':
-                errorMessage = 'ID no disponible - reintentando...';
-                if (this.connectionAttempts < this.maxConnectionAttempts) {
-                    setTimeout(() => {
-                        this.connectionAttempts++;
-                        if (this.isHost) {
-                            this.hostGame();
-                        }
-                    }, 2000);
-                    return;
-                }
-                break;
-            default:
-                errorMessage = `Error: ${error.type || 'Desconocido'}`;
-        }
-        
-        this.updateStatus(errorMessage);
-        
-        // Auto-cleanup after serious errors
-        if (['peer-unavailable', 'network', 'server-error'].includes(error.type)) {
-            setTimeout(() => this.cleanup(), 5000);
         }
     }
 
@@ -2578,202 +2378,20 @@ setupConnection(conn, hostId) {
             this.handlePlayerDisconnect(conn.peer);
         });
     }
- handleMessage(data, playerId) {
-        // Validate message structure
-        if (!data || typeof data !== 'object' || !data.type) {
-            console.warn('Invalid message received:', data);
-            return;
-        }
 
-        try {
-            switch (data.type) {
-                case 'playerUpdate':
-                    if (data.player && data.player.position && typeof data.player.rotation === 'number') {
-                        this.updateRemotePlayer(playerId, data);
-                    }
-                    break;
-                case 'bulletFired':
-                    if (data.position && data.direction && typeof data.speed === 'number') {
-                        this.handleRemoteBullet(data);
-                    }
-                    break;
-                case 'enemyDamaged':
-                    if (data.enemyPosition && typeof data.damage === 'number') {
-                        this.handleEnemyDamage(data);
-                    }
-                    break;
-                case 'planetDamaged':
-                    if (data.planetPosition && typeof data.damage === 'number') {
-                        this.handlePlanetDamage(data);
-                    }
-                    break;
-                case 'artifactPickup':
-                    if (data.position) {
-                        this.handleArtifactPickup(data);
-                    }
-                    break;
-                case 'chatMessage':
-                    if (data.message && typeof data.message === 'string') {
-                        this.game.eventLogger.logSystem(`${playerId.substring(0, 8)}: ${data.message}`);
-                    }
-                    break;
-                case 'gameState':
-                    this.handleGameState(data);
-                    break;
-                default:
-                    console.warn('Unknown message type:', data.type);
-            }
-        } catch (error) {
-            console.error('Error handling message:', error, data);
+    handleMessage(data, playerId) {
+        switch (data.type) {
+            case 'playerUpdate':
+                this.updateRemotePlayer(playerId, data);
+                break;
+            case 'chatMessage':
+                this.game.eventLogger.logSystem(`${playerId.substring(0, 8)}: ${data.message}`);
+                break;
+            case 'gameState':
+                this.handleGameState(data);
+                break;
         }
     }
-
-handleRemoteBullet(data) {
-    // Create bullet from remote player
-    const bulletGeom = new THREE.SphereGeometry(0.2, 8, 8);
-    const bulletMat = new THREE.MeshBasicMaterial({
-        color: data.isAlly ? 0x00ff88 : 0x00f2fe,
-        depthTest: true,
-        depthWrite: true
-    });
-    const bullet = new THREE.Mesh(bulletGeom, bulletMat);
-    bullet.renderOrder = 60;
-    
-    bullet.position.copy(data.position);
-    const velocity = new THREE.Vector3().copy(data.direction).multiplyScalar(data.speed);
-    
-    const bulletObject = {
-        mesh: bullet,
-        velocity: velocity,
-        life: data.life,
-        isRemote: true,
-        playerId: data.playerId,
-        damage: data.damage
-    };
-    
-    this.game.bullets.push(bulletObject);
-    this.game.scene.add(bullet);
-}
-
-handleEnemyDamage(data) {
-    // Find enemy by position (closest match)
-    let targetEnemy = null;
-    let minDistance = Infinity;
-    
-    this.game.enemies.forEach(enemy => {
-        if (enemy.health > 0) {
-            const distance = enemy.mesh.position.distanceTo(data.enemyPosition);
-            if (distance < minDistance && distance < 5) {
-                minDistance = distance;
-                targetEnemy = enemy;
-            }
-        }
-    });
-    
-    if (targetEnemy) {
-        targetEnemy.health -= data.damage;
-        this.game.audioManager.playEnemyHit();
-        
-        if (targetEnemy.health <= 0) {
-            this.game.createExplosion(targetEnemy.mesh.position);
-            this.game.audioManager.playExplosion();
-            targetEnemy.mesh.visible = false;
-            this.game.eventLogger.logEnemyDefeated(targetEnemy.type);
-            this.game.dropArtifact(targetEnemy.mesh.position);
-        }
-    }
-}
-
-handlePlanetDamage(data) {
-    // Find planet by position
-    let targetPlanet = null;
-    let minDistance = Infinity;
-    
-    this.game.planets.forEach(planet => {
-        if (!planet.destroyed) {
-            const distance = planet.center.distanceTo(data.planetPosition);
-            if (distance < minDistance && distance < 10) {
-                minDistance = distance;
-                targetPlanet = planet;
-            }
-        }
-    });
-    
-    if (targetPlanet) {
-        targetPlanet.health -= data.damage;
-        if (targetPlanet.health <= 0 && !targetPlanet.destroyed) {
-            this.game.destroyPlanet(targetPlanet);
-        }
-    }
-}
-
-handleArtifactPickup(data) {
-    // Remove artifact at specific position
-    this.game.artifacts = this.game.artifacts.filter(artifact => {
-        const distance = artifact.mesh.position.distanceTo(data.position);
-        if (distance < 3) {
-            this.game.scene.remove(artifact.mesh);
-            return false;
-        }
-        return true;
-    });
-}
-
-broadcastBulletFired(bulletData) {
-    const data = {
-        type: 'bulletFired',
-        playerId: this.myPlayerId,
-        position: bulletData.position,
-        direction: bulletData.direction,
-        speed: bulletData.speed,
-        life: bulletData.life,
-        damage: bulletData.damage,
-        isAlly: false
-    };
-    
-    this.connections.forEach(conn => {
-        conn.send(data);
-    });
-}
-
-broadcastEnemyDamage(enemyPosition, damage) {
-    const data = {
-        type: 'enemyDamaged',
-        playerId: this.myPlayerId,
-        enemyPosition: enemyPosition,
-        damage: damage
-    };
-    
-    this.connections.forEach(conn => {
-        conn.send(data);
-    });
-}
-
-broadcastPlanetDamage(planetPosition, damage) {
-    const data = {
-        type: 'planetDamaged',
-        playerId: this.myPlayerId,
-        planetPosition: planetPosition,
-        damage: damage
-    };
-    
-    this.connections.forEach(conn => {
-        conn.send(data);
-    });
-}
-
-broadcastArtifactPickup(position) {
-    const data = {
-        type: 'artifactPickup',
-        playerId: this.myPlayerId,
-        position: position
-    };
-    
-    this.connections.forEach(conn => {
-        conn.send(data);
-    });
-}
-
 
     sendGameState(conn) {
         const gameState = {
@@ -2861,26 +2479,10 @@ broadcastArtifactPickup(position) {
     }
 
     showGameCode(code) {
-    console.log('Showing game code:', code); // Debug log
-    
-    // Make sure the code is displayed
-    const gameCodeElement = document.getElementById('gameCode');
-    const gameCodeDisplay = document.getElementById('gameCodeDisplay');
-    const mpControls = document.getElementById('mpControls');
-    
-    if (gameCodeElement) {
-        gameCodeElement.textContent = code;
+        document.getElementById('gameCode').textContent = code;
+        document.getElementById('gameCodeDisplay').style.display = 'block';
+        document.getElementById('mpControls').style.display = 'none';
     }
-    if (gameCodeDisplay) {
-        gameCodeDisplay.style.display = 'block';
-    }
-    if (mpControls) {
-        mpControls.style.display = 'none';
-    }
-    
-    // Also show in status for clarity
-    this.updateStatus(`Código: ${code} - Esperando jugadores...`, true);
-}
 
     updatePlayersList() {
         const content = document.getElementById('playersContent');
@@ -2894,18 +2496,9 @@ broadcastArtifactPickup(position) {
     }
 
     update() {
-        if (this.isConnected()) {
+        if (this.peer && this.peer.open) {
             this.broadcastPlayerUpdate();
             this.cleanupStaleRemotePlayers();
-        } else if (this.peer && this.peer.disconnected) {
-            // Attempt reconnection
-            console.log('Peer disconnected, attempting reconnection...');
-            try {
-                this.peer.reconnect();
-            } catch (error) {
-                console.error('Reconnection failed:', error);
-                this.cleanup();
-            }
         }
     }
 
@@ -2939,11 +2532,6 @@ broadcastArtifactPickup(position) {
           this.animate()
         }
 
-cleanupMultiplayer() {
-    if (this.multiplayerManager) {
-        this.multiplayerManager.cleanup();
-    }
-}
         
 // 2. Add helper method to find planet by name (add to SpaceShooter class)
 findPlanetByName(planetName){
@@ -3280,7 +2868,6 @@ this.tractorBeam = null;
     this.audioManager=new AudioManager();
     this.minimapManager=new MinimapManager();
     this.eventLogger = new EventLogger();
-this.multiplayerManager = new MultiplayerManager(this);
     this.explosions=[];
     this.landingState='none';
     this.landingTarget=null;
@@ -4151,53 +3738,34 @@ fireHomingMissile(){
           }
         }
         createBullet(angleOffset = 0) {
-    try {
-        const bulletGeom = new THREE.SphereGeometry(0.2, 8, 8);
-        const bulletMat = new THREE.MeshBasicMaterial({color: 0x00f2fe, depthTest: true, depthWrite: true});
-        const bullet = new THREE.Mesh(bulletGeom, bulletMat);
-        bullet.renderOrder = 60;
-
-        if (!this.playerShip || !this.playerShip.position) {
-            console.warn('Player ship not available for bullet creation');
-            return;
-        }
-
-        bullet.position.copy(this.playerShip.position);
-        bullet.position.y += 0.5;
-        
-        const direction = new THREE.Vector3(
-            Math.sin(this.playerShip.rotation.y + angleOffset),
-            0,
-            Math.cos(this.playerShip.rotation.y + angleOffset)
-        );
-        const bulletVelocity = direction.clone().multiplyScalar(CONFIG.bullet.speed);
-        const damage = this.player.effects.damage.active ? 
-            CONFIG.bullet.damage * CONFIG.audio.damage.mult : CONFIG.bullet.damage;
-
-        const bulletObject = {
-            mesh: bullet,
-            velocity: bulletVelocity,
-            life: CONFIG.bullet.life,
-            damage: damage
-        };
-
-        this.bullets.push(bulletObject);
-        this.scene.add(bullet);
-
-        // Broadcast bullet to other players
-        if (this.multiplayerManager && this.multiplayerManager.connections.size > 0) {
-            this.multiplayerManager.broadcastBulletFired({
-                position: bullet.position,
-                direction: direction,
-                speed: CONFIG.bullet.speed,
-                life: CONFIG.bullet.life,
-                damage: damage
+          try {
+            const bulletGeom = new THREE.SphereGeometry(0.2, 8, 8);
+            const bulletMat = new THREE.MeshBasicMaterial({
+              color: 0x00f2fe,
+            depthTest: true,     // ADD THIS LINE
+            depthWrite: true  
             });
+            const bullet = new THREE.Mesh(bulletGeom, bulletMat);
+               bullet.renderOrder = 60;
+            if (!this.playerShip || !this.playerShip.position) {
+              console.warn('Player ship not available for bullet creation');
+              return;
+            }
+            bullet.position.copy(this.playerShip.position);
+            bullet.position.y += 0.5;
+            const direction = new THREE.Vector3(Math.sin(this.playerShip.rotation.y + angleOffset), 0, Math.cos(this.playerShip.rotation.y + angleOffset));
+            const bulletVelocity = direction.clone().multiplyScalar(CONFIG.bullet.speed);
+            const bulletObject = {
+              mesh: bullet,
+              velocity: bulletVelocity,
+              life: CONFIG.bullet.life
+            };
+            this.bullets.push(bulletObject);
+            this.scene.add(bullet);
+          } catch (e) {
+            console.error('Failed to create bullet:', e);
+          }
         }
-    } catch (e) {
-        console.error('Failed to create bullet:', e);
-    }
-}
         fireMine(){
     const mineGeom = new THREE.SphereGeometry(0.6, 12, 12);
     const mineMat = new THREE.MeshBasicMaterial({
@@ -4384,28 +3952,8 @@ this.updateEnemyEMPRecovery();
     this.updateWaypointIndicator(); // Update 3D indicator
     if (this.waypointReachedCooldown > 0) this.waypointReachedCooldown--;
           this.updateMinimap();
-          this.updateExplosions();
-        
-if (this.multiplayerManager) {
-    this.multiplayerManager.update();
-}
-
+          this.updateExplosions()
         }
-        createRemotePlayerShip() {
-    const remoteShip = ShipFactory.create('fighter'); // Different ship type for visibility
-    remoteShip.traverse((child) => {
-        if (child.isMesh) {
-            // Make remote players semi-transparent
-            child.material = child.material.clone();
-            child.material.transparent = true;
-            child.material.opacity = 0.7;
-            // Different color for remote players
-            child.material.color.setHex(0x00ff88);
-        }
-    });
-    remoteShip.scale.multiplyScalar(0.9); // Slightly smaller
-    return remoteShip;
-}
  updateAllies(){
     this.allies = this.allies.filter(ally => {
         if(ally.health <= 0){
@@ -4949,98 +4497,78 @@ createAllyBullet(ally, target){
           return cooldowns[weaponType] || 120
         }
         updateBullets() {
-    this.bullets = this.bullets.filter(bullet => {
-        if (!bullet || !bullet.mesh || !bullet.velocity) {
-            return false;
-        }
-        
-        bullet.mesh.position.add(bullet.velocity);
-        bullet.life--;
-        
-        const damage = bullet.damage || (this.player.effects.damage.active ? 
-            CONFIG.bullet.damage * CONFIG.audio.damage.mult : CONFIG.bullet.damage);
-
-        // Enemy collision detection
-        for (let enemy of this.enemies) {
-            if (!enemy || !enemy.mesh || !enemy.mesh.position || enemy.health <= 0) continue;
-            
-            try {
+          this.bullets = this.bullets.filter(bullet => {
+            // Safety check
+            if (!bullet || !bullet.mesh || !bullet.velocity) {
+              return false;
+            }
+            bullet.mesh.position.add(bullet.velocity);
+            bullet.life--;
+            const damage = this.player.effects.damage.active ? CONFIG.bullet.damage * CONFIG.audio.damage.mult : CONFIG.bullet.damage;
+            // Check enemy collisions
+            for (let enemy of this.enemies) {
+              if (!enemy || !enemy.mesh || !enemy.mesh.position || enemy.health <= 0) continue;
+              try {
                 if (bullet.mesh.position.distanceTo(enemy.mesh.position) < 3) {
-                    enemy.health -= damage;
-                    enemy.attacking = true;
-                    enemy.retreating = false;
-                    this.audioManager.playEnemyHit();
-
-                    // Broadcast enemy damage to other players (only if not remote bullet)
-                    if (!bullet.isRemote && this.multiplayerManager && this.multiplayerManager.connections.size > 0) {
-                        this.multiplayerManager.broadcastEnemyDamage(enemy.mesh.position, damage);
-                    }
-
-                    if (enemy.health <= 0) {
-                        this.createExplosion(enemy.mesh.position);
-                        this.audioManager.playExplosion();
-                        enemy.mesh.visible = false;
-                        this.player.score += enemy.score;
-                        this.eventLogger.logEnemyDefeated(enemy.type);
-                        this.dropArtifact(enemy.mesh.position);
-                        this.updateHUD();
-                    }
-
-                    try {
-                        this.scene.remove(bullet.mesh);
-                    } catch (e) {
-                        console.warn('Failed to remove bullet from scene:', e);
-                    }
-                    return false;
+                  const bulletDamage = bullet.isAlly ? (bullet.damage || 25) : 
+                        (this.player.effects.damage.active ? CONFIG.bullet.damage * CONFIG.audio.damage.mult : CONFIG.bullet.damage);
+    enemy.health -= bulletDamage;
+                  enemy.attacking = true;
+                  enemy.retreating = false;
+                  this.audioManager.playEnemyHit();
+                  if (enemy.health <= 0) {
+                    this.createExplosion(enemy.mesh.position);
+                    this.audioManager.playExplosion();
+                    enemy.mesh.visible = false;
+                    this.player.score += enemy.score;
+                    this.dropArtifact(enemy.mesh.position);
+                    this.updateHUD();
+                  }
+                  try {
+                    this.scene.remove(bullet.mesh);
+                  } catch (e) {
+                    console.warn('Failed to remove bullet from scene:', e);
+                  }
+                  return false;
                 }
-            } catch (e) {
+              } catch (e) {
                 console.warn('Error in bullet-enemy collision:', e);
                 continue;
+              }
             }
-        }
-
-        // Planet collision detection
-        for (let planet of this.planets) {
-            if (!planet || !planet.center || planet.destroyed) continue;
-            
-            try {
+            // Check planet collisions
+            for (let planet of this.planets) {
+              if (!planet || !planet.center || planet.destroyed) continue;
+              try {
                 if (bullet.mesh.position.distanceTo(planet.center) < planet.config.radius) {
-                    planet.health -= damage;
-                    
-                    // Broadcast planet damage to other players (only if not remote bullet)
-                    if (!bullet.isRemote && this.multiplayerManager && this.multiplayerManager.connections.size > 0) {
-                        this.multiplayerManager.broadcastPlanetDamage(planet.center, damage);
-                    }
-                    
-                    if (planet.health <= 0) {
-                        this.destroyPlanet(planet);
-                    }
-
-                    try {
-                        this.scene.remove(bullet.mesh);
-                    } catch (e) {
-                        console.warn('Failed to remove bullet from scene:', e);
-                    }
-                    return false;
+                  planet.health -= damage;
+                  if (planet.health <= 0) {
+                    this.destroyPlanet(planet);
+                  }
+                  try {
+                    this.scene.remove(bullet.mesh);
+                  } catch (e) {
+                    console.warn('Failed to remove bullet from scene:', e);
+                  }
+                  return false;
                 }
-            } catch (e) {
+              } catch (e) {
                 console.warn('Error in bullet-planet collision:', e);
                 continue;
+              }
             }
-        }
-
-        if (bullet.life <= 0) {
-            try {
+            // Check bullet lifetime
+            if (bullet.life <= 0) {
+              try {
                 this.scene.remove(bullet.mesh);
-            } catch (e) {
+              } catch (e) {
                 console.warn('Failed to remove expired bullet:', e);
+              }
+              return false;
             }
-            return false;
+            return true;
+          });
         }
-
-        return true;
-    });
-}
         updateEnemyBullets(){
     this.enemyBullets = this.enemyBullets.filter(bullet => {
         if(!bullet || !bullet.mesh || !bullet.velocity){
@@ -5119,38 +4647,36 @@ this.audioManager.playSprite(randomSound, this.playerShip.position, this.playerS
         return true;
     });
 }
- updateArtifacts() {
+        updateArtifacts(){
     this.artifacts = this.artifacts.filter(artifact => {
         artifact.life--;
+        
+        // Enhanced bobbing and rotation
         artifact.mesh.position.y = 1 + Math.sin(Date.now() * 0.005 + artifact.bobOffset) * 0.8;
         artifact.mesh.rotation.y += 0.08;
         artifact.mesh.rotation.x += 0.03;
         
+        // Pulsing effect on the main body and edges
         const pulse = 0.3 + 0.4 * Math.sin(Date.now() * 0.008 + artifact.pulseOffset);
         artifact.mainBody.material.emissiveIntensity = pulse;
         artifact.mainBody.material.opacity = 0.7 + 0.2 * pulse;
         artifact.edges.material.opacity = 0.6 + 0.3 * pulse;
-
+        
         const playerPosition = this.playerShip.position.clone();
         playerPosition.y = artifact.mesh.position.y;
         const distance = artifact.mesh.position.distanceTo(playerPosition);
         
-        if (distance < 6) {
-            // Broadcast artifact pickup to other players
-            if (this.multiplayerManager && this.multiplayerManager.connections.size > 0) {
-                this.multiplayerManager.broadcastArtifactPickup(artifact.mesh.position);
-            }
-            
+        if(distance < 6){
             this.applyArtifactEffect(artifact.type);
             this.scene.remove(artifact.mesh);
             return false;
         }
-
-        if (artifact.life <= 0) {
+        
+        if(artifact.life <= 0){
             this.scene.remove(artifact.mesh);
             return false;
         }
-
+        
         return true;
     });
 }
@@ -5390,20 +4916,17 @@ setTimeout(() => {
           this.createArtifact(position, randomType)
         }
         applyArtifactEffect(type) {
-    const artifactConfig = CONFIG.audio[type];
-    const currentTime = Date.now();
-    
-    if (type === 'health') {
-        this.player.health = Math.min(CONFIG.player.health, this.player.health + artifactConfig.amount);
-    } else {
-        this.player.effects[type].active = true;
-        this.player.effects[type].endTime = currentTime + artifactConfig.duration;
-    }
-    
-    this.audioManager.playWeaponSwitch();
-    this.updateHUD();
-}
-
+          const artifactConfig = CONFIG.audio[type];
+          const currentTime = Date.now();
+          if (type === 'health') {
+            this.player.health = Math.min(CONFIG.player.health, this.player.health + artifactConfig.amount)
+          } else {
+            this.player.effects[type].active = !0;
+            this.player.effects[type].endTime = currentTime + artifactConfig.duration
+          }
+          this.audioManager.playWeaponSwitch();
+          this.updateHUD()
+        }
         createExplosion(position, size = 5) {
           const explosionGeom = new THREE.SphereGeometry(size, 16, 16);
           const explosionMat = new THREE.MeshBasicMaterial({
@@ -5555,7 +5078,6 @@ setTimeout(() => {
     this.waypointReachedCooldown=0;
     this.initialWaypointSet=!1; // Resetear bandera de waypoint inicial para permitir nuevo seteo
     
-    this.cleanupMultiplayer();
     // Clean up allies
     this.allies.forEach(ally=>this.scene.remove(ally.mesh));
     this.allies=[];

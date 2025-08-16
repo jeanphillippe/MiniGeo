@@ -2147,6 +2147,382 @@ class EventLogger {
         this.logEvent(`📡 ${message}`, 'system');
     }
 }
+class MultiplayerManager {
+    constructor(game) {
+        this.game = game;
+        this.peer = null;
+        this.connections = new Map(); // playerId -> connection
+        this.isHost = false;
+        this.myPlayerId = null;
+        this.remotePlayers = new Map(); // playerId -> player data
+        this.lastSentPosition = { x: 0, z: 0, rotation: 0 };
+        this.setupUI();
+    }
+
+    setupUI() {
+        // Create multiplayer UI
+        const mpUI = document.createElement('div');
+        mpUI.id = 'multiplayerUI';
+        mpUI.innerHTML = `
+            <div id="mpPanel" class="mp-hidden">
+                <h3>Multijugador</h3>
+                <div id="mpStatus">Desconectado</div>
+                <div id="mpControls">
+                    <button id="hostGameBtn">Crear Partida</button>
+                    <div id="joinGameDiv">
+                        <input id="gameCodeInput" placeholder="Código de partida" maxlength="10">
+                        <button id="joinGameBtn">Unirse</button>
+                    </div>
+                    <div id="gameCodeDisplay" style="display:none;">
+                        <strong>Código: <span id="gameCode"></span></strong>
+                        <button id="copyCodeBtn">Copiar</button>
+                    </div>
+                </div>
+                <div id="playersList">
+                    <h4>Jugadores:</h4>
+                    <div id="playersContent"></div>
+                </div>
+            </div>
+            <button id="mpToggle">MP</button>
+        `;
+
+        // Add CSS
+        const style = document.createElement('style');
+        style.textContent = `
+            #multiplayerUI {
+                position: fixed;
+                top: 100px;
+                left: 20px;
+                z-index: 1000;
+            }
+            
+            #mpPanel {
+                width: 280px;
+                background: rgba(0, 0, 0, 0.9);
+                border: 2px solid rgba(0, 242, 254, 0.6);
+                border-radius: 10px;
+                padding: 15px;
+                font-family: 'Courier New', monospace;
+                color: #fff;
+                transition: transform 0.3s ease;
+            }
+            
+            #mpPanel.mp-hidden {
+                transform: translateX(-100%);
+            }
+            
+            #mpToggle {
+                position: absolute;
+                right: -40px;
+                top: 10px;
+                background: rgba(0, 242, 254, 0.2);
+                border: 2px solid rgba(0, 242, 254, 0.6);
+                color: #00f2fe;
+                padding: 8px 10px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-family: 'Courier New', monospace;
+                font-size: 12px;
+            }
+            
+            #mpPanel h3 {
+                margin: 0 0 10px 0;
+                color: #00f2fe;
+                font-size: 16px;
+            }
+            
+            #mpStatus {
+                margin-bottom: 15px;
+                padding: 5px 8px;
+                background: rgba(255, 71, 87, 0.2);
+                border-radius: 4px;
+                font-size: 12px;
+            }
+            
+            #mpStatus.connected {
+                background: rgba(0, 255, 136, 0.2);
+            }
+            
+            #mpControls button {
+                background: rgba(0, 242, 254, 0.2);
+                border: 1px solid rgba(0, 242, 254, 0.6);
+                color: #00f2fe;
+                padding: 6px 12px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 11px;
+                margin: 2px;
+                width: 100%;
+            }
+            
+            #mpControls input {
+                background: rgba(0, 0, 0, 0.5);
+                border: 1px solid rgba(0, 242, 254, 0.6);
+                color: #fff;
+                padding: 6px 8px;
+                border-radius: 4px;
+                width: 100%;
+                margin: 2px 0;
+                font-family: 'Courier New', monospace;
+                font-size: 11px;
+            }
+            
+            #playersList {
+                margin-top: 15px;
+            }
+            
+            #playersList h4 {
+                margin: 0 0 5px 0;
+                color: #00f2fe;
+                font-size: 12px;
+            }
+            
+            .player-item {
+                padding: 4px 8px;
+                background: rgba(0, 242, 254, 0.1);
+                margin: 2px 0;
+                border-radius: 3px;
+                font-size: 11px;
+            }
+            
+            .remote-player {
+                position: absolute;
+                pointer-events: none;
+                transform-origin: center;
+            }
+        `;
+
+        document.head.appendChild(style);
+        document.body.appendChild(mpUI);
+        
+        this.setupEventListeners();
+    }
+
+    setupEventListeners() {
+        document.getElementById('mpToggle').addEventListener('click', () => {
+            const panel = document.getElementById('mpPanel');
+            panel.classList.toggle('mp-hidden');
+        });
+
+        document.getElementById('hostGameBtn').addEventListener('click', () => {
+            this.hostGame();
+        });
+
+        document.getElementById('joinGameBtn').addEventListener('click', () => {
+            const code = document.getElementById('gameCodeInput').value.trim();
+            if (code) this.joinGame(code);
+        });
+
+        document.getElementById('copyCodeBtn').addEventListener('click', () => {
+            const code = document.getElementById('gameCode').textContent;
+            navigator.clipboard.writeText(code);
+        });
+    }
+
+    async hostGame() {
+        try {
+            this.peer = new Peer();
+            this.isHost = true;
+            
+            this.peer.on('open', (id) => {
+                this.myPlayerId = id;
+                this.updateStatus('Esperando jugadores...', true);
+                this.showGameCode(id);
+                this.game.eventLogger.logSystem('Partida multijugador creada');
+            });
+
+            this.peer.on('connection', (conn) => {
+                this.handleNewPlayer(conn);
+            });
+
+        } catch (error) {
+            console.error('Error hosting game:', error);
+            this.updateStatus('Error al crear partida');
+        }
+    }
+
+    async joinGame(hostId) {
+        try {
+            this.peer = new Peer();
+            
+            this.peer.on('open', (id) => {
+                this.myPlayerId = id;
+                const conn = this.peer.connect(hostId);
+                this.handleNewPlayer(conn);
+            });
+
+        } catch (error) {
+            console.error('Error joining game:', error);
+            this.updateStatus('Error al unirse a la partida');
+        }
+    }
+
+    handleNewPlayer(conn) {
+        conn.on('open', () => {
+            this.connections.set(conn.peer, conn);
+            this.updateStatus(`Conectado (${this.connections.size + 1} jugadores)`, true);
+            this.updatePlayersList();
+            
+            // Send initial game state
+            this.sendGameState(conn);
+            
+            // Log connection
+            this.game.eventLogger.logSystem(`Jugador ${conn.peer.substring(0, 8)} se unió`);
+        });
+
+        conn.on('data', (data) => {
+            this.handleMessage(data, conn.peer);
+        });
+
+        conn.on('close', () => {
+            this.handlePlayerDisconnect(conn.peer);
+        });
+    }
+
+    handleMessage(data, playerId) {
+        switch (data.type) {
+            case 'playerUpdate':
+                this.updateRemotePlayer(playerId, data);
+                break;
+            case 'chatMessage':
+                this.game.eventLogger.logSystem(`${playerId.substring(0, 8)}: ${data.message}`);
+                break;
+            case 'gameState':
+                this.handleGameState(data);
+                break;
+        }
+    }
+
+    sendGameState(conn) {
+        const gameState = {
+            type: 'gameState',
+            player: {
+                id: this.myPlayerId,
+                position: this.game.playerShip.position,
+                rotation: this.game.playerShip.rotation.y,
+                health: this.game.player.health,
+                score: this.game.player.score
+            }
+        };
+        conn.send(gameState);
+    }
+
+    updateRemotePlayer(playerId, data) {
+        if (!this.remotePlayers.has(playerId)) {
+            // Create new remote player ship
+            const remoteShip = this.game.createRemotePlayerShip();
+            this.remotePlayers.set(playerId, {
+                ship: remoteShip,
+                lastUpdate: Date.now(),
+                ...data.player
+            });
+            this.game.scene.add(remoteShip);
+        }
+
+        const remotePlayer = this.remotePlayers.get(playerId);
+        remotePlayer.ship.position.copy(data.player.position);
+        remotePlayer.ship.rotation.y = data.player.rotation;
+        remotePlayer.lastUpdate = Date.now();
+    }
+
+    broadcastPlayerUpdate() {
+        if (this.connections.size === 0) return;
+
+        const currentPos = this.game.playerShip.position;
+        const currentRot = this.game.playerShip.rotation.y;
+        
+        // Only send if player moved significantly
+        const moved = Math.abs(currentPos.x - this.lastSentPosition.x) > 0.5 ||
+                     Math.abs(currentPos.z - this.lastSentPosition.z) > 0.5 ||
+                     Math.abs(currentRot - this.lastSentPosition.rotation) > 0.1;
+
+        if (moved) {
+            const updateData = {
+                type: 'playerUpdate',
+                player: {
+                    position: currentPos,
+                    rotation: currentRot,
+                    health: this.game.player.health,
+                    score: this.game.player.score
+                }
+            };
+
+            this.connections.forEach(conn => {
+                conn.send(updateData);
+            });
+
+            this.lastSentPosition = {
+                x: currentPos.x,
+                z: currentPos.z,
+                rotation: currentRot
+            };
+        }
+    }
+
+    handlePlayerDisconnect(playerId) {
+        this.connections.delete(playerId);
+        
+        if (this.remotePlayers.has(playerId)) {
+            this.game.scene.remove(this.remotePlayers.get(playerId).ship);
+            this.remotePlayers.delete(playerId);
+        }
+        
+        this.updateStatus(`Conectado (${this.connections.size + 1} jugadores)`, true);
+        this.updatePlayersList();
+        this.game.eventLogger.logSystem(`Jugador ${playerId.substring(0, 8)} se desconectó`);
+    }
+
+    updateStatus(message, connected = false) {
+        const status = document.getElementById('mpStatus');
+        status.textContent = message;
+        status.className = connected ? 'connected' : '';
+    }
+
+    showGameCode(code) {
+        document.getElementById('gameCode').textContent = code;
+        document.getElementById('gameCodeDisplay').style.display = 'block';
+        document.getElementById('mpControls').style.display = 'none';
+    }
+
+    updatePlayersList() {
+        const content = document.getElementById('playersContent');
+        let html = `<div class="player-item">Tú (Host: ${this.isHost})</div>`;
+        
+        this.connections.forEach((conn, playerId) => {
+            html += `<div class="player-item">${playerId.substring(0, 8)}</div>`;
+        });
+        
+        content.innerHTML = html;
+    }
+
+    update() {
+        if (this.peer && this.peer.open) {
+            this.broadcastPlayerUpdate();
+            this.cleanupStaleRemotePlayers();
+        }
+    }
+
+    cleanupStaleRemotePlayers() {
+        const now = Date.now();
+        this.remotePlayers.forEach((player, playerId) => {
+            if (now - player.lastUpdate > 5000) { // 5 seconds timeout
+                this.handlePlayerDisconnect(playerId);
+            }
+        });
+    }
+
+    sendChatMessage(message) {
+        const chatData = {
+            type: 'chatMessage',
+            message: message,
+            timestamp: Date.now()
+        };
+
+        this.connections.forEach(conn => {
+            conn.send(chatData);
+        });
+    }
+}
       class SpaceShooter {
         constructor() {
           this.initializeRenderer();
@@ -2492,6 +2868,7 @@ this.tractorBeam = null;
     this.audioManager=new AudioManager();
     this.minimapManager=new MinimapManager();
     this.eventLogger = new EventLogger();
+this.multiplayerManager = new MultiplayerManager(this);
     this.explosions=[];
     this.landingState='none';
     this.landingTarget=null;
@@ -3576,8 +3953,28 @@ this.updateEnemyEMPRecovery();
     this.updateWaypointIndicator(); // Update 3D indicator
     if (this.waypointReachedCooldown > 0) this.waypointReachedCooldown--;
           this.updateMinimap();
-          this.updateExplosions()
+          this.updateExplosions();
+        
+if (this.multiplayerManager) {
+    this.multiplayerManager.update();
+}
+
         }
+        createRemotePlayerShip() {
+    const remoteShip = ShipFactory.create('fighter'); // Different ship type for visibility
+    remoteShip.traverse((child) => {
+        if (child.isMesh) {
+            // Make remote players semi-transparent
+            child.material = child.material.clone();
+            child.material.transparent = true;
+            child.material.opacity = 0.7;
+            // Different color for remote players
+            child.material.color.setHex(0x00ff88);
+        }
+    });
+    remoteShip.scale.multiplyScalar(0.9); // Slightly smaller
+    return remoteShip;
+}
  updateAllies(){
     this.allies = this.allies.filter(ally => {
         if(ally.health <= 0){

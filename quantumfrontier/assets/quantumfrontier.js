@@ -2380,18 +2380,176 @@ class MultiplayerManager {
     }
 
     handleMessage(data, playerId) {
-        switch (data.type) {
-            case 'playerUpdate':
-                this.updateRemotePlayer(playerId, data);
-                break;
-            case 'chatMessage':
-                this.game.eventLogger.logSystem(`${playerId.substring(0, 8)}: ${data.message}`);
-                break;
-            case 'gameState':
-                this.handleGameState(data);
-                break;
+    switch (data.type) {
+        case 'playerUpdate':
+            this.updateRemotePlayer(playerId, data);
+            break;
+        case 'bulletFired':
+            this.handleRemoteBullet(data);
+            break;
+        case 'enemyDamaged':
+            this.handleEnemyDamage(data);
+            break;
+        case 'planetDamaged':
+            this.handlePlanetDamage(data);
+            break;
+        case 'artifactPickup':
+            this.handleArtifactPickup(data);
+            break;
+        case 'chatMessage':
+            this.game.eventLogger.logSystem(`${playerId.substring(0, 8)}: ${data.message}`);
+            break;
+        case 'gameState':
+            this.handleGameState(data);
+            break;
+    }
+}
+handleRemoteBullet(data) {
+    // Create bullet from remote player
+    const bulletGeom = new THREE.SphereGeometry(0.2, 8, 8);
+    const bulletMat = new THREE.MeshBasicMaterial({
+        color: data.isAlly ? 0x00ff88 : 0x00f2fe,
+        depthTest: true,
+        depthWrite: true
+    });
+    const bullet = new THREE.Mesh(bulletGeom, bulletMat);
+    bullet.renderOrder = 60;
+    
+    bullet.position.copy(data.position);
+    const velocity = new THREE.Vector3().copy(data.direction).multiplyScalar(data.speed);
+    
+    const bulletObject = {
+        mesh: bullet,
+        velocity: velocity,
+        life: data.life,
+        isRemote: true,
+        playerId: data.playerId,
+        damage: data.damage
+    };
+    
+    this.game.bullets.push(bulletObject);
+    this.game.scene.add(bullet);
+}
+
+handleEnemyDamage(data) {
+    // Find enemy by position (closest match)
+    let targetEnemy = null;
+    let minDistance = Infinity;
+    
+    this.game.enemies.forEach(enemy => {
+        if (enemy.health > 0) {
+            const distance = enemy.mesh.position.distanceTo(data.enemyPosition);
+            if (distance < minDistance && distance < 5) {
+                minDistance = distance;
+                targetEnemy = enemy;
+            }
+        }
+    });
+    
+    if (targetEnemy) {
+        targetEnemy.health -= data.damage;
+        this.game.audioManager.playEnemyHit();
+        
+        if (targetEnemy.health <= 0) {
+            this.game.createExplosion(targetEnemy.mesh.position);
+            this.game.audioManager.playExplosion();
+            targetEnemy.mesh.visible = false;
+            this.game.eventLogger.logEnemyDefeated(targetEnemy.type);
+            this.game.dropArtifact(targetEnemy.mesh.position);
         }
     }
+}
+
+handlePlanetDamage(data) {
+    // Find planet by position
+    let targetPlanet = null;
+    let minDistance = Infinity;
+    
+    this.game.planets.forEach(planet => {
+        if (!planet.destroyed) {
+            const distance = planet.center.distanceTo(data.planetPosition);
+            if (distance < minDistance && distance < 10) {
+                minDistance = distance;
+                targetPlanet = planet;
+            }
+        }
+    });
+    
+    if (targetPlanet) {
+        targetPlanet.health -= data.damage;
+        if (targetPlanet.health <= 0 && !targetPlanet.destroyed) {
+            this.game.destroyPlanet(targetPlanet);
+        }
+    }
+}
+
+handleArtifactPickup(data) {
+    // Remove artifact at specific position
+    this.game.artifacts = this.game.artifacts.filter(artifact => {
+        const distance = artifact.mesh.position.distanceTo(data.position);
+        if (distance < 3) {
+            this.game.scene.remove(artifact.mesh);
+            return false;
+        }
+        return true;
+    });
+}
+
+broadcastBulletFired(bulletData) {
+    const data = {
+        type: 'bulletFired',
+        playerId: this.myPlayerId,
+        position: bulletData.position,
+        direction: bulletData.direction,
+        speed: bulletData.speed,
+        life: bulletData.life,
+        damage: bulletData.damage,
+        isAlly: false
+    };
+    
+    this.connections.forEach(conn => {
+        conn.send(data);
+    });
+}
+
+broadcastEnemyDamage(enemyPosition, damage) {
+    const data = {
+        type: 'enemyDamaged',
+        playerId: this.myPlayerId,
+        enemyPosition: enemyPosition,
+        damage: damage
+    };
+    
+    this.connections.forEach(conn => {
+        conn.send(data);
+    });
+}
+
+broadcastPlanetDamage(planetPosition, damage) {
+    const data = {
+        type: 'planetDamaged',
+        playerId: this.myPlayerId,
+        planetPosition: planetPosition,
+        damage: damage
+    };
+    
+    this.connections.forEach(conn => {
+        conn.send(data);
+    });
+}
+
+broadcastArtifactPickup(position) {
+    const data = {
+        type: 'artifactPickup',
+        playerId: this.myPlayerId,
+        position: position
+    };
+    
+    this.connections.forEach(conn => {
+        conn.send(data);
+    });
+}
+
 
     sendGameState(conn) {
         const gameState = {
@@ -3739,34 +3897,53 @@ fireHomingMissile(){
           }
         }
         createBullet(angleOffset = 0) {
-          try {
-            const bulletGeom = new THREE.SphereGeometry(0.2, 8, 8);
-            const bulletMat = new THREE.MeshBasicMaterial({
-              color: 0x00f2fe,
-            depthTest: true,     // ADD THIS LINE
-            depthWrite: true  
-            });
-            const bullet = new THREE.Mesh(bulletGeom, bulletMat);
-               bullet.renderOrder = 60;
-            if (!this.playerShip || !this.playerShip.position) {
-              console.warn('Player ship not available for bullet creation');
-              return;
-            }
-            bullet.position.copy(this.playerShip.position);
-            bullet.position.y += 0.5;
-            const direction = new THREE.Vector3(Math.sin(this.playerShip.rotation.y + angleOffset), 0, Math.cos(this.playerShip.rotation.y + angleOffset));
-            const bulletVelocity = direction.clone().multiplyScalar(CONFIG.bullet.speed);
-            const bulletObject = {
-              mesh: bullet,
-              velocity: bulletVelocity,
-              life: CONFIG.bullet.life
-            };
-            this.bullets.push(bulletObject);
-            this.scene.add(bullet);
-          } catch (e) {
-            console.error('Failed to create bullet:', e);
-          }
+    try {
+        const bulletGeom = new THREE.SphereGeometry(0.2, 8, 8);
+        const bulletMat = new THREE.MeshBasicMaterial({color: 0x00f2fe, depthTest: true, depthWrite: true});
+        const bullet = new THREE.Mesh(bulletGeom, bulletMat);
+        bullet.renderOrder = 60;
+
+        if (!this.playerShip || !this.playerShip.position) {
+            console.warn('Player ship not available for bullet creation');
+            return;
         }
+
+        bullet.position.copy(this.playerShip.position);
+        bullet.position.y += 0.5;
+        
+        const direction = new THREE.Vector3(
+            Math.sin(this.playerShip.rotation.y + angleOffset),
+            0,
+            Math.cos(this.playerShip.rotation.y + angleOffset)
+        );
+        const bulletVelocity = direction.clone().multiplyScalar(CONFIG.bullet.speed);
+        const damage = this.player.effects.damage.active ? 
+            CONFIG.bullet.damage * CONFIG.audio.damage.mult : CONFIG.bullet.damage;
+
+        const bulletObject = {
+            mesh: bullet,
+            velocity: bulletVelocity,
+            life: CONFIG.bullet.life,
+            damage: damage
+        };
+
+        this.bullets.push(bulletObject);
+        this.scene.add(bullet);
+
+        // Broadcast bullet to other players
+        if (this.multiplayerManager && this.multiplayerManager.connections.size > 0) {
+            this.multiplayerManager.broadcastBulletFired({
+                position: bullet.position,
+                direction: direction,
+                speed: CONFIG.bullet.speed,
+                life: CONFIG.bullet.life,
+                damage: damage
+            });
+        }
+    } catch (e) {
+        console.error('Failed to create bullet:', e);
+    }
+}
         fireMine(){
     const mineGeom = new THREE.SphereGeometry(0.6, 12, 12);
     const mineMat = new THREE.MeshBasicMaterial({
@@ -4518,78 +4695,98 @@ createAllyBullet(ally, target){
           return cooldowns[weaponType] || 120
         }
         updateBullets() {
-          this.bullets = this.bullets.filter(bullet => {
-            // Safety check
-            if (!bullet || !bullet.mesh || !bullet.velocity) {
-              return false;
-            }
-            bullet.mesh.position.add(bullet.velocity);
-            bullet.life--;
-            const damage = this.player.effects.damage.active ? CONFIG.bullet.damage * CONFIG.audio.damage.mult : CONFIG.bullet.damage;
-            // Check enemy collisions
-            for (let enemy of this.enemies) {
-              if (!enemy || !enemy.mesh || !enemy.mesh.position || enemy.health <= 0) continue;
-              try {
+    this.bullets = this.bullets.filter(bullet => {
+        if (!bullet || !bullet.mesh || !bullet.velocity) {
+            return false;
+        }
+        
+        bullet.mesh.position.add(bullet.velocity);
+        bullet.life--;
+        
+        const damage = bullet.damage || (this.player.effects.damage.active ? 
+            CONFIG.bullet.damage * CONFIG.audio.damage.mult : CONFIG.bullet.damage);
+
+        // Enemy collision detection
+        for (let enemy of this.enemies) {
+            if (!enemy || !enemy.mesh || !enemy.mesh.position || enemy.health <= 0) continue;
+            
+            try {
                 if (bullet.mesh.position.distanceTo(enemy.mesh.position) < 3) {
-                  const bulletDamage = bullet.isAlly ? (bullet.damage || 25) : 
-                        (this.player.effects.damage.active ? CONFIG.bullet.damage * CONFIG.audio.damage.mult : CONFIG.bullet.damage);
-    enemy.health -= bulletDamage;
-                  enemy.attacking = true;
-                  enemy.retreating = false;
-                  this.audioManager.playEnemyHit();
-                  if (enemy.health <= 0) {
-                    this.createExplosion(enemy.mesh.position);
-                    this.audioManager.playExplosion();
-                    enemy.mesh.visible = false;
-                    this.player.score += enemy.score;
-                    this.dropArtifact(enemy.mesh.position);
-                    this.updateHUD();
-                  }
-                  try {
-                    this.scene.remove(bullet.mesh);
-                  } catch (e) {
-                    console.warn('Failed to remove bullet from scene:', e);
-                  }
-                  return false;
+                    enemy.health -= damage;
+                    enemy.attacking = true;
+                    enemy.retreating = false;
+                    this.audioManager.playEnemyHit();
+
+                    // Broadcast enemy damage to other players (only if not remote bullet)
+                    if (!bullet.isRemote && this.multiplayerManager && this.multiplayerManager.connections.size > 0) {
+                        this.multiplayerManager.broadcastEnemyDamage(enemy.mesh.position, damage);
+                    }
+
+                    if (enemy.health <= 0) {
+                        this.createExplosion(enemy.mesh.position);
+                        this.audioManager.playExplosion();
+                        enemy.mesh.visible = false;
+                        this.player.score += enemy.score;
+                        this.eventLogger.logEnemyDefeated(enemy.type);
+                        this.dropArtifact(enemy.mesh.position);
+                        this.updateHUD();
+                    }
+
+                    try {
+                        this.scene.remove(bullet.mesh);
+                    } catch (e) {
+                        console.warn('Failed to remove bullet from scene:', e);
+                    }
+                    return false;
                 }
-              } catch (e) {
+            } catch (e) {
                 console.warn('Error in bullet-enemy collision:', e);
                 continue;
-              }
             }
-            // Check planet collisions
-            for (let planet of this.planets) {
-              if (!planet || !planet.center || planet.destroyed) continue;
-              try {
+        }
+
+        // Planet collision detection
+        for (let planet of this.planets) {
+            if (!planet || !planet.center || planet.destroyed) continue;
+            
+            try {
                 if (bullet.mesh.position.distanceTo(planet.center) < planet.config.radius) {
-                  planet.health -= damage;
-                  if (planet.health <= 0) {
-                    this.destroyPlanet(planet);
-                  }
-                  try {
-                    this.scene.remove(bullet.mesh);
-                  } catch (e) {
-                    console.warn('Failed to remove bullet from scene:', e);
-                  }
-                  return false;
+                    planet.health -= damage;
+                    
+                    // Broadcast planet damage to other players (only if not remote bullet)
+                    if (!bullet.isRemote && this.multiplayerManager && this.multiplayerManager.connections.size > 0) {
+                        this.multiplayerManager.broadcastPlanetDamage(planet.center, damage);
+                    }
+                    
+                    if (planet.health <= 0) {
+                        this.destroyPlanet(planet);
+                    }
+
+                    try {
+                        this.scene.remove(bullet.mesh);
+                    } catch (e) {
+                        console.warn('Failed to remove bullet from scene:', e);
+                    }
+                    return false;
                 }
-              } catch (e) {
+            } catch (e) {
                 console.warn('Error in bullet-planet collision:', e);
                 continue;
-              }
             }
-            // Check bullet lifetime
-            if (bullet.life <= 0) {
-              try {
-                this.scene.remove(bullet.mesh);
-              } catch (e) {
-                console.warn('Failed to remove expired bullet:', e);
-              }
-              return false;
-            }
-            return true;
-          });
         }
+
+        if (bullet.life <= 0) {
+            try {
+                this.scene.remove(bullet.mesh);
+            } catch (e) {
+                console.warn('Failed to remove expired bullet:', e);
+            }
+            return false;
+        }
+
+        return true;
+    });
+}
         updateEnemyBullets(){
     this.enemyBullets = this.enemyBullets.filter(bullet => {
         if(!bullet || !bullet.mesh || !bullet.velocity){
@@ -4668,36 +4865,38 @@ this.audioManager.playSprite(randomSound, this.playerShip.position, this.playerS
         return true;
     });
 }
-        updateArtifacts(){
+ updateArtifacts() {
     this.artifacts = this.artifacts.filter(artifact => {
         artifact.life--;
-        
-        // Enhanced bobbing and rotation
         artifact.mesh.position.y = 1 + Math.sin(Date.now() * 0.005 + artifact.bobOffset) * 0.8;
         artifact.mesh.rotation.y += 0.08;
         artifact.mesh.rotation.x += 0.03;
         
-        // Pulsing effect on the main body and edges
         const pulse = 0.3 + 0.4 * Math.sin(Date.now() * 0.008 + artifact.pulseOffset);
         artifact.mainBody.material.emissiveIntensity = pulse;
         artifact.mainBody.material.opacity = 0.7 + 0.2 * pulse;
         artifact.edges.material.opacity = 0.6 + 0.3 * pulse;
-        
+
         const playerPosition = this.playerShip.position.clone();
         playerPosition.y = artifact.mesh.position.y;
         const distance = artifact.mesh.position.distanceTo(playerPosition);
         
-        if(distance < 6){
+        if (distance < 6) {
+            // Broadcast artifact pickup to other players
+            if (this.multiplayerManager && this.multiplayerManager.connections.size > 0) {
+                this.multiplayerManager.broadcastArtifactPickup(artifact.mesh.position);
+            }
+            
             this.applyArtifactEffect(artifact.type);
             this.scene.remove(artifact.mesh);
             return false;
         }
-        
-        if(artifact.life <= 0){
+
+        if (artifact.life <= 0) {
             this.scene.remove(artifact.mesh);
             return false;
         }
-        
+
         return true;
     });
 }
@@ -4937,17 +5136,20 @@ setTimeout(() => {
           this.createArtifact(position, randomType)
         }
         applyArtifactEffect(type) {
-          const artifactConfig = CONFIG.audio[type];
-          const currentTime = Date.now();
-          if (type === 'health') {
-            this.player.health = Math.min(CONFIG.player.health, this.player.health + artifactConfig.amount)
-          } else {
-            this.player.effects[type].active = !0;
-            this.player.effects[type].endTime = currentTime + artifactConfig.duration
-          }
-          this.audioManager.playWeaponSwitch();
-          this.updateHUD()
-        }
+    const artifactConfig = CONFIG.audio[type];
+    const currentTime = Date.now();
+    
+    if (type === 'health') {
+        this.player.health = Math.min(CONFIG.player.health, this.player.health + artifactConfig.amount);
+    } else {
+        this.player.effects[type].active = true;
+        this.player.effects[type].endTime = currentTime + artifactConfig.duration;
+    }
+    
+    this.audioManager.playWeaponSwitch();
+    this.updateHUD();
+}
+
         createExplosion(position, size = 5) {
           const explosionGeom = new THREE.SphereGeometry(size, 16, 16);
           const explosionMat = new THREE.MeshBasicMaterial({

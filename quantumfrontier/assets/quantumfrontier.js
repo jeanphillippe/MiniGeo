@@ -1897,6 +1897,256 @@ playDamage(sourcePos=null,listenerPos=null){
         }
     }
 }
+class EventLogger {
+    constructor() {
+        this.events = [];
+        this.maxEvents = 50; // Keep last 50 events
+        this.visible = false;
+        this.createEventPanel();
+    }
+
+    createEventPanel() {
+        // Create the events panel HTML
+        const eventsPanel = document.createElement('div');
+        eventsPanel.id = 'eventsPanel';
+        eventsPanel.innerHTML = `
+            <div id="eventsHeader">
+                <span>EVENTOS</span>
+                <button id="eventsToggle">×</button>
+            </div>
+            <div id="eventsContent"></div>
+        `;
+        
+        // Add CSS styles
+        const style = document.createElement('style');
+        style.textContent = `
+            #eventsPanel {
+                position: fixed;
+                top: 20px;
+                right: -320px;
+                width: 300px;
+                height: 400px;
+                background: rgba(0, 0, 0, 0.9);
+                border: 2px solid rgba(0, 242, 254, 0.6);
+                border-radius: 10px;
+                z-index: 1000;
+                transition: right 0.3s ease;
+                font-family: 'Courier New', monospace;
+                overflow: hidden;
+                backdrop-filter: blur(5px);
+            }
+
+            #eventsPanel.visible {
+                right: 20px;
+            }
+
+            #eventsHeader {
+                background: rgba(0, 242, 254, 0.2);
+                padding: 10px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                color: #00f2fe;
+                font-weight: bold;
+                font-size: 14px;
+            }
+
+            #eventsToggle {
+                background: none;
+                border: none;
+                color: #00f2fe;
+                font-size: 18px;
+                cursor: pointer;
+                width: 20px;
+                height: 20px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            #eventsContent {
+                height: calc(100% - 44px);
+                overflow-y: auto;
+                padding: 10px;
+                scrollbar-width: thin;
+                scrollbar-color: rgba(0, 242, 254, 0.6) transparent;
+            }
+
+            #eventsContent::-webkit-scrollbar {
+                width: 6px;
+            }
+
+            #eventsContent::-webkit-scrollbar-track {
+                background: transparent;
+            }
+
+            #eventsContent::-webkit-scrollbar-thumb {
+                background: rgba(0, 242, 254, 0.6);
+                border-radius: 3px;
+            }
+
+            .event-entry {
+                margin-bottom: 8px;
+                padding: 6px 8px;
+                border-left: 3px solid #00f2fe;
+                background: rgba(0, 242, 254, 0.1);
+                border-radius: 4px;
+                font-size: 12px;
+                line-height: 1.4;
+                color: #e0e0e0;
+                animation: eventFadeIn 0.3s ease-in;
+            }
+
+            .event-timestamp {
+                color: #888;
+                font-size: 10px;
+                display: block;
+                margin-bottom: 2px;
+            }
+
+            .event-content {
+                color: #fff;
+            }
+
+            .event-planet-destroyed {
+                border-left-color: #ff4757;
+                background: rgba(255, 71, 87, 0.1);
+            }
+
+            .event-enemy-defeated {
+                border-left-color: #feca57;
+                background: rgba(254, 202, 87, 0.1);
+            }
+
+            .event-system {
+                border-left-color: #a55eea;
+                background: rgba(165, 94, 234, 0.1);
+            }
+
+            @keyframes eventFadeIn {
+                from { opacity: 0; transform: translateX(10px); }
+                to { opacity: 1; transform: translateX(0); }
+            }
+
+            /* Toggle button when panel is closed */
+            #eventsOpenBtn {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: rgba(0, 242, 254, 0.2);
+                border: 2px solid rgba(0, 242, 254, 0.6);
+                color: #00f2fe;
+                padding: 8px 12px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-family: 'Courier New', monospace;
+                font-size: 12px;
+                z-index: 999;
+                transition: all 0.3s ease;
+            }
+
+            #eventsOpenBtn:hover {
+                background: rgba(0, 242, 254, 0.4);
+                transform: scale(1.05);
+            }
+
+            #eventsOpenBtn.hidden {
+                display: none;
+            }
+        `;
+
+        document.head.appendChild(style);
+        document.body.appendChild(eventsPanel);
+
+        // Create open button
+        const openBtn = document.createElement('button');
+        openBtn.id = 'eventsOpenBtn';
+        openBtn.textContent = 'EVENTOS';
+        document.body.appendChild(openBtn);
+
+        // Setup event listeners
+        this.setupEventListeners();
+    }
+
+    setupEventListeners() {
+        const panel = document.getElementById('eventsPanel');
+        const toggleBtn = document.getElementById('eventsToggle');
+        const openBtn = document.getElementById('eventsOpenBtn');
+
+        toggleBtn.addEventListener('click', () => this.togglePanel());
+        openBtn.addEventListener('click', () => this.togglePanel());
+    }
+
+    togglePanel() {
+        this.visible = !this.visible;
+        const panel = document.getElementById('eventsPanel');
+        const openBtn = document.getElementById('eventsOpenBtn');
+        
+        panel.classList.toggle('visible', this.visible);
+        openBtn.classList.toggle('hidden', this.visible);
+    }
+
+    logEvent(message, type = 'system') {
+        const timestamp = new Date().toLocaleTimeString();
+        const event = {
+            id: Date.now() + Math.random(),
+            message,
+            type,
+            timestamp
+        };
+
+        this.events.unshift(event);
+        
+        // Limit events array size
+        if (this.events.length > this.maxEvents) {
+            this.events = this.events.slice(0, this.maxEvents);
+        }
+
+        this.updateDisplay();
+    }
+
+    updateDisplay() {
+        const content = document.getElementById('eventsContent');
+        if (!content) return;
+
+        content.innerHTML = this.events.map(event => `
+            <div class="event-entry event-${event.type}">
+                <span class="event-timestamp">${event.timestamp}</span>
+                <div class="event-content">${event.message}</div>
+            </div>
+        `).join('');
+
+        // Auto-scroll to top (newest events)
+        content.scrollTop = 0;
+    }
+
+    // Convenience methods for different event types
+    logPlanetDestroyed(planetName) {
+        this.logEvent(`🔥 Planeta destruido: ${planetName}`, 'planet-destroyed');
+    }
+
+    logEnemyDefeated(enemyType, count = 1) {
+        const shipNames = {
+            'f': 'Caza',
+            'i': 'Interceptor', 
+            's': 'Explorador',
+            'd': 'Doradito',
+            'p': 'Diamante Púrpura',
+            'h': 'Pesado'
+        };
+        const shipName = shipNames[enemyType] || 'Enemigo';
+        
+        if (count === 1) {
+            this.logEvent(`⚡ ${shipName} eliminado`, 'enemy-defeated');
+        } else {
+            this.logEvent(`⚡ ${count} ${shipName}s eliminados`, 'enemy-defeated');
+        }
+    }
+
+    logSystem(message) {
+        this.logEvent(`📡 ${message}`, 'system');
+    }
+}
       class SpaceShooter {
         constructor() {
           this.initializeRenderer();
@@ -1939,7 +2189,7 @@ showNavigationNotification(targetName){
     `;
     notification.textContent = `Ve a: ${targetName}`;
     document.body.appendChild(notification);
-    
+    this.eventLogger.logSystem(`Nuevo objetivo: ${targetName}`);
     setTimeout(() => {
         if (document.body.contains(notification)) {
             document.body.removeChild(notification);
@@ -2241,6 +2491,7 @@ this.tractorBeam = null;
     this.touchControls={moveX:0,moveY:0,firing:!1};
     this.audioManager=new AudioManager();
     this.minimapManager=new MinimapManager();
+    this.eventLogger = new EventLogger();
     this.explosions=[];
     this.landingState='none';
     this.landingTarget=null;
@@ -4333,10 +4584,14 @@ setTimeout(() => {
         destroyPlanet(planet) {
     planet.destroyed = true;
     this.createExplosion(planet.center, planet.config.radius);
-    this.audioManager.playExplosion(2, planet.center, this.playerShip.position); // Updated call
+    this.audioManager.playExplosion(2, planet.center, this.playerShip.position);
     this.scene.remove(planet.mesh);
     this.player.score += 500;
     this.updateHUD();
+    
+    // ADD THIS LINE - Log planet destruction
+    const planetName = this.getPlanetName(planet);
+    this.eventLogger.logPlanetDestroyed(planetName);
     
     this.enemies = this.enemies.filter(enemy => {
         if (enemy.planet === planet) {

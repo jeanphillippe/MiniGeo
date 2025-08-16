@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimal Multiplayer Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+        }
+        
+        #gameContainer {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #00f2fe;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid rgba(0, 242, 254, 0.6);
+        }
+        
+        #status {
+            margin-bottom: 10px;
+            padding: 5px;
+            background: rgba(255, 71, 87, 0.2);
+            border-radius: 5px;
+        }
+        
+        #status.connected {
+            background: rgba(0, 255, 136, 0.2);
+        }
+        
+        button {
+            background: rgba(0, 242, 254, 0.2);
+            border: 1px solid rgba(0, 242, 254, 0.6);
+            color: #00f2fe;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 2px;
+            font-family: inherit;
+        }
+        
+        button:hover {
+            background: rgba(0, 242, 254, 0.4);
+        }
+        
+        input {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(0, 242, 254, 0.6);
+            color: #fff;
+            padding: 5px;
+            border-radius: 5px;
+            font-family: inherit;
+            margin: 2px;
+        }
+        
+        #gameCode {
+            background: rgba(0, 255, 136, 0.2);
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: #00f2fe;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid rgba(0, 242, 254, 0.3);
+        }
+        
+        #info {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: #feca57;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid rgba(254, 202, 87, 0.3);
+        }
+        
+        .player-list {
+            margin-top: 10px;
+        }
+        
+        .player-item {
+            background: rgba(0, 242, 254, 0.1);
+            padding: 3px 8px;
+            margin: 2px 0;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="ui">
+            <div id="status">Disconnected</div>
+            <button id="hostBtn">Host Game</button>
+            <div>
+                <input id="gameCodeInput" placeholder="Game Code" style="width: 120px;">
+                <button id="joinBtn">Join</button>
+            </div>
+            <div id="gameCode" style="display: none;">
+                Code: <span id="codeText"></span>
+                <button id="copyBtn">Copy</button>
+            </div>
+            <div class="player-list">
+                <div>Players:</div>
+                <div id="playersList"></div>
+            </div>
+        </div>
+        
+        <div id="controls">
+            WASD: Move<br>
+            SPACE: Shoot<br>
+            Mouse: Look
+        </div>
+        
+        <div id="info">
+            <div>Position: <span id="position">0, 0</span></div>
+            <div>Players: <span id="playerCount">0</span></div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.4.7/peerjs.min.js"></script>
+    
+    <script>
+        class MinimalMultiplayerTest {
+            constructor() {
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setClearColor(0x000011);
+                document.getElementById('gameContainer').appendChild(this.renderer.domElement);
+                
+                // Game state
+                this.myPlayer = null;
+                this.remotePlayers = new Map();
+                this.bullets = [];
+                this.keys = {};
+                this.mouse = { x: 0, y: 0 };
+                this.lastShotTime = 0;
+                
+                // Multiplayer
+                this.peer = null;
+                this.connections = new Map();
+                this.isHost = false;
+                this.myPlayerId = null;
+                this.lastSentData = { x: 0, z: 0, rotation: 0 };
+                
+                this.init();
+                this.setupEventListeners();
+                this.animate();
+            }
+            
+            init() {
+                // Lighting
+                const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+                this.scene.add(ambientLight);
+                
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(1, 1, 1);
+                this.scene.add(directionalLight);
+                
+                // Create player ship
+                this.createPlayer();
+                
+                // Position camera
+                this.camera.position.set(0, 20, 30);
+                this.camera.lookAt(0, 0, 0);
+                
+                // Create simple ground plane
+                const groundGeometry = new THREE.PlaneGeometry(200, 200);
+                const groundMaterial = new THREE.MeshLambertMaterial({ 
+                    color: 0x002244,
+                    transparent: true,
+                    opacity: 0.3
+                });
+                const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+                ground.rotation.x = -Math.PI / 2;
+                ground.position.y = -1;
+                this.scene.add(ground);
+                
+                // Add grid
+                const gridHelper = new THREE.GridHelper(200, 20, 0x00f2fe, 0x003366);
+                gridHelper.position.y = -0.9;
+                this.scene.add(gridHelper);
+            }
+            
+            createPlayer() {
+                // Simple ship geometry
+                const geometry = new THREE.ConeGeometry(1, 3, 8);
+                const material = new THREE.MeshLambertMaterial({ color: 0x00f2fe });
+                this.myPlayer = new THREE.Mesh(geometry, material);
+                this.myPlayer.position.set(0, 0, 0);
+                this.myPlayer.rotation.x = Math.PI / 2;
+                this.scene.add(this.myPlayer);
+                
+                // Add engine glow
+                const glowGeometry = new THREE.SphereGeometry(0.5, 8, 8);
+                const glowMaterial = new THREE.MeshBasicMaterial({ 
+                    color: 0x00ffff,
+                    transparent: true,
+                    opacity: 0.6
+                });
+                const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+                glow.position.z = -2;
+                this.myPlayer.add(glow);
+            }
+            
+            createRemotePlayer(playerId) {
+                const geometry = new THREE.ConeGeometry(1, 3, 8);
+                const material = new THREE.MeshLambertMaterial({ color: 0xff6b6b });
+                const player = new THREE.Mesh(geometry, material);
+                player.rotation.x = Math.PI / 2;
+                
+                // Add engine glow
+                const glowGeometry = new THREE.SphereGeometry(0.5, 8, 8);
+                const glowMaterial = new THREE.MeshBasicMaterial({ 
+                    color: 0xff6b6b,
+                    transparent: true,
+                    opacity: 0.6
+                });
+                const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+                glow.position.z = -2;
+                player.add(glow);
+                
+                this.scene.add(player);
+                this.remotePlayers.set(playerId, {
+                    mesh: player,
+                    lastUpdate: Date.now()
+                });
+                
+                this.updatePlayerCount();
+            }
+            
+            createBullet(position, direction, isLocal = true) {
+                const geometry = new THREE.SphereGeometry(0.1, 8, 8);
+                const material = new THREE.MeshBasicMaterial({ 
+                    color: isLocal ? 0x00ff00 : 0xff0000 
+                });
+                const bullet = new THREE.Mesh(geometry, material);
+                bullet.position.copy(position);
+                
+                const velocity = direction.clone().multiplyScalar(50);
+                
+                this.bullets.push({
+                    mesh: bullet,
+                    velocity: velocity,
+                    life: 100,
+                    isLocal: isLocal
+                });
+                
+                this.scene.add(bullet);
+            }
+            
+            // Multiplayer Functions
+            async hostGame() {
+                try {
+                    this.updateStatus('Starting server...', false);
+                    
+                    this.peer = new Peer({
+                        debug: 0,
+                        config: {
+                            iceServers: [
+                                { urls: 'stun:stun.l.google.com:19302' },
+                                { urls: 'stun:stun1.l.google.com:19302' }
+                            ]
+                        }
+                    });
+                    
+                    this.peer.on('open', (id) => {
+                        this.myPlayerId = id;
+                        this.isHost = true;
+                        this.updateStatus('Server active', true);
+                        this.showGameCode(id);
+                        console.log('Server active:', id);
+                    });
+                    
+                    this.peer.on('connection', (conn) => {
+                        console.log('Incoming connection from:', conn.peer);
+                        this.handleNewConnection(conn);
+                    });
+                    
+                    this.peer.on('error', (error) => {
+                        console.error('Peer error:', error);
+                        this.updateStatus(`Error: ${error.type || 'unknown'}`);
+                    });
+                    
+                } catch (error) {
+                    console.error('Host error:', error);
+                    this.updateStatus('Host failed');
+                }
+            }
+            
+            async joinGame(hostId) {
+                try {
+                    this.updateStatus('Connecting...', false);
+                    
+                    this.peer = new Peer({
+                        debug: 0,
+                        config: {
+                            iceServers: [
+                                { urls: 'stun:stun.l.google.com:19302' },
+                                { urls: 'stun:stun1.l.google.com:19302' }
+                            ]
+                        }
+                    });
+                    
+                    this.peer.on('open', (id) => {
+                        this.myPlayerId = id;
+                        console.log('Client ready:', id);
+                        
+                        const conn = this.peer.connect(hostId, {
+                            reliable: true,
+                            serialization: 'json'
+                        });
+                        
+                        this.handleNewConnection(conn);
+                    });
+                    
+                    this.peer.on('error', (error) => {
+                        console.error('Join error:', error);
+                        this.updateStatus(`Error: ${error.type || 'unknown'}`);
+                    });
+                    
+                } catch (error) {
+                    console.error('Join error:', error);
+                    this.updateStatus('Join failed');
+                }
+            }
+            
+            handleNewConnection(conn) {
+                conn.on('open', () => {
+                    this.connections.set(conn.peer, conn);
+                    this.updateStatus(`Connected (${this.connections.size + 1} players)`, true);
+                    this.updatePlayersList();
+                    console.log('Connection opened with:', conn.peer);
+                });
+                
+                conn.on('data', (data) => {
+                    this.handleMessage(data, conn.peer);
+                });
+                
+                conn.on('close', () => {
+                    console.log('Connection closed:', conn.peer);
+                    this.handlePlayerDisconnect(conn.peer);
+                });
+                
+                conn.on('error', (error) => {
+                    console.error('Connection error:', error);
+                });
+            }
+            
+            handleMessage(data, playerId) {
+                switch (data.type) {
+                    case 'playerUpdate':
+                        this.updateRemotePlayer(playerId, data);
+                        break;
+                    case 'playerShoot':
+                        this.handleRemoteShoot(data);
+                        break;
+                }
+            }
+            
+            updateRemotePlayer(playerId, data) {
+                if (!this.remotePlayers.has(playerId)) {
+                    this.createRemotePlayer(playerId);
+                }
+                
+                const remotePlayer = this.remotePlayers.get(playerId);
+                if (data.position) {
+                    remotePlayer.mesh.position.copy(data.position);
+                }
+                if (data.rotation !== undefined) {
+                    remotePlayer.mesh.rotation.y = data.rotation;
+                }
+                remotePlayer.lastUpdate = Date.now();
+            }
+            
+            handleRemoteShoot(data) {
+                if (data.position && data.direction) {
+                    this.createBullet(
+                        new THREE.Vector3().copy(data.position),
+                        new THREE.Vector3().copy(data.direction),
+                        false
+                    );
+                }
+            }
+            
+            handlePlayerDisconnect(playerId) {
+                this.connections.delete(playerId);
+                
+                if (this.remotePlayers.has(playerId)) {
+                    this.scene.remove(this.remotePlayers.get(playerId).mesh);
+                    this.remotePlayers.delete(playerId);
+                }
+                
+                this.updateStatus(`Connected (${this.connections.size + 1} players)`, 
+                                this.connections.size > 0 || this.isHost);
+                this.updatePlayersList();
+                this.updatePlayerCount();
+            }
+            
+            broadcastMessage(message) {
+                this.connections.forEach(conn => {
+                    if (conn.open) {
+                        try {
+                            conn.send(message);
+                        } catch (error) {
+                            console.warn('Failed to send message:', error);
+                        }
+                    }
+                });
+            }
+            
+            broadcastPlayerUpdate() {
+                if (this.connections.size === 0) return;
+                
+                const currentPos = this.myPlayer.position;
+                const currentRot = this.myPlayer.rotation.y;
+                
+                // Only send if moved significantly
+                const moved = Math.abs(currentPos.x - this.lastSentData.x) > 0.1 ||
+                             Math.abs(currentPos.z - this.lastSentData.z) > 0.1 ||
+                             Math.abs(currentRot - this.lastSentData.rotation) > 0.05;
+                
+                if (moved) {
+                    const updateData = {
+                        type: 'playerUpdate',
+                        position: currentPos,
+                        rotation: currentRot
+                    };
+                    
+                    this.broadcastMessage(updateData);
+                    
+                    this.lastSentData = {
+                        x: currentPos.x,
+                        z: currentPos.z,
+                        rotation: currentRot
+                    };
+                }
+            }
+            
+            broadcastShoot(position, direction) {
+                const shootData = {
+                    type: 'playerShoot',
+                    position: position,
+                    direction: direction
+                };
+                
+                this.broadcastMessage(shootData);
+            }
+            
+            // UI Functions
+            updateStatus(message, connected = false) {
+                const status = document.getElementById('status');
+                status.textContent = message;
+                status.className = connected ? 'connected' : '';
+            }
+            
+            showGameCode(code) {
+                document.getElementById('codeText').textContent = code;
+                document.getElementById('gameCode').style.display = 'block';
+            }
+            
+            updatePlayersList() {
+                const playersList = document.getElementById('playersList');
+                let html = `<div class="player-item">You (${this.isHost ? 'Host' : 'Client'})</div>`;
+                
+                this.connections.forEach((conn, playerId) => {
+                    html += `<div class="player-item">${playerId.substring(0, 8)}</div>`;
+                });
+                
+                playersList.innerHTML = html;
+            }
+            
+            updatePlayerCount() {
+                document.getElementById('playerCount').textContent = this.connections.size + 1;
+            }
+            
+            // Game Loop
+            update() {
+                // Handle input
+                let moveX = 0, moveZ = 0;
+                
+                if (this.keys['KeyW']) moveZ -= 1;
+                if (this.keys['KeyS']) moveZ += 1;
+                if (this.keys['KeyA']) moveX -= 1;
+                if (this.keys['KeyD']) moveX += 1;
+                
+                // Normalize movement
+                if (moveX !== 0 || moveZ !== 0) {
+                    const length = Math.sqrt(moveX * moveX + moveZ * moveZ);
+                    moveX /= length;
+                    moveZ /= length;
+                    
+                    this.myPlayer.position.x += moveX * 0.5;
+                    this.myPlayer.position.z += moveZ * 0.5;
+                }
+                
+                // Mouse look
+                this.myPlayer.rotation.y = this.mouse.x * 0.01;
+                
+                // Shooting
+                if (this.keys['Space']) {
+                    const now = Date.now();
+                    if (now - this.lastShotTime > 200) { // 200ms cooldown
+                        this.shoot();
+                        this.lastShotTime = now;
+                    }
+                }
+                
+                // Update bullets
+                this.updateBullets();
+                
+                // Update camera to follow player
+                this.camera.position.x = this.myPlayer.position.x;
+                this.camera.position.z = this.myPlayer.position.z + 30;
+                this.camera.lookAt(this.myPlayer.position);
+                
+                // Update position display
+                document.getElementById('position').textContent = 
+                    `${Math.round(this.myPlayer.position.x)}, ${Math.round(this.myPlayer.position.z)}`;
+                
+                // Broadcast player state
+                this.broadcastPlayerUpdate();
+                
+                // Clean up stale remote players
+                this.cleanupRemotePlayers();
+            }
+            
+            shoot() {
+                const direction = new THREE.Vector3(
+                    Math.sin(this.myPlayer.rotation.y),
+                    0,
+                    Math.cos(this.myPlayer.rotation.y)
+                );
+                
+                const bulletPos = this.myPlayer.position.clone();
+                bulletPos.add(direction.clone().multiplyScalar(2));
+                
+                this.createBullet(bulletPos, direction, true);
+                this.broadcastShoot(bulletPos, direction);
+            }
+            
+            updateBullets() {
+                this.bullets = this.bullets.filter(bullet => {
+                    bullet.mesh.position.add(bullet.velocity.clone().multiplyScalar(0.016)); // Assuming 60fps
+                    bullet.life--;
+                    
+                    if (bullet.life <= 0) {
+                        this.scene.remove(bullet.mesh);
+                        return false;
+                    }
+                    
+                    return true;
+                });
+            }
+            
+            cleanupRemotePlayers() {
+                const now = Date.now();
+                this.remotePlayers.forEach((player, playerId) => {
+                    if (now - player.lastUpdate > 5000) { // 5 second timeout
+                        console.log('Cleaning up stale player:', playerId);
+                        this.handlePlayerDisconnect(playerId);
+                    }
+                });
+            }
+            
+            // Event Listeners
+            setupEventListeners() {
+                // Keyboard
+                document.addEventListener('keydown', (e) => {
+                    this.keys[e.code] = true;
+                });
+                
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.code] = false;
+                });
+                
+                // Mouse
+                document.addEventListener('mousemove', (e) => {
+                    this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+                    this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                });
+                
+                // UI buttons
+                document.getElementById('hostBtn').addEventListener('click', () => {
+                    this.hostGame();
+                });
+                
+                document.getElementById('joinBtn').addEventListener('click', () => {
+                    const code = document.getElementById('gameCodeInput').value.trim();
+                    if (code) {
+                        this.joinGame(code);
+                    }
+                });
+                
+                document.getElementById('copyBtn').addEventListener('click', () => {
+                    const code = document.getElementById('codeText').textContent;
+                    navigator.clipboard.writeText(code).then(() => {
+                        console.log('Code copied to clipboard');
+                    });
+                });
+                
+                // Window resize
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+            }
+            
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                this.update();
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+        
+        // Start the test
+        const game = new MinimalMultiplayerTest();
+    </script>
+</body>
+</html>

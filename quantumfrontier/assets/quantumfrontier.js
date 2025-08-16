@@ -512,11 +512,11 @@
         }
       }
       class PlanetFactory {
-   static configs = [{
+        static configs = [{
           radius: 18,
           color: 0xff6b6b,
           distance: 100,
-          enemyCount: 5,
+          enemyCount: 9,
           enemyType: 'f',
            style: 'sharp',          // 🔧 Angular mining/industrial surface
           irregularity: 0,   
@@ -533,8 +533,54 @@
              setStoryWaypoint:'Helion IV',
             baseText: 'Asteria Prime fue una vez el mayor exportador de minerales raros del sector, con flotas de cargueros despegando diariamente hacia los mundos centrales. Ahora solo quedan torres de perforación oxidadas y pueblos fantasma barridos por tormentas de polvo. Entre los datos fragmentados de las últimas semanas antes del abandono, algo no encaja. Transferencias nocturnas, códigos de embarque alterados, y un patrón que solo alguien con tu experiencia podría reconocer: contrabando a gran escala.El rastro apunta hacia los cañones rocosos de Helion IV, donde los mercenarios no hacen preguntas.',
             flagTexts: {
-              visited_glacialis: 'Energy readings from Glacialis indicate this planet was part of an interconnected network.',
-              visited_oceanus: 'The quantum signatures resonate with Oceanus readings - confirming the ancient network theory.'
+              visited_proxima: 'Energy readings from Proxima Centauri b indicate this planet was part of an interconnected network.',
+              visited_trappist: 'The quantum signatures resonate with TRAPPIST-1e readings - confirming the ancient network theory.'
+            }
+          }
+        }, {
+          radius: 25,
+          color: 0xff0000,
+          distance: 180,
+          enemyCount: 6,
+          enemyType: 'd',
+          health: 300,
+          orbitCenter: {
+            x: 0,
+            z: 0
+          },
+          orbitSpeed: 0.003,
+          startAngle: Math.PI / 4,
+          dialogue: {
+            name: 'Pyrrhos',
+             setStoryWaypoint:'Helion IV',
+            image: './quantumfrontier/assets/images/planets44.jpeg',
+            baseText: 'Pyrrhos es un infierno de lava y roca fundida donde los ríos de magma serpentean entre picos de basalto negro. El calor es tan intenso que incluso los drones más resistentes fallan después de pocas horas de exposición. Aquí, la supervivencia se mide en minutos. Enterrada en las profundidades rocosas, una forja milenaria late con el resplandor de cristales semi-formados. Los grabados en las paredes hablan de una civilización que dominaba energías capaces de abrir puertas entre mundos. Pero también advierten sobre el precio de tal poder. Las inscripciones apuntan hacia "los guardianes del mundo verde" en Viridara, donde el conocimiento ancestral aguarda entre las ruinas envueltas en vegetación.',
+            flagTexts: {
+              visited_kepler: 'The crystalline formations here match those found on Kepler-442b - part of the same stellar engineering project.',
+              visited_trappist: 'Cross-referencing with TRAPPIST-1e data reveals this is a mining outpost for the ancient network.'
+            }
+          }
+        }, {
+          radius: 25,
+          color: 0x00ff88,
+          distance: 220,
+          enemyCount: 6,
+          irregularity: 0.4,   
+          enemyType: 'p',
+          health: 300,
+          orbitCenter: {
+            x: 50,
+            z: 50
+          },
+          orbitSpeed: 0.002,
+          startAngle: Math.PI / 2,
+          dialogue: {
+            name: 'Helion IV',
+            image: 'quantumfrontier/assets/images/planets3.jpeg',
+            baseText: 'Los cañones de arenisca roja de Helion IV ocultan una de las fortalezas mercenarias más temidas del sector exterior. Durante décadas, estas paredes rocosas han protegido operaciones que los mundos centrales prefieren ignorar: tráfico de armas, información clasificada, y cargamentos que oficialmente nunca existieron. Las patrullas aéreas que surcan los desfiladeros son solo la primera advertencia. Aquí, la lealtad se compra con créditos y las preguntas equivocadas pueden costarte más que tu nave. Pero los registros de Asteria Prime no mienten: algo importante pasó por esta fortaleza. Un contacto en las cantinas subterráneas menciona algo perturbador: el FSA intentó un asalto reciente que terminó en desastre. Los mercenarios hablan de "fragmentos cristalinos" y una guerra que apenas está comenzando.',
+            flagTexts: {
+              visited_kepler: 'The quantum signatures here resonate with similar readings from Kepler-442b. This confirms the ancient network theory.',
+              visited_proxima: 'Data correlation with Proxima Centauri b suggests this was the central hub of an ancient civilization.'
             }
           }
         }, {
@@ -546,8 +592,8 @@
           irregularity: 0,
           health: 150,
           orbitCenter: {
-            x: 0,
-            z: 0
+            x: -30,
+            z: 20
           },
           orbitSpeed: 0.007,
           startAngle: Math.PI,
@@ -558,21 +604,45 @@
             baseText: 'Glacialis es un mundo de hielo eterno donde las temperaturas nunca superan los -200°C. Vastas llanuras de hielo azul se extienden hasta el horizonte, interrumpidas por imponentes cordilleras cristalinas que brillan bajo la luz de estrellas distantes. Bajo la superficie helada, antiguos complejos de investigación permanecen preservados en el tiempo. Los laboratorios criogénicos aún funcionan con energía geotérmica, manteniendo muestras de civilizaciones perdidas y experimentos que desafían la comprensión actual. Los registros hablan de "muestras de Asteria Prime" almacenadas en las bóvedas más profundas.',
             flagTexts: {
               visited_asteria: 'Cryogenic logs confirm mineral samples from Asteria Prime were stored here before the evacuation.',
-              visited_ferrus: 'Temperature differential studies between this ice world and Ferrus reveal connected research projects.'
+              visited_pyrrhos: 'Temperature differential studies between this ice world and Pyrrhos reveal connected research projects.'
+            }
+          }
+        }, {
+          radius: 35,
+          color: 0x4b0082,
+          distance: 320,
+          enemyCount: 12,
+          enemyType: 'd',
+          irregularity: 0.6,
+          health: 500,
+          orbitCenter: {
+            x: 0,
+            z: 0
+          },
+          orbitSpeed: 0.001,
+          startAngle: Math.PI / 6,
+          dialogue: {
+            name: 'Tempest Major',
+            image: './quantumfrontier/assets/images/planets44.jpeg',
+            setStoryWaypoint: 'Pyrrhos',
+            baseText: 'Tempest Major es un gigante gaseoso de tormentas perpetuas donde vientos de 2000 km/h crean un ballet caótico de nubes violetas y relámpagos plasmáticos. Sus tres lunas principales orbitan en formación, cada una equipada con estaciones de investigación atmosférica abandonadas. En las capas superiores de la atmósfera, plataformas flotantes extraen gases raros utilizados en la fabricación de cristales de energía. Los trabajadores que sobrevivieron al abandono masivo hablan de extrañas resonancias que emergían desde las profundidades del planeta. Las frecuencias registradas coinciden con las emanaciones cristalinas de Pyrrhos.',
+            flagTexts: {
+              visited_pyrrhos: 'Atmospheric resonance patterns match the crystal formations found on Pyrrhos.',
+              visited_helion: 'Gas extraction records show shipments to mercenary bases on Helion IV.'
             }
           }
         }, {
           radius: 20,
           color: 0xffa500,
           distance: 260,
-          enemyCount: 5,
+          enemyCount: 8,
           enemyType: 'p',
           style: 'sharp',
           irregularity: 0.2,
           health: 250,
           orbitCenter: {
-            x: 0,
-            z: 0
+            x: 80,
+            z: -40
           },
           orbitSpeed: 0.004,
           startAngle: Math.PI / 3,
@@ -584,126 +654,6 @@
             flagTexts: {
               visited_glacialis: 'Archive cross-references confirm research caches were hidden on the ice world Glacialis.',
               visited_tempest: 'Navigation records show this civilization used gas giant gravitational fields for interdimensional travel.'
-            }
-          }
-        }, {
-          radius: 16,
-          color: 0x808080,
-          distance: 120,
-          enemyCount: 4,
-          enemyType: 'p',
-          irregularity: 0,
-          health: 180,
-          orbitCenter: {
-            x: 0,
-            z: 0
-          },
-          orbitSpeed: 0.008,
-          startAngle: Math.PI / 7,
-          dialogue: {
-            name: 'Ferrus',
-            image: './quantumfrontier/assets/images/planets3.jpeg',
-            setStoryWaypoint: 'Oceanus',
-            baseText: 'Ferrus es un mundo de metal puro donde montañas de hierro y titanio se alzan bajo un cielo color óxido. La superficie está marcada por cráteres de impacto que revelan vetas de metales raros y aleaciones que no deberían existir de forma natural. Complejos industriales automatizados siguen funcionando en algunos cráteres, moldeando y refinando metales con una precisión imposible. Las máquinas parecen estar fabricando componentes para algún proyecto mayor, siguiendo planos que nadie ha visto. Los análisis metalúrgicos muestran patrones que coinciden con las aleaciones encontradas en estructuras de mundos oceánicos.',
-            flagTexts: {
-              visited_oceanus: 'Metallurgical analysis confirms the underwater structures on Oceanus contain alloys manufactured here.',
-              visited_glacialis: 'Manufacturing logs show shipments of specialized metals to ice world research facilities.'
-            }
-          }
-        }, {
-          radius: 28,
-          color: 0x000080,
-          distance: 300,
-          enemyCount: 5,
-          enemyType: 'f',
-          irregularity: 0.3,
-          health: 400,
-          orbitCenter: {
-            x: 0,
-            z: 0
-          },
-          orbitSpeed: 0.0015,
-          startAngle: Math.PI / 5,
-          dialogue: {
-            name: 'Oceanus',
-            image: './quantumfrontier/assets/images/planets.jpeg',
-            setStoryWaypoint: 'Ferrus',
-            baseText: 'Oceanus es un mundo océano donde mares infinitos de color azul profundo cubren todo el planeta. Islas flotantes de coral bioluminiscente derivan lentamente por las corrientes, formando archipiélagos temporales que existen por siglos antes de disolverse. En las profundidades abisales, ciudades sumergidas pulsan con una luz azul fantasmal. Sus habitantes hace tiempo que desaparecieron, pero los sistemas automatizados siguen funcionando, manteniendo granjas de algas que procesan gases atmosféricos específicos. Los registros de producción indican que estos gases se exportaban a gigantes gaseosos cercanos.',
-            flagTexts: {
-              visited_tempest: 'Production logs confirm atmospheric gases were shipped to Tempest processing facilities.',
-              visited_aridus: 'Ancient navigation charts show regular trade routes with desert world civilizations.'
-            }
-          }
-        }, {
-          radius: 25,
-          color: 0x00ff88,
-          distance: 220,
-          enemyCount: 5,
-          irregularity: 0.4,   
-          enemyType: 'p',
-          health: 300,
-          orbitCenter: {
-            x: 0,
-            z: 0
-          },
-          orbitSpeed: 0.002,
-          startAngle: Math.PI / 2,
-          dialogue: {
-            name: 'Helion IV',
-            image: './quantumfrontier/assets/images/planets3.jpeg',
-            setStoryWaypoint: 'Anulos',
-            baseText: 'Los cañones de arenisca roja de Helion IV ocultan una de las fortalezas mercenarias más temidas del sector exterior. Durante décadas, estas paredes rocosas han protegido operaciones que los mundos centrales prefieren ignorar: tráfico de armas, información clasificada, y cargamentos que oficialmente nunca existieron. Las patrullas aéreas que surcan los desfiladeros son solo la primera advertencia. Aquí, la lealtad se compra con créditos y las preguntas equivocadas pueden costarte más que tu nave. Pero los registros de Asteria Prime no mienten: algo importante pasó por esta fortaleza. Un contacto en las cantinas subterráneas menciona algo perturbador: el FSA intentó un asalto reciente que terminó en desastre. Los mercenarios hablan de "fragmentos cristalinos" y una guerra que apenas está comenzando.',
-            flagTexts: {
-              visited_anulos: 'The quantum signatures here resonate with similar readings from Anulos. This confirms the ancient network theory.',
-              visited_asteria: 'Data correlation with Asteria Prime suggests this was a central hub for the smuggling operation.'
-            }
-          }
-        }, {
-          radius: 33,
-          color: 0xdaa520,
-          distance: 350,
-          enemyCount: 5,
-          enemyType: 'p',
-          irregularity: 0.4,
-          health: 450,
-          orbitCenter: {
-            x: 0,
-            z: 0
-          },
-          orbitSpeed: 0.0008,
-          startAngle: Math.PI / 11,
-          dialogue: {
-            name: 'Anulos',
-            image: './quantumfrontier/assets/images/planets3.jpeg',
-            setStoryWaypoint: 'Tempest',
-            baseText: 'Anulos es un gigante planetario rodeado por tres anillos de asteroide que contienen los restos de lunas destruidas. Los fragmentos rocosos orbitan en formaciones geométricas perfectas que desafían las leyes de la gravedad, sugiriendo algún tipo de manipulación artificial. Entre los fragmentos del anillo medio, estaciones espaciales abandonadas flotan como sepulcros silenciosos. Sus archivos revelan que este era el centro de una alianza intergaláctica que colapsó hace milenios debido a conflictos religiosos sobre el destino del universo. Los registros finales mencionan "refugios en mundos de tormenta" donde los líderes se ocultaron durante el colapso.',
-            flagTexts: {
-              visited_tempest: 'Final records confirm alliance leaders fled to storm worlds like Tempest during the civilization collapse.',
-              visited_helion: 'Trade agreements show this alliance had dealings with mercenary groups in rocky canyon worlds.'
-            }
-          }
-        }, {
-          radius: 35,
-          color: 0x4b0082,
-          distance: 320,
-          enemyCount: 5,
-          enemyType: 'd',
-          irregularity: 0.6,
-          health: 500,
-          orbitCenter: {
-            x: 0,
-            z: 0
-          },
-          orbitSpeed: 0.001,
-          startAngle: Math.PI / 6,
-          dialogue: {
-            name: 'Tempest',
-            image: './quantumfrontier/assets/images/planets44.jpeg',
-            setStoryWaypoint: 'Oceanus',
-            baseText: 'Tempest es un gigante gaseoso de tormentas perpetuas donde vientos de 2000 km/h crean un ballet caótico de nubes violetas y relámpagos plasmáticos. Sus tres lunas principales orbitan en formación, cada una equipada con estaciones de investigación atmosférica abandonadas. En las capas superiores de la atmósfera, plataformas flotantes extraen gases raros utilizados en la fabricación de cristales de energía. Los trabajadores que sobrevivieron al abandono masivo hablan de extrañas resonancias que emergían desde las profundidades del planeta. Las frecuencias registradas coinciden con las emanaciones de otros mundos del sector.',
-            flagTexts: {
-              visited_oceanus: 'Atmospheric resonance patterns match the quantum frequencies detected on Oceanus.',
-              visited_helion: 'Gas extraction records show shipments to mercenary bases on Helion IV.'
             }
           }
         }];
@@ -2301,7 +2251,28 @@ this.tractorBeam = null;
     this.wasPlayerVisible=!0;
     this.visitedPlanets=new Set();
     this.typewriterSpeed=7
-    this.selectedShipType = 'player'; ;
+    this.selectedShipType = 'player';
+    this.sharedNoise = new PerlinNoise(Math.random());
+this.weaponCooldowns = {
+    1: 0, // blaster
+    2: 0, // scatter  
+    3: 0, // shotgun
+    4: 0, // mines
+    5: 0, // laser
+    6: 0, // emp
+    7: 0, // homing
+    8: 0  // tractor
+};
+this.weaponCooldownDurations = {
+    1: 8,   // blaster - fast
+    2: 12,  // scatter - medium
+    3: 18,  // shotgun - slower
+    4: 45,  // mines - slow
+    5: 1,   // laser - continuous
+    6: 90,  // emp - very slow (mobile strain)
+    7: 60,  // homing - slow
+    8: 1    // tractor - continuous
+};
 }
         initializeScene() {
           this.camera.position.set(0, 60, 60);
@@ -2762,8 +2733,19 @@ this.tractorBeam = null;
         getPlanetName(planet) {
           return planet.config.dialogue?.name || `Planet ${this.planets.indexOf(planet) + 1}`
         }
+        canFireWeapon(weaponType) {
+    return this.weaponCooldowns[weaponType] <= 0;
+}
        fireWeapon(){
-    switch(this.player.currentWeapon){
+    const currentWeapon = this.player.currentWeapon;
+    
+    // Check if weapon is on cooldown
+    if (!this.canFireWeapon(currentWeapon)) {
+        return; // Don't fire if on cooldown
+    }
+    
+    // Fire the weapon
+    switch(currentWeapon){
         case 1: this.fireBlaster(); break;
         case 2: this.fireScatter(3); break;
         case 3: this.fireScatter(5); break;
@@ -2772,6 +2754,11 @@ this.tractorBeam = null;
         case 6: this.fireEMPBurst(); break;
         case 7: this.fireHomingMissile(); break;
         case 8: this.activateTractorBeam(); break;
+    }
+    
+    // Set cooldown (except for continuous weapons like laser/tractor)
+    if (currentWeapon !== 5 && currentWeapon !== 8) {
+        this.weaponCooldowns[currentWeapon] = this.weaponCooldownDurations[currentWeapon];
     }
 }
 fireEMPBurst(){
@@ -3368,6 +3355,7 @@ this.updateEMPBursts();
 this.updateHomingMissiles(); 
 this.updateTractorBeam();
 this.updateEnemyEMPRecovery();
+this.updateWeaponCooldowns();
           this.updateCollisions();
           this.updateBackground();
           this.updateEffects();
@@ -3377,6 +3365,14 @@ this.updateEnemyEMPRecovery();
           this.updateMinimap();
           this.updateExplosions()
         }
+        updateWeaponCooldowns() {
+    // Decrease all weapon cooldowns
+    for (let weapon in this.weaponCooldowns) {
+        if (this.weaponCooldowns[weapon] > 0) {
+            this.weaponCooldowns[weapon]--;
+        }
+    }
+}
  updateAllies(){
     this.allies = this.allies.filter(ally => {
         if(ally.health <= 0){
@@ -3586,33 +3582,46 @@ createAllyBullet(ally, target){
     this.audioManager.playBlaster(ally.mesh.position, this.playerShip.position);
 }
 
-        createTrail(){
-    if(Math.random()>0.3)return;
-    const trailCount=3;
-    const coneAngle=Math.PI/4;
-    const behindDistance=3;
-    for(let i=0;i<trailCount;i++){
-        const spreadAngle=(Math.random()-0.5)*coneAngle;
-        const playerAngle=this.playerShip.rotation.y+Math.PI;
-        const finalAngle=playerAngle+spreadAngle;
-        const distance=behindDistance+Math.random()*2;
-        const x=this.playerShip.position.x+Math.sin(finalAngle)*distance;
-        const z=this.playerShip.position.z+Math.cos(finalAngle)*distance;
-        const noiseValue=new PerlinNoise().noise(x*0.1,z*0.1,Date.now()*0.001);
-        const intensity=Math.abs(noiseValue);
-        const trailGeom=new THREE.SphereGeometry(0.3+intensity*0.5,6,6);
-        const hue=(intensity*360+200)%360;
-        const trailMat=new THREE.MeshBasicMaterial({
-            color:new THREE.Color().setHSL(hue/360,0.8,0.6),
-            transparent:!0,
-            opacity:0.7,
-            depthTest: true,  // ✅ Ensure proper depth testing
-            depthWrite: false // ✅ Prevent z-fighting
+ createTrail(){
+    // Remove random chance - trails always create when moving fast enough
+    if(this.playerVelocity.length() < 0.15) return; // Only skip if moving too slowly
+    
+    const trailCount = 3;
+    const coneAngle = Math.PI/4;
+    const behindDistance = 3;
+    
+    for(let i = 0; i < trailCount; i++){
+        const spreadAngle = (Math.random()-0.5) * coneAngle;
+        const playerAngle = this.playerShip.rotation.y + Math.PI;
+        const finalAngle = playerAngle + spreadAngle;
+        const distance = behindDistance + Math.random() * 2;
+        
+        const x = this.playerShip.position.x + Math.sin(finalAngle) * distance;
+        const z = this.playerShip.position.z + Math.cos(finalAngle) * distance;
+        
+        // Use cached noise instead of creating new instance
+        const noiseValue = this.sharedNoise.noise(x * 0.1, z * 0.1, Date.now() * 0.001);
+        const intensity = Math.abs(noiseValue);
+        
+        const trailGeom = new THREE.SphereGeometry(0.3 + intensity * 0.5, 6, 6);
+        const hue = (intensity * 360 + 200) % 360;
+        const trailMat = new THREE.MeshBasicMaterial({
+            color: new THREE.Color().setHSL(hue/360, 0.8, 0.6),
+            transparent: true,
+            opacity: 0.7,
+            depthTest: true,
+            depthWrite: false
         });
-        const trail=new THREE.Mesh(trailGeom,trailMat);
+        
+        const trail = new THREE.Mesh(trailGeom, trailMat);
         trail.position.set(x, 3.5 + Math.random() * 0.5, z);
-        trail.renderOrder = 50; 
-        this.trails.push({mesh:trail,life:60+Math.random()*40,maxLife:60+Math.random()*40});
+        trail.renderOrder = 50;
+        
+        this.trails.push({
+            mesh: trail,
+            life: 60 + Math.random() * 40,
+            maxLife: 60 + Math.random() * 40
+        });
         this.scene.add(trail);
     }
 }
@@ -4556,6 +4565,9 @@ this.enemies.forEach(enemy => {
     this.trails.forEach(trail=>this.scene.remove(trail.mesh));
     this.trails=[];
     this.collisionEnabled=!0;
+    for (let weapon in this.weaponCooldowns) {
+    this.weaponCooldowns[weapon] = 0;
+}
     this.bullets.forEach(bullet=>this.scene.remove(bullet.mesh));
     this.bullets=[];
     this.enemyBullets.forEach(bullet=>this.scene.remove(bullet.mesh));

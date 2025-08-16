@@ -2453,180 +2453,142 @@ document.getElementById('testConnectionBtn').addEventListener('click', () => {
         }
     }
 
-    async hostGame() {
+ async hostGame() {
     try {
-        this.updateStatus('Conectando...', false);
+        this.updateStatus('Iniciando servidor...', false);
+        this.game.eventLogger.logSystem('🚀 Creando servidor multijugador...');
         
-        // Configuración mejorada para móviles
-        this.peer = new Peer({
-            debug: 0, // Reducir debug
-            config: {
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-                    { urls: 'stun:stun2.l.google.com:19302' },
-                    { urls: 'stun:stun3.l.google.com:19302' },
-                    { urls: 'stun:stun4.l.google.com:19302' }
-                ],
-                iceCandidatePoolSize: 10
-            },
-            pingInterval: 5000
-        });
-
-        // Timeout para conexión
-        const connectionTimeout = setTimeout(() => {
-            this.game.eventLogger.logSystem('❌ Timeout de conexión');
-            this.updateStatus('Error: Timeout de conexión');
-            if (this.peer) {
-                this.peer.destroy();
-            }
-        }, 15000);
-
-        this.peer.on('open', (id) => {
-            clearTimeout(connectionTimeout);
-            this.myPlayerId = id;
-            this.isHost = true;
-            this.updateStatus('Esperando jugadores...', true);
-            this.showGameCode(id);
-            this.game.eventLogger.logSystem('✅ Partida multijugador creada');
-            this.game.eventLogger.logSystem(`ID del host: ${id.substring(0, 8)}`);
-        });
-
-        this.peer.on('connection', (conn) => {
-            this.game.eventLogger.logSystem(`🔗 Nueva conexión entrante: ${conn.peer.substring(0, 8)}`);
-            this.handleNewPlayer(conn);
-        });
-
-        this.peer.on('error', (error) => {
-            clearTimeout(connectionTimeout);
-            this.game.eventLogger.logSystem(`❌ Error del host: ${error.type || error.message}`);
-            
-            if (error.type === 'network') {
-                this.updateStatus('Error de red - Revisa tu conexión');
-            } else if (error.type === 'server-error') {
-                this.updateStatus('Error del servidor - Intenta de nuevo');
-            } else {
-                this.updateStatus('Error al crear partida');
-            }
-        });
-
-        this.peer.on('disconnected', () => {
-            this.game.eventLogger.logSystem('⚠️ Desconectado del servidor');
-            this.updateStatus('Desconectado - Reconectando...');
-            // Intentar reconectar
-            setTimeout(() => {
-                if (this.peer && !this.peer.destroyed) {
-                    this.peer.reconnect();
-                }
-            }, 2000);
-        });
-
-    } catch (error) {
-        this.game.eventLogger.logSystem(`❌ Error crítico: ${error.message}`);
-        this.updateStatus('Error crítico al crear partida');
-    }
-}
-
-    async joinGame(hostId) {
-    try {
-        this.updateStatus('Conectando...', false);
-        this.game.eventLogger.logSystem(`🔄 Intentando conectar a: ${hostId.substring(0, 8)}`);
-        
-        // Configuración mejorada para móviles
+        // Configuración simplificada y más estable
         this.peer = new Peer({
             debug: 0,
             config: {
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-                    { urls: 'stun:stun2.l.google.com:19302' },
-                    { urls: 'stun:stun3.l.google.com:19302' },
-                    { urls: 'stun:stun4.l.google.com:19302' }
-                ],
-                iceCandidatePoolSize: 10
-            },
-            pingInterval: 5000
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]
+            }
         });
 
-        // Timeout para la conexión inicial
-        const peerTimeout = setTimeout(() => {
-            this.game.eventLogger.logSystem('❌ Timeout obteniendo ID');
-            this.updateStatus('Error: Timeout de conexión');
-            if (this.peer) {
+        // Timeout más generoso
+        const connectionTimeout = setTimeout(() => {
+            this.game.eventLogger.logSystem('⏰ Timeout creando servidor');
+            this.updateStatus('Timeout - Intenta de nuevo');
+            if (this.peer && !this.peer.destroyed) {
                 this.peer.destroy();
             }
-        }, 15000);
+        }, 30000);
 
         this.peer.on('open', (id) => {
-            clearTimeout(peerTimeout);
+            clearTimeout(connectionTimeout);
             this.myPlayerId = id;
-            this.game.eventLogger.logSystem(`✅ ID obtenido: ${id.substring(0, 8)}`);
-            this.game.eventLogger.logSystem(`🔗 Conectando al host: ${hostId.substring(0, 8)}`);
-            
-            // Timeout para la conexión al host
-            const connectTimeout = setTimeout(() => {
-                this.game.eventLogger.logSystem('❌ Timeout conectando al host');
-                this.updateStatus('Error: Host no responde');
-            }, 10000);
+            this.isHost = true;
+            this.updateStatus('Servidor activo', true);
+            this.showGameCode(id);
+            this.game.eventLogger.logSystem(`✅ Servidor creado: ${id.substring(0, 8)}`);
+        });
 
-            const conn = this.peer.connect(hostId, {
-                reliable: true,
-                serialization: 'json'
-            });
-
-            conn.on('open', () => {
-                clearTimeout(connectTimeout);
-                this.game.eventLogger.logSystem('✅ Conectado al host exitosamente');
-            });
-
-            conn.on('error', (error) => {
-                clearTimeout(connectTimeout);
-                this.game.eventLogger.logSystem(`❌ Error conectando al host: ${error.message}`);
-                this.updateStatus('Error conectando al host');
-            });
-
+        this.peer.on('connection', (conn) => {
+            this.game.eventLogger.logSystem(`📞 Llamada entrante de: ${conn.peer.substring(0, 8)}`);
             this.handleNewPlayer(conn);
         });
 
         this.peer.on('error', (error) => {
+            clearTimeout(connectionTimeout);
+            this.game.eventLogger.logSystem(`❌ Error servidor: ${error.type || error.message || 'desconocido'}`);
+            this.updateStatus('Error del servidor');
+        });
+
+    } catch (error) {
+        this.game.eventLogger.logSystem(`💥 Error crítico: ${error.message}`);
+        this.updateStatus('Error crítico');
+    }
+}
+
+ async joinGame(hostId) {
+    try {
+        this.updateStatus('Buscando servidor...', false);
+        this.game.eventLogger.logSystem(`🔍 Buscando servidor: ${hostId.substring(0, 8)}`);
+        
+        // Configuración simplificada
+        this.peer = new Peer({
+            debug: 0,
+            config: {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]
+            }
+        });
+
+        const peerTimeout = setTimeout(() => {
+            this.game.eventLogger.logSystem('⏰ Timeout obteniendo ID cliente');
+            this.updateStatus('Timeout - Revisa conexión');
+            if (this.peer && !this.peer.destroyed) {
+                this.peer.destroy();
+            }
+        }, 30000);
+
+        this.peer.on('open', (id) => {
             clearTimeout(peerTimeout);
-            this.game.eventLogger.logSystem(`❌ Error del cliente: ${error.type || error.message}`);
+            this.myPlayerId = id;
+            this.game.eventLogger.logSystem(`✅ ID cliente: ${id.substring(0, 8)}`);
+            this.game.eventLogger.logSystem(`🔗 Intentando conectar...`);
             
-            if (error.type === 'peer-unavailable') {
-                this.updateStatus('Host no disponible');
-            } else if (error.type === 'network') {
-                this.updateStatus('Error de red - Revisa conexión');
-            } else if (error.type === 'server-error') {
-                this.updateStatus('Error del servidor');
-            } else {
+            // Intentar conexión con timeout
+            const connectTimeout = setTimeout(() => {
+                this.game.eventLogger.logSystem('⏰ Timeout conectando al servidor');
+                this.updateStatus('Servidor no responde');
+            }, 20000);
+
+            try {
+                const conn = this.peer.connect(hostId, {
+                    reliable: true
+                });
+
+                conn.on('open', () => {
+                    clearTimeout(connectTimeout);
+                    this.game.eventLogger.logSystem('🎉 ¡Conectado al servidor!');
+                });
+
+                conn.on('error', (error) => {
+                    clearTimeout(connectTimeout);
+                    this.game.eventLogger.logSystem(`❌ Error al conectar: ${error.type || 'desconocido'}`);
+                });
+
+                this.handleNewPlayer(conn);
+                
+            } catch (connectError) {
+                clearTimeout(connectTimeout);
+                this.game.eventLogger.logSystem(`💥 Error al intentar conectar: ${connectError.message}`);
                 this.updateStatus('Error al conectar');
             }
         });
 
-        this.peer.on('disconnected', () => {
-            this.game.eventLogger.logSystem('⚠️ Desconectado del servidor');
-            this.updateStatus('Desconectado - Reconectando...');
-            setTimeout(() => {
-                if (this.peer && !this.peer.destroyed) {
-                    this.peer.reconnect();
-                }
-            }, 2000);
+        this.peer.on('error', (error) => {
+            clearTimeout(peerTimeout);
+            this.game.eventLogger.logSystem(`❌ Error cliente: ${error.type || error.message || 'desconocido'}`);
+            
+            if (error.type === 'peer-unavailable') {
+                this.updateStatus('Servidor no encontrado');
+            } else {
+                this.updateStatus('Error de conexión');
+            }
         });
 
     } catch (error) {
-        this.game.eventLogger.logSystem(`❌ Error crítico: ${error.message}`);
-        this.updateStatus('Error crítico al conectar');
+        this.game.eventLogger.logSystem(`💥 Error crítico cliente: ${error.message}`);
+        this.updateStatus('Error crítico');
     }
 }
 
- handleNewPlayer(conn) {
-    this.game.eventLogger.logSystem(`🤝 Manejando conexión con: ${conn.peer.substring(0, 8)}`);
+handleNewPlayer(conn) {
+    this.game.eventLogger.logSystem(`🤝 Iniciando conexión con: ${conn.peer.substring(0, 8)}`);
     
-    // Timeout para apertura de conexión
+    // Timeout más largo para móviles
     const openTimeout = setTimeout(() => {
-        this.game.eventLogger.logSystem(`❌ Timeout abriendo conexión con ${conn.peer.substring(0, 8)}`);
-        conn.close();
-    }, 10000);
+        this.game.eventLogger.logSystem(`⏰ Timeout abriendo conexión con ${conn.peer.substring(0, 8)}`);
+        // No cerrar inmediatamente, dar más tiempo
+    }, 30000); // Aumentado de 10 a 30 segundos
 
     conn.on('open', () => {
         clearTimeout(openTimeout);
@@ -2634,13 +2596,15 @@ document.getElementById('testConnectionBtn').addEventListener('click', () => {
         this.updateStatus(`Conectado (${this.connections.size + 1} jugadores)`, true);
         this.updatePlayersList();
         
-        // El host envía su estado al nuevo jugador
-        if (this.isHost && this.game.gameStarted && this.game.playerShip) {
-            this.sendGameState(conn);
-            this.game.eventLogger.logSystem(`📤 Estado enviado a ${conn.peer.substring(0, 8)}`);
-        }
+        this.game.eventLogger.logSystem(`✅ Conexión exitosa con ${conn.peer.substring(0, 8)}`);
         
-        this.game.eventLogger.logSystem(`✅ Conexión establecida con ${conn.peer.substring(0, 8)}`);
+        // Enviar estado después de un delay para asegurar estabilidad
+        if (this.isHost && this.game.gameStarted && this.game.playerShip) {
+            setTimeout(() => {
+                this.sendGameState(conn);
+                this.game.eventLogger.logSystem(`📤 Estado enviado a ${conn.peer.substring(0, 8)}`);
+            }, 1000);
+        }
     });
 
     conn.on('data', (data) => {
@@ -2649,14 +2613,18 @@ document.getElementById('testConnectionBtn').addEventListener('click', () => {
 
     conn.on('close', () => {
         clearTimeout(openTimeout);
-        this.game.eventLogger.logSystem(`🔌 Conexión cerrada: ${conn.peer.substring(0, 8)}`);
+        this.game.eventLogger.logSystem(`🔌 Conexión cerrada con ${conn.peer.substring(0, 8)}`);
         this.handlePlayerDisconnect(conn.peer);
     });
 
     conn.on('error', (error) => {
         clearTimeout(openTimeout);
-        this.game.eventLogger.logSystem(`❌ Error de conexión con ${conn.peer.substring(0, 8)}: ${error.message}`);
-        this.handlePlayerDisconnect(conn.peer);
+        this.game.eventLogger.logSystem(`❌ Error conexión ${conn.peer.substring(0, 8)}: ${error.type || 'desconocido'}`);
+        
+        // No desconectar inmediatamente por errores menores
+        if (error.type !== 'negotiation-failed') {
+            this.handlePlayerDisconnect(conn.peer);
+        }
     });
 }
 
@@ -2681,18 +2649,31 @@ document.getElementById('testConnectionBtn').addEventListener('click', () => {
 }
 
     sendGameState(conn) {
-    const gameState = {
-        type: 'gameState',
-        player: {
-            id: this.myPlayerId,
-            position: this.game.playerShip.position,
-            rotation: this.game.playerShip.rotation.y,
-            health: this.game.player.health,
-            score: this.game.player.score,
-            shipType: this.game.selectedShipType
-        }
-    };
-    conn.send(gameState);
+    // Verificar que la conexión esté realmente abierta
+    if (!conn || !conn.open) {
+        this.game.eventLogger.logSystem(`⚠️ Conexión no disponible para enviar estado`);
+        return;
+    }
+    
+    try {
+        const gameState = {
+            type: 'gameState',
+            player: {
+                id: this.myPlayerId,
+                position: this.game.playerShip.position,
+                rotation: this.game.playerShip.rotation.y,
+                health: this.game.player.health,
+                score: this.game.player.score,
+                shipType: this.game.selectedShipType
+            }
+        };
+        
+        conn.send(gameState);
+        this.game.eventLogger.logSystem(`📨 Estado enviado exitosamente`);
+        
+    } catch (error) {
+        this.game.eventLogger.logSystem(`❌ Error enviando estado: ${error.message}`);
+    }
 }
 
     updateRemotePlayer(playerId, data) {
@@ -2762,17 +2743,22 @@ document.getElementById('testConnectionBtn').addEventListener('click', () => {
 }
 
     handlePlayerDisconnect(playerId) {
-        this.connections.delete(playerId);
-        
-        if (this.remotePlayers.has(playerId)) {
-            this.game.scene.remove(this.remotePlayers.get(playerId).ship);
-            this.remotePlayers.delete(playerId);
-        }
-        
-        this.updateStatus(`Conectado (${this.connections.size + 1} jugadores)`, true);
-        this.updatePlayersList();
-        this.game.eventLogger.logSystem(`Jugador ${playerId.substring(0, 8)} se desconectó`);
+    // Verificar si realmente está en las conexiones
+    if (!this.connections.has(playerId)) {
+        return; // Ya fue removido
     }
+    
+    this.connections.delete(playerId);
+    
+    if (this.remotePlayers.has(playerId)) {
+        this.game.scene.remove(this.remotePlayers.get(playerId).ship);
+        this.remotePlayers.delete(playerId);
+        this.game.eventLogger.logSystem(`👋 Jugador ${playerId.substring(0, 8)} se desconectó`);
+    }
+    
+    this.updateStatus(`Conectado (${this.connections.size + 1} jugadores)`, this.connections.size > 0 || this.isHost);
+    this.updatePlayersList();
+}
 
     updateStatus(message, connected = false) {
         const status = document.getElementById('mpStatus');
@@ -2806,14 +2792,15 @@ document.getElementById('testConnectionBtn').addEventListener('click', () => {
     }
 
     cleanupStaleRemotePlayers() {
-        const now = Date.now();
-        this.remotePlayers.forEach((player, playerId) => {
-            if (now - player.lastUpdate > 35000) {
-               this.game.eventLogger.logSystem(`Jugador ${playerId.substring(0, 8)} perdió conexión`);
-                this.handlePlayerDisconnect(playerId);
-            }
-        });
-    }
+    const now = Date.now();
+    this.remotePlayers.forEach((player, playerId) => {
+        // Aumentar a 30 segundos para móviles
+        if (now - player.lastUpdate > 38000) {
+            this.game.eventLogger.logSystem(`⏰ Jugador ${playerId.substring(0, 8)} timeout`);
+            this.handlePlayerDisconnect(playerId);
+        }
+    });
+}
 }
       class SpaceShooter {
         constructor() {

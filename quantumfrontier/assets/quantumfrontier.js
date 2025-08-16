@@ -1205,6 +1205,7 @@ nebula.position.set(
         }
       }
       // WebRTC Multiplayer Manager using PeerJS
+// WebRTC Multiplayer Manager using PeerJS
 class MultiplayerManager {
     constructor(game) {
         this.game = game;
@@ -1217,21 +1218,18 @@ class MultiplayerManager {
         this.lastSyncTime = 0;
         this.syncRate = 1000 / 20; // 20 FPS sync rate
         
+        // Log multiplayer initialization
+        this.game.eventLogger?.logSystem(`🌐 Inicializando multijugador...`);
+        this.game.eventLogger?.logSystem(`🏠 Sala: ${this.roomId}`);
+        
         this.setupPeer();
     }
-getRoomId() {
-    // Check URL parameter first
-    const urlParams = new URLSearchParams(window.location.search);
-    const roomParam = urlParams.get('room');
-    if (roomParam) return roomParam;
-    
-    // Check hash
-    const hash = window.location.hash.substring(1);
-    if (hash) return hash;
-    
-    // Default room
-    return 'main-lobby';
-}
+
+    getRoomId() {
+        // Use URL hash or generate a simple room ID
+        const hash = window.location.hash.substring(1);
+        return hash || 'default-room';
+    }
 
     async setupPeer() {
         // Import PeerJS from CDN
@@ -1239,14 +1237,27 @@ getRoomId() {
             await this.loadPeerJS();
         }
 
-        // Create peer with room-based ID discovery
+        // Create peer - using PeerJS cloud service (most reliable)
         this.peer = new Peer(null, {
-           debug:1
+            // Option 1: Use PeerJS cloud service (recommended)
+            debug: 1
         });
+        
+        // Option 2: Alternative free server (uncomment to use)
+        /*
+        this.peer = new Peer(null, {
+            host: '0.peerjs.com',
+            port: 443,
+            path: '/',
+            secure: true
+        });
+        */
 
         this.peer.on('open', (id) => {
             this.myId = id;
             console.log('Connected with ID:', id);
+            this.game.eventLogger?.logSystem(`🔗 Conectado al servidor multijugador`);
+            this.game.eventLogger?.logSystem(`🆔 Tu ID: ${id.substring(0, 8)}...`);
             this.discoverPeers();
             this.startSyncLoop();
         });
@@ -1257,6 +1268,7 @@ getRoomId() {
 
         this.peer.on('error', (err) => {
             console.warn('Peer error:', err);
+            this.game.eventLogger?.logSystem(`❌ Error de conexión: ${err.type || 'Desconocido'}`);
         });
     }
 
@@ -1279,9 +1291,18 @@ getRoomId() {
         const updatedPeers = [...existingPeers.filter(id => id !== this.myId), this.myId];
         localStorage.setItem(storageKey, JSON.stringify(updatedPeers));
         
+        // Log room info
+        this.game.eventLogger?.logSystem(`🏠 Buscando jugadores en sala: ${this.roomId}`);
+        if (existingPeers.length > 0) {
+            this.game.eventLogger?.logSystem(`👥 Encontrados ${existingPeers.length} jugadores en sala`);
+        } else {
+            this.game.eventLogger?.logSystem(`🔍 Esperando otros jugadores...`);
+        }
+        
         // Connect to existing peers
         for (const peerId of existingPeers) {
             if (peerId !== this.myId && !this.connections.has(peerId)) {
+                this.game.eventLogger?.logSystem(`📡 Intentando conectar con ${peerId.substring(0, 8)}...`);
                 await this.connectToPeer(peerId);
             }
         }
@@ -1296,10 +1317,12 @@ getRoomId() {
             this.handleConnection(conn);
         } catch (err) {
             console.warn('Failed to connect to peer:', peerId, err);
+            this.game.eventLogger?.logSystem(`❌ Falló conexión con ${peerId.substring(0, 8)}`);
         }
     }
 
     handleIncomingConnection(conn) {
+        this.game.eventLogger?.logSystem(`📞 Conexión entrante de ${conn.peer.substring(0, 8)}`);
         this.handleConnection(conn);
     }
 
@@ -1308,14 +1331,17 @@ getRoomId() {
             console.log('Connected to peer:', conn.peer);
             this.connections.set(conn.peer, conn);
             
+            // Log successful connection locally
+            this.game.eventLogger?.logSystem(`✅ Conectado con ${conn.peer.substring(0, 8)}`);
+            
             // Send initial player data
             this.sendToPlayer(conn.peer, {
                 type: 'player_join',
                 player: this.getMyPlayerData()
             });
 
-            // Log the connection
-            this.game.eventLogger?.logSystem(`Jugador ${conn.peer.substring(0, 8)} se unió`);
+            // Broadcast connection to all other players
+            this.broadcastEvent(`🔗 ${conn.peer.substring(0, 8)} se conectó`, 'system');
         });
 
         conn.on('data', (data) => {
@@ -1323,11 +1349,15 @@ getRoomId() {
         });
 
         conn.on('close', () => {
+            console.log('Connection closed with:', conn.peer);
+            this.game.eventLogger?.logSystem(`🔌 ${conn.peer.substring(0, 8)} se desconectó`);
+            this.broadcastEvent(`📴 ${conn.peer.substring(0, 8)} se desconectó`, 'system');
             this.handlePlayerLeave(conn.peer);
         });
 
         conn.on('error', (err) => {
             console.warn('Connection error:', err);
+            this.game.eventLogger?.logSystem(`⚠️ Error con ${conn.peer.substring(0, 8)}: ${err.type || 'Desconocido'}`);
             this.handlePlayerLeave(conn.peer);
         });
     }
@@ -1360,6 +1390,11 @@ getRoomId() {
         
         this.players.set(peerId, remotePlayer);
         this.game.scene.add(remotePlayer.ship);
+        
+        // Log player join locally and broadcast to others
+        const shipType = playerData.shipType || 'desconocida';
+        this.game.eventLogger?.logSystem(`🚀 ${peerId.substring(0, 8)} se unió (${shipType})`);
+        this.broadcastEvent(`👋 ${peerId.substring(0, 8)} entró al juego`, 'player-join');
         
         // Send our data back if we haven't already
         if (!this.connections.has(peerId)) return;
@@ -1400,7 +1435,9 @@ getRoomId() {
                 this.game.scene.remove(player.ship);
             }
             this.players.delete(peerId);
-            this.game.eventLogger?.logSystem(`Jugador ${peerId.substring(0, 8)} se desconectó`);
+            
+            // Log player leave locally only (don't broadcast as they might not receive it)
+            this.game.eventLogger?.logSystem(`👋 ${peerId.substring(0, 8)} salió del juego`);
         }
         
         this.connections.delete(peerId);
@@ -1469,7 +1506,17 @@ getRoomId() {
                 this.broadcastPlayerUpdate();
             }
             this.cleanupStaleePlayers();
+            this.logConnectionStatus();
         }, this.syncRate);
+    }
+
+    // Log connection status every 30 seconds
+    logConnectionStatus() {
+        if (Date.now() % 30000 < this.syncRate) { // Every ~30 seconds
+            if (this.connections.size > 0) {
+                this.game.eventLogger?.logSystem(`📊 ${this.connections.size + 1} jugadores conectados`);
+            }
+        }
     }
 
     broadcastPlayerUpdate() {
@@ -1516,6 +1563,7 @@ getRoomId() {
 
         this.players.forEach((player, peerId) => {
             if (now - player.lastUpdate > timeout) {
+                this.game.eventLogger?.logSystem(`⏰ ${peerId.substring(0, 8)} desconectado (timeout)`);
                 this.handlePlayerLeave(peerId);
             }
         });

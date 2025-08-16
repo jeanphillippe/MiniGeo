@@ -1241,10 +1241,7 @@ getRoomId() {
 
         // Create peer with room-based ID discovery
         this.peer = new Peer(null, {
-            host: 'broker-cloud.freeboard.io',
-            port: 443,
-            path: '/peerjs',
-            secure: true
+           debug:1
         });
 
         this.peer.on('open', (id) => {

@@ -2151,16 +2151,17 @@ class MultiplayerManager {
     constructor(game) {
         this.game = game;
         this.peer = null;
-        this.connections = new Map(); // playerId -> connection
+        this.connections = new Map();
         this.isHost = false;
         this.myPlayerId = null;
-        this.remotePlayers = new Map(); // playerId -> player data
+        this.remotePlayers = new Map();
         this.lastSentPosition = { x: 0, z: 0, rotation: 0 };
+        this.connectionRetries = 0;
+        this.maxRetries = 3;
         this.setupUI();
     }
 
     setupUI() {
-        // Create multiplayer UI
         const mpUI = document.createElement('div');
         mpUI.id = 'multiplayerUI';
         mpUI.innerHTML = `
@@ -2170,12 +2171,13 @@ class MultiplayerManager {
                 <div id="mpControls">
                     <button id="hostGameBtn">Crear Partida</button>
                     <div id="joinGameDiv">
-                        <input id="gameCodeInput" placeholder="Código de partida" maxlength="10">
+                        <input id="gameCodeInput" placeholder="Código de partida" maxlength="20">
                         <button id="joinGameBtn">Unirse</button>
                     </div>
                     <div id="gameCodeDisplay" style="display:none;">
                         <strong>Código: <span id="gameCode"></span></strong>
                         <button id="copyCodeBtn">Copiar</button>
+                        <button id="shareLinkBtn">Compartir Link</button>
                     </div>
                 </div>
                 <div id="playersList">
@@ -2186,7 +2188,6 @@ class MultiplayerManager {
             <button id="mpToggle">MP</button>
         `;
 
-        // Add CSS
         const style = document.createElement('style');
         style.textContent = `
             #multiplayerUI {
@@ -2291,11 +2292,11 @@ class MultiplayerManager {
                 transform-origin: center;
             }
         `;
-
+        
         document.head.appendChild(style);
         document.body.appendChild(mpUI);
-        
         this.setupEventListeners();
+        this.checkUrlForGameCode();
     }
 
     setupEventListeners() {
@@ -2315,45 +2316,177 @@ class MultiplayerManager {
 
         document.getElementById('copyCodeBtn').addEventListener('click', () => {
             const code = document.getElementById('gameCode').textContent;
-            navigator.clipboard.writeText(code);
+            this.copyToClipboard(code);
+        });
+
+        document.getElementById('shareLinkBtn').addEventListener('click', () => {
+            const code = document.getElementById('gameCode').textContent;
+            const gameUrl = `${window.location.origin}${window.location.pathname}?game=${code}`;
+            this.copyToClipboard(gameUrl);
+            this.updateStatus('¡Link copiado al portapapeles!', true);
+        });
+    }
+
+    checkUrlForGameCode() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const gameCode = urlParams.get('game');
+        if (gameCode) {
+            document.getElementById('gameCodeInput').value = gameCode;
+            // Auto-join after a short delay to ensure everything is loaded
+            setTimeout(() => {
+                if (confirm(`¿Unirse a la partida ${gameCode}?`)) {
+                    this.joinGame(gameCode);
+                }
+            }, 1000);
+        }
+    }
+
+    async copyToClipboard(text) {
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                // Fallback for older browsers or non-HTTPS
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-999999px';
+                textArea.style.top = '-999999px';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                document.execCommand('copy');
+                textArea.remove();
+            }
+        } catch (err) {
+            console.warn('Failed to copy to clipboard:', err);
+        }
+    }
+
+    createPeerWithRetry() {
+        return new Promise((resolve, reject) => {
+            const tryCreate = (retryCount = 0) => {
+                try {
+                    // Use multiple reliable PeerJS servers as fallbacks
+                    const servers = [
+                        { host: '0.peerjs.com', port: 443, secure: true },
+                        // Local fallback - you can add your own server here
+                        null // Will use default PeerJS cloud
+                    ];
+
+                    const serverConfig = servers[retryCount % servers.length];
+                    
+                    const peerConfig = {
+                        debug: 2,
+                        config: {
+                            iceServers: [
+                                { urls: 'stun:stun.l.google.com:19302' },
+                                { urls: 'stun:stun1.l.google.com:19302' }
+                            ]
+                        }
+                    };
+
+                    if (serverConfig) {
+                        Object.assign(peerConfig, serverConfig);
+                    }
+
+                    const peer = new Peer(peerConfig);
+                    
+                    const timeout = setTimeout(() => {
+                        peer.destroy();
+                        if (retryCount < this.maxRetries - 1) {
+                            console.log(`Retry attempt ${retryCount + 1}`);
+                            tryCreate(retryCount + 1);
+                        } else {
+                            reject(new Error('Failed to create peer after all retries'));
+                        }
+                    }, 10000); // 10 second timeout
+
+                    peer.on('open', (id) => {
+                        clearTimeout(timeout);
+                        resolve({ peer, id });
+                    });
+
+                    peer.on('error', (error) => {
+                        clearTimeout(timeout);
+                        console.error('Peer error:', error);
+                        peer.destroy();
+                        
+                        if (retryCount < this.maxRetries - 1) {
+                            console.log(`Retry attempt ${retryCount + 1} due to error:`, error);
+                            setTimeout(() => tryCreate(retryCount + 1), 2000);
+                        } else {
+                            reject(error);
+                        }
+                    });
+
+                } catch (error) {
+                    console.error('Error creating peer:', error);
+                    if (retryCount < this.maxRetries - 1) {
+                        setTimeout(() => tryCreate(retryCount + 1), 2000);
+                    } else {
+                        reject(error);
+                    }
+                }
+            };
+
+            tryCreate();
         });
     }
 
     async hostGame() {
         try {
-            this.peer = new Peer();
-            this.isHost = true;
+            this.updateStatus('Conectando...', false);
             
-            this.peer.on('open', (id) => {
-                this.myPlayerId = id;
-                this.updateStatus('Esperando jugadores...', true);
-                this.showGameCode(id);
-                this.game.eventLogger.logSystem('Partida multijugador creada');
-            });
+            const { peer, id } = await this.createPeerWithRetry();
+            this.peer = peer;
+            this.isHost = true;
+            this.myPlayerId = id;
+            
+            this.updateStatus('Esperando jugadores...', true);
+            this.showGameCode(id);
+            this.game.eventLogger.logSystem('Partida multijugador creada');
 
             this.peer.on('connection', (conn) => {
                 this.handleNewPlayer(conn);
             });
 
+            this.peer.on('error', (error) => {
+                console.error('Host peer error:', error);
+                this.updateStatus(`Error: ${error.message}`);
+            });
+
         } catch (error) {
             console.error('Error hosting game:', error);
-            this.updateStatus('Error al crear partida');
+            this.updateStatus('Error al crear partida. Verifica tu conexión.');
         }
     }
 
     async joinGame(hostId) {
         try {
-            this.peer = new Peer();
+            this.updateStatus('Conectando...', false);
             
-            this.peer.on('open', (id) => {
-                this.myPlayerId = id;
-                const conn = this.peer.connect(hostId);
-                this.handleNewPlayer(conn);
+            const { peer, id } = await this.createPeerWithRetry();
+            this.peer = peer;
+            this.myPlayerId = id;
+            
+            this.peer.on('error', (error) => {
+                console.error('Join peer error:', error);
+                this.updateStatus(`Error: ${error.message}`);
             });
+
+            const conn = this.peer.connect(hostId);
+            
+            conn.on('error', (error) => {
+                console.error('Connection error:', error);
+                this.updateStatus('Error al conectar con el host');
+            });
+
+            this.handleNewPlayer(conn);
 
         } catch (error) {
             console.error('Error joining game:', error);
-            this.updateStatus('Error al unirse a la partida');
+            this.updateStatus('Error al unirse. Verifica el código.');
         }
     }
 
@@ -2362,11 +2495,7 @@ class MultiplayerManager {
             this.connections.set(conn.peer, conn);
             this.updateStatus(`Conectado (${this.connections.size + 1} jugadores)`, true);
             this.updatePlayersList();
-            
-            // Send initial game state
             this.sendGameState(conn);
-            
-            // Log connection
             this.game.eventLogger.logSystem(`Jugador ${conn.peer.substring(0, 8)} se unió`);
         });
 
@@ -2375,6 +2504,11 @@ class MultiplayerManager {
         });
 
         conn.on('close', () => {
+            this.handlePlayerDisconnect(conn.peer);
+        });
+
+        conn.on('error', (error) => {
+            console.error('Connection error:', error);
             this.handlePlayerDisconnect(conn.peer);
         });
     }
@@ -2409,7 +2543,6 @@ class MultiplayerManager {
 
     updateRemotePlayer(playerId, data) {
         if (!this.remotePlayers.has(playerId)) {
-            // Create new remote player ship
             const remoteShip = this.game.createRemotePlayerShip();
             this.remotePlayers.set(playerId, {
                 ship: remoteShip,
@@ -2430,8 +2563,7 @@ class MultiplayerManager {
 
         const currentPos = this.game.playerShip.position;
         const currentRot = this.game.playerShip.rotation.y;
-        
-        // Only send if player moved significantly
+
         const moved = Math.abs(currentPos.x - this.lastSentPosition.x) > 0.5 ||
                      Math.abs(currentPos.z - this.lastSentPosition.z) > 0.5 ||
                      Math.abs(currentRot - this.lastSentPosition.rotation) > 0.1;
@@ -2448,7 +2580,13 @@ class MultiplayerManager {
             };
 
             this.connections.forEach(conn => {
-                conn.send(updateData);
+                if (conn.open) {
+                    try {
+                        conn.send(updateData);
+                    } catch (error) {
+                        console.warn('Failed to send update to player:', error);
+                    }
+                }
             });
 
             this.lastSentPosition = {
@@ -2505,7 +2643,7 @@ class MultiplayerManager {
     cleanupStaleRemotePlayers() {
         const now = Date.now();
         this.remotePlayers.forEach((player, playerId) => {
-            if (now - player.lastUpdate > 5000) { // 5 seconds timeout
+            if (now - player.lastUpdate > 5000) {
                 this.handlePlayerDisconnect(playerId);
             }
         });
@@ -2517,10 +2655,34 @@ class MultiplayerManager {
             message: message,
             timestamp: Date.now()
         };
-
+        
         this.connections.forEach(conn => {
-            conn.send(chatData);
+            if (conn.open) {
+                try {
+                    conn.send(chatData);
+                } catch (error) {
+                    console.warn('Failed to send chat message:', error);
+                }
+            }
         });
+    }
+
+    // Add method to create remote player ship (needed by the main game)
+    createRemotePlayerShip() {
+        // This should be added to your main SpaceShooter class
+        const remoteShip = ShipFactory.create(this.selectedShipType || 'player');
+        remoteShip.userData.isRemotePlayer = true;
+        
+        // Make remote players slightly transparent to distinguish them
+        remoteShip.traverse((child) => {
+            if (child.isMesh) {
+                child.material = child.material.clone();
+                child.material.transparent = true;
+                child.material.opacity = 0.8;
+            }
+        });
+        
+        return remoteShip;
     }
 }
       class SpaceShooter {
@@ -2532,7 +2694,27 @@ class MultiplayerManager {
           this.animate()
         }
 
-        
+      createRemotePlayerShip() {
+    const remoteShip = ShipFactory.create(this.selectedShipType || 'player');
+    remoteShip.userData.isRemotePlayer = true;
+    
+    // Make remote players slightly transparent and different colored to distinguish them
+    remoteShip.traverse((child) => {
+        if (child.isMesh) {
+            child.material = child.material.clone();
+            child.material.transparent = true;
+            child.material.opacity = 0.8;
+            
+            // Tint remote players with a different color
+            if (child.material.color) {
+                child.material.color.multiplyScalar(0.7);
+                child.material.color.r += 0.3; // Add some red tint
+            }
+        }
+    });
+    
+    return remoteShip;
+}  
 // 2. Add helper method to find planet by name (add to SpaceShooter class)
 findPlanetByName(planetName){
     return this.planets.find(planet => 
@@ -2851,6 +3033,7 @@ showWaypointSetFeedback(x, y) {
     this.enemies=[];
     this.planets=[];
     this.previewRenderer = null;
+       this.multiplayerManager = new MultiplayerManager(this);
 this.previewScenes = new Map();
 this.previewAnimationId = null;
     this.stars=[];
@@ -3952,7 +4135,10 @@ this.updateEnemyEMPRecovery();
     this.updateWaypointIndicator(); // Update 3D indicator
     if (this.waypointReachedCooldown > 0) this.waypointReachedCooldown--;
           this.updateMinimap();
-          this.updateExplosions()
+          this.updateExplosions();
+          if (this.multiplayerManager) {
+        this.multiplayerManager.update();
+    }
         }
  updateAllies(){
     this.allies = this.allies.filter(ally => {

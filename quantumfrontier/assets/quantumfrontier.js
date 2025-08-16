@@ -2180,6 +2180,7 @@ handleGameState(data) {
         mpUI.innerHTML = `
             <div id="mpPanel" class="mp-hidden">
                 <h3>Multijugador</h3>
+                <button id="testConnectionBtn">Test Conexión</button>
                 <div id="mpStatus">Desconectado</div>
                 <div id="mpControls">
                     <button id="hostGameBtn">Crear Partida</button>
@@ -2201,7 +2202,7 @@ handleGameState(data) {
                 </div>
             </div>
             <button id="mpToggle">MP</button>
-<button id="testConnectionBtn">Test Conexión</button>
+
         `;
 
         const style = document.createElement('style');

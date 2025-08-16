@@ -288,6 +288,12 @@
             // Multiplayer Functions
             async hostGame() {
                 try {
+                    // Clean up any existing peer
+                    if (this.peer) {
+                        this.peer.destroy();
+                        this.peer = null;
+                    }
+                    
                     this.updateStatus('Starting server...', false);
                     this.updateDebugInfo('🚀 Creating peer for hosting...');
                     console.log('Creating peer for hosting...');
@@ -299,18 +305,29 @@
                                 { urls: 'stun:stun.l.google.com:19302' },
                                 { urls: 'stun:stun1.l.google.com:19302' },
                                 { urls: 'stun:global.stun.twilio.com:3478' },
-                                { urls: 'stun:stun.cloudflare.com:3478' }
+                                { urls: 'stun:stun.cloudflare.com:3478' },
+                                { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' }
                             ],
-                            iceCandidatePoolSize: 10
+                            iceCandidatePoolSize: 10,
+                            iceTransportPolicy: 'all'
                         }
                     });
                     
+                    // Add timeout for peer creation
+                    const peerTimeout = setTimeout(() => {
+                        this.updateDebugInfo('⏰ Peer creation timed out - trying again...');
+                        this.peer.destroy();
+                        setTimeout(() => this.hostGame(), 2000);
+                    }, 10000);
+                    
                     this.peer.on('open', (id) => {
+                        clearTimeout(peerTimeout);
                         this.myPlayerId = id;
                         this.isHost = true;
                         this.updateStatus('Server active - Ready for connections', true);
                         this.showGameCode(id);
                         this.updateDebugInfo(`✅ Server active with ID: ${id.substring(0, 8)}...`);
+                        this.updateDebugInfo('🎯 Host is ready to accept connections!');
                         console.log('✅ Server active with ID:', id);
                     });
                     
@@ -326,12 +343,13 @@
                     });
                     
                     this.peer.on('error', (error) => {
+                        clearTimeout(peerTimeout);
                         this.updateDebugInfo(`❌ Peer error: ${error.type || error.message || 'unknown'}`);
                         console.error('❌ Peer error:', error);
                         this.updateStatus(`Error: ${error.type || error.message || 'unknown'}`, false);
                         
                         // Retry for certain errors
-                        if (error.type === 'network' || error.type === 'server-error') {
+                        if (error.type === 'network' || error.type === 'server-error' || error.type === 'unavailable-id') {
                             this.updateDebugInfo('🔄 Retrying in 3 seconds...');
                             console.log('🔄 Retrying in 3 seconds...');
                             setTimeout(() => this.hostGame(), 3000);
@@ -341,7 +359,9 @@
                     this.peer.on('disconnected', () => {
                         this.updateDebugInfo('⚠️ Peer disconnected, attempting to reconnect...');
                         console.log('⚠️ Peer disconnected, attempting to reconnect...');
-                        this.peer.reconnect();
+                        if (!this.peer.destroyed) {
+                            this.peer.reconnect();
+                        }
                     });
                     
                 } catch (error) {
@@ -359,6 +379,12 @@
                         return;
                     }
                     
+                    // Clean up any existing peer
+                    if (this.peer) {
+                        this.peer.destroy();
+                        this.peer = null;
+                    }
+                    
                     this.updateStatus('Initializing connection...', false);
                     this.updateDebugInfo(`🔗 Attempting to join: ${hostId.substring(0, 8)}...`);
                     console.log('🔗 Attempting to join:', hostId);
@@ -370,13 +396,23 @@
                                 { urls: 'stun:stun.l.google.com:19302' },
                                 { urls: 'stun:stun1.l.google.com:19302' },
                                 { urls: 'stun:global.stun.twilio.com:3478' },
-                                { urls: 'stun:stun.cloudflare.com:3478' }
+                                { urls: 'stun:stun.cloudflare.com:3478' },
+                                { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' }
                             ],
-                            iceCandidatePoolSize: 10
+                            iceCandidatePoolSize: 10,
+                            iceTransportPolicy: 'all'
                         }
                     });
                     
+                    // Add timeout for peer creation
+                    const peerTimeout = setTimeout(() => {
+                        this.updateDebugInfo('⏰ Client peer creation timed out - trying again...');
+                        this.peer.destroy();
+                        setTimeout(() => this.joinGame(hostId), 2000);
+                    }, 10000);
+                    
                     this.peer.on('open', (id) => {
+                        clearTimeout(peerTimeout);
                         this.myPlayerId = id;
                         this.updateDebugInfo(`✅ Client peer ready: ${id.substring(0, 8)}...`);
                         console.log('✅ Client peer ready:', id);
@@ -385,10 +421,11 @@
                         // Wait a moment before attempting connection
                         setTimeout(() => {
                             this.attemptConnection(hostId, 1);
-                        }, 1000);
+                        }, 1500); // Increased delay
                     });
                     
                     this.peer.on('error', (error) => {
+                        clearTimeout(peerTimeout);
                         this.updateDebugInfo(`❌ Client peer error: ${error.type || error.message || 'unknown'}`);
                         console.error('❌ Client peer error:', error);
                         this.updateStatus(`Error: ${error.type || error.message || 'unknown'}`, false);
@@ -397,7 +434,9 @@
                     this.peer.on('disconnected', () => {
                         this.updateDebugInfo('⚠️ Client disconnected, attempting to reconnect...');
                         console.log('⚠️ Client disconnected, attempting to reconnect...');
-                        this.peer.reconnect();
+                        if (!this.peer.destroyed) {
+                            this.peer.reconnect();
+                        }
                     });
                     
                 } catch (error) {
@@ -408,7 +447,7 @@
             }
             
             attemptConnection(hostId, attempt) {
-                const maxAttempts = 3;
+                const maxAttempts = 5; // Increased attempts
                 this.updateDebugInfo(`🔄 Connection attempt ${attempt}/${maxAttempts} to: ${hostId.substring(0, 8)}...`);
                 console.log(`🔄 Connection attempt ${attempt}/${maxAttempts} to: ${hostId}`);
                 this.updateStatus(`Connecting... (${attempt}/${maxAttempts})`, false);
@@ -417,24 +456,29 @@
                     const conn = this.peer.connect(hostId, {
                         reliable: true,
                         serialization: 'json',
-                        metadata: { attempt: attempt }
+                        metadata: { attempt: attempt, timestamp: Date.now() }
                     });
                     
+                    // Shorter initial timeout, longer for later attempts
+                    const timeoutDuration = attempt === 1 ? 8000 : (8000 + (attempt * 3000));
                     const timeout = setTimeout(() => {
-                        this.updateDebugInfo(`⏰ Connection attempt ${attempt} timed out`);
+                        this.updateDebugInfo(`⏰ Connection attempt ${attempt} timed out (${timeoutDuration}ms)`);
                         console.log(`⏰ Connection attempt ${attempt} timed out`);
+                        
                         if (attempt < maxAttempts) {
-                            this.updateDebugInfo(`🔄 Retrying in ${attempt * 2} seconds...`);
-                            console.log(`🔄 Retrying in ${attempt * 2} seconds...`);
+                            const retryDelay = attempt * 1000; // Progressive delay
+                            this.updateDebugInfo(`🔄 Retrying in ${retryDelay/1000} seconds...`);
+                            console.log(`🔄 Retrying in ${retryDelay/1000} seconds...`);
                             setTimeout(() => {
                                 this.attemptConnection(hostId, attempt + 1);
-                            }, attempt * 2000);
+                            }, retryDelay);
                         } else {
                             this.updateStatus('Connection failed - Host unreachable');
                             this.updateDebugInfo('❌ All connection attempts failed');
+                            this.updateDebugInfo('💡 Try: 1) Check if host is ready 2) Both refresh and try again');
                             console.log('❌ All connection attempts failed');
                         }
-                    }, 10000 + (attempt * 5000)); // Increase timeout with each attempt
+                    }, timeoutDuration);
                     
                     conn.on('open', () => {
                         clearTimeout(timeout);
@@ -451,15 +495,23 @@
                         
                         if (error.type === 'peer-unavailable') {
                             this.updateStatus('Host not found - Check the code');
-                            this.updateDebugInfo('💡 Make sure the host clicked "Host Game" first');
+                            this.updateDebugInfo('💡 Make sure the host clicked "Host Game" and shows "Server active"');
+                        } else if (error.type === 'network') {
+                            this.updateDebugInfo('💡 Network error - trying different connection method...');
+                            if (attempt < maxAttempts) {
+                                setTimeout(() => {
+                                    this.attemptConnection(hostId, attempt + 1);
+                                }, 2000);
+                            }
                         } else if (attempt < maxAttempts) {
-                            this.updateDebugInfo(`🔄 Retrying in ${attempt * 2} seconds...`);
-                            console.log(`🔄 Retrying in ${attempt * 2} seconds...`);
+                            this.updateDebugInfo(`🔄 Retrying in ${attempt * 1000/1000} seconds...`);
+                            console.log(`🔄 Retrying in ${attempt * 1000/1000} seconds...`);
                             setTimeout(() => {
                                 this.attemptConnection(hostId, attempt + 1);
-                            }, attempt * 2000);
+                            }, attempt * 1000);
                         } else {
                             this.updateStatus(`Connection failed: ${error.type || 'unknown'}`);
+                            this.updateDebugInfo('💡 Both players may need to refresh and try again');
                         }
                     });
                     
@@ -469,7 +521,7 @@
                     if (attempt < maxAttempts) {
                         setTimeout(() => {
                             this.attemptConnection(hostId, attempt + 1);
-                        }, attempt * 2000);
+                        }, attempt * 1000);
                     } else {
                         this.updateStatus('Connection error');
                     }

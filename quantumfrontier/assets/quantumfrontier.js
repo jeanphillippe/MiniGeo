@@ -2156,676 +2156,248 @@ class MultiplayerManager {
         this.myPlayerId = null;
         this.remotePlayers = new Map();
         this.lastSentPosition = { x: 0, z: 0, rotation: 0 };
+        
+        // Add mobile detection
+        this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
         this.setupUI();
     }
-broadcastMessage(message) {
-    this.connections.forEach(conn => {
-        if (conn.open) {
-            try {
-                conn.send(message);
-            } catch (error) {
-                console.warn('Failed to broadcast message:', error);
-            }
-        }
-    });
-}
-handleGameState(data) {
-    if (data.player && data.player.id !== this.myPlayerId) {
-        this.updateRemotePlayer(data.player.id, { player: data.player });
-    }
-}
-    setupUI() {
-        const mpUI = document.createElement('div');
-        mpUI.id = 'multiplayerUI';
-        mpUI.innerHTML = `
-            <div id="mpPanel" class="mp-hidden">
-                <h3>Multijugador</h3>
-                <button id="testConnectionBtn">Test Conexión</button>
-                <div id="mpStatus">Desconectado</div>
-                <div id="mpControls">
-                    <button id="hostGameBtn">Crear Partida</button>
-                    <div id="joinGameDiv">
-                        <input id="gameCodeInput" placeholder="Código de partida">
-                        <button id="joinGameBtn">Unirse</button>
-                    </div>
-                    <div id="gameCodeDisplay" style="display:none;">
-                        <strong>Código: <span id="gameCode"></span></strong>
-                        <div>
-                            <button id="copyCodeBtn">Copiar</button>
-                            <button id="shareLinkBtn">Compartir Link</button>
-                        </div>
-                    </div>
-                </div>
-                <div id="playersList">
-                    <h4>Jugadores:</h4>
-                    <div id="playersContent"></div>
-                </div>
-            </div>
-            <button id="mpToggle">MP</button>
 
-        `;
-
-        const style = document.createElement('style');
-        style.textContent = `
-            #multiplayerUI {
-                position: fixed;
-                top: 100px;
-                left: 20px;
-                z-index: 1000;
-            }
-            
-            #mpPanel {
-                width: 280px;
-                background: rgba(0, 0, 0, 0.9);
-                border: 2px solid rgba(0, 242, 254, 0.6);
-                border-radius: 10px;
-                padding: 15px;
-                font-family: 'Courier New', monospace;
-                color: #fff;
-                transition: transform 0.3s ease;
-            }
-            
-            #mpPanel.mp-hidden {
-                transform: translateX(-100%);
-            }
-            
-            #mpToggle {
-                position: absolute;
-                right: -40px;
-                top: 10px;
-                background: rgba(0, 242, 254, 0.2);
-                border: 2px solid rgba(0, 242, 254, 0.6);
-                color: #00f2fe;
-                padding: 8px 10px;
-                border-radius: 5px;
-                cursor: pointer;
-                font-family: 'Courier New', monospace;
-                font-size: 12px;
-            }
-            
-            #mpPanel h3 {
-                margin: 0 0 10px 0;
-                color: #00f2fe;
-                font-size: 16px;
-            }
-            
-            #mpStatus {
-                margin-bottom: 15px;
-                padding: 5px 8px;
-                background: rgba(255, 71, 87, 0.2);
-                border-radius: 4px;
-                font-size: 12px;
-            }
-            
-            #mpStatus.connected {
-                background: rgba(0, 255, 136, 0.2);
-            }
-            
-            #mpControls button {
-                background: rgba(0, 242, 254, 0.2);
-                border: 1px solid rgba(0, 242, 254, 0.6);
-                color: #00f2fe;
-                padding: 6px 12px;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 11px;
-                margin: 2px;
-                width: 100%;
-            }
-            
-            #mpControls input {
-                background: rgba(0, 0, 0, 0.5);
-                border: 1px solid rgba(0, 242, 254, 0.6);
-                color: #fff;
-                padding: 6px 8px;
-                border-radius: 4px;
-                width: 100%;
-                margin: 2px 0;
-                font-family: 'Courier New', monospace;
-                font-size: 11px;
-                box-sizing: border-box;
-            }
-            
-            #gameCodeDisplay {
-                background: rgba(0, 255, 136, 0.1);
-                border: 1px solid rgba(0, 255, 136, 0.3);
-                border-radius: 8px;
-                padding: 10px;
-                margin: 10px 0;
-                text-align: center;
-            }
-            
-            #gameCodeDisplay strong {
-                display: block;
-                margin-bottom: 8px;
-                color: #00ff88;
-                font-size: 12px;
-            }
-            
-            #gameCode {
-                font-family: monospace;
-                font-size: 14px;
-                color: #ffffff;
-                background: rgba(0, 0, 0, 0.3);
-                padding: 4px 8px;
-                border-radius: 4px;
-                word-break: break-all;
-            }
-            
-            #gameCodeDisplay button {
-                background: rgba(0, 242, 254, 0.2);
-                border: 1px solid rgba(0, 242, 254, 0.6);
-                color: #00f2fe;
-                padding: 6px 12px;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 11px;
-                margin: 2px;
-                width: calc(50% - 4px);
-                display: inline-block;
-            }
-            
-            #playersList {
-                margin-top: 15px;
-            }
-            
-            #playersList h4 {
-                margin: 0 0 5px 0;
-                color: #00f2fe;
-                font-size: 12px;
-            }
-            
-            .player-item {
-                padding: 4px 8px;
-                background: rgba(0, 242, 254, 0.1);
-                margin: 2px 0;
-                border-radius: 3px;
-                font-size: 11px;
-            }
-        `;
+    // 2. Modify attemptConnection method - replace the existing one
+    attemptConnection(hostId, attempt) {
+        const maxAttempts = 3;
         
-        document.head.appendChild(style);
-        document.body.appendChild(mpUI);
-        this.setupEventListeners();
-        this.checkUrlForGameCode();
-    }
-testConnection() {
-    this.game.eventLogger.logSystem('🔧 Probando conexión...');
-    
-    // Test básico de red
-    fetch('https://www.google.com/favicon.ico', { mode: 'no-cors' })
-        .then(() => {
-            this.game.eventLogger.logSystem('✅ Conexión a internet OK');
-        })
-        .catch(() => {
-            this.game.eventLogger.logSystem('❌ Sin conexión a internet');
-        });
-
-    // Test de WebRTC
-    if (window.RTCPeerConnection) {
-        this.game.eventLogger.logSystem('✅ WebRTC soportado');
+        // Increase timeout for mobile devices
+        const connectionTimeout = this.isMobile ? 25000 : 15000;
         
-        const pc = new RTCPeerConnection({
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-        });
+        this.game.eventLogger.logSystem(`🔄 Intento ${attempt}/${maxAttempts} conectando...`);
+        this.updateStatus(`Conectando... (${attempt}/${maxAttempts})`, false);
         
-        pc.createDataChannel('test');
-        pc.createOffer().then(() => {
-            this.game.eventLogger.logSystem('✅ WebRTC funcional');
-            pc.close();
-        }).catch((error) => {
-            this.game.eventLogger.logSystem(`❌ WebRTC error: ${error.message}`);
-            pc.close();
-        });
-    } else {
-        this.game.eventLogger.logSystem('❌ WebRTC no soportado');
-    }
-}
-    setupEventListeners() {
-        document.getElementById('mpToggle').addEventListener('click', () => {
-            const panel = document.getElementById('mpPanel');
-            panel.classList.toggle('mp-hidden');
-        });
-
-        document.getElementById('hostGameBtn').addEventListener('click', () => {
-            this.hostGame();
-        });
-// Agregar después de los otros event listeners:
-document.getElementById('testConnectionBtn').addEventListener('click', () => {
-    this.testConnection();
-});
-        document.getElementById('joinGameBtn').addEventListener('click', () => {
-            const code = document.getElementById('gameCodeInput').value.trim();
-            if (code) this.joinGame(code);
-        });
-
-        document.getElementById('copyCodeBtn').addEventListener('click', () => {
-            const code = document.getElementById('gameCode').textContent;
-            this.copyToClipboard(code);
-            this.updateStatus('¡Código copiado!', true);
-            setTimeout(() => {
-                this.updateStatus(`Conectado (${this.connections.size + 1} jugadores)`, true);
-            }, 2000);
-        });
-
-        document.getElementById('shareLinkBtn').addEventListener('click', () => {
-            const code = document.getElementById('gameCode').textContent;
-            const gameUrl = `${window.location.origin}${window.location.pathname}?game=${code}`;
-            this.copyToClipboard(gameUrl);
-            this.updateStatus('¡Link copiado!', true);
-            setTimeout(() => {
-                this.updateStatus(`Conectado (${this.connections.size + 1} jugadores)`, true);
-            }, 2000);
-        });
-    }
-
-    checkUrlForGameCode() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const gameCode = urlParams.get('game');
-        if (gameCode) {
-            document.getElementById('gameCodeInput').value = gameCode;
-            setTimeout(() => {
-                if (confirm(`¿Unirse a la partida?\nCódigo: ${gameCode.substring(0, 8)}...`)) {
-                    this.joinGame(gameCode);
-                }
-            }, 1000);
-        }
-    }
-
-    async copyToClipboard(text) {
         try {
-            if (navigator.clipboard && window.isSecureContext) {
-                await navigator.clipboard.writeText(text);
-            } else {
-                const textArea = document.createElement('textarea');
-                textArea.value = text;
-                textArea.style.position = 'fixed';
-                textArea.style.left = '-999999px';
-                textArea.style.top = '-999999px';
-                document.body.appendChild(textArea);
-                textArea.focus();
-                textArea.select();
-                document.execCommand('copy');
-                textArea.remove();
-            }
-        } catch (err) {
-            console.warn('Failed to copy to clipboard:', err);
-        }
-    }
+            const conn = this.peer.connect(hostId, {
+                reliable: true,
+                serialization: 'json',
+                metadata: { attempt: attempt, isMobile: this.isMobile }
+            });
 
-async hostGame() {
-    try {
-        this.updateStatus('Iniciando servidor...', false);
-        this.game.eventLogger.logSystem('🚀 Creando servidor...');
-        
-        // Configuración mejorada para el host
-        this.peer = new Peer({
-            debug: 0,
-            config: {
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-                    { urls: 'stun:global.stun.twilio.com:3478' }
-                ],
-                iceCandidatePoolSize: 10,
-                iceTransportPolicy: 'all'
-            }
-        });
+            const attemptTimeout = setTimeout(() => {
+                this.game.eventLogger.logSystem(`⏰ Timeout intento ${attempt}`);
+                conn.close(); // Close the failed connection
+                
+                if (attempt < maxAttempts) {
+                    const retryDelay = this.isMobile ? 3000 * attempt : 2000 * attempt;
+                    setTimeout(() => {
+                        this.attemptConnection(hostId, attempt + 1);
+                    }, retryDelay);
+                } else {
+                    this.game.eventLogger.logSystem('❌ Todos los intentos fallaron');
+                    this.updateStatus('Conexión falló - Intenta de nuevo');
+                }
+            }, connectionTimeout);
 
-        this.peer.on('open', (id) => {
-            this.myPlayerId = id;
-            this.isHost = true;
-            this.updateStatus('Servidor activo', true);
-            this.showGameCode(id);
-            this.game.eventLogger.logSystem(`✅ Servidor activo: ${id.substring(0, 8)}`);
-        });
+            // Add connection state tracking
+            let connectionEstablished = false;
 
-        this.peer.on('connection', (conn) => {
-            const clientId = conn.peer.substring(0, 8);
-            const attempt = conn.metadata?.attempt || 1;
-            
-            this.game.eventLogger.logSystem(`📞 Conexión entrante de: ${clientId} (intento ${attempt})`);
-            
-            // Dar tiempo para que la conexión se estabilice
-            setTimeout(() => {
+            conn.on('open', () => {
+                if (connectionEstablished) return; // Prevent duplicate handling
+                connectionEstablished = true;
+                
+                clearTimeout(attemptTimeout);
+                this.game.eventLogger.logSystem(`🎉 ¡Conectado en intento ${attempt}!`);
+                this.updateStatus('Conectado', true);
                 this.handleNewPlayer(conn);
-            }, 500);
-        });
+            });
 
-        this.peer.on('error', (error) => {
-            this.game.eventLogger.logSystem(`❌ Error servidor: ${error.type || error.message}`);
-            this.updateStatus(`Error: ${error.type || 'desconocido'}`);
-        });
+            conn.on('error', (error) => {
+                if (connectionEstablished) return; // Already connected, ignore
+                
+                clearTimeout(attemptTimeout);
+                this.game.eventLogger.logSystem(`❌ Error intento ${attempt}: ${error.type || error.message}`);
+                
+                // More specific error handling
+                if (error.type === 'negotiation-failed' || error.type === 'connection-failed') {
+                    if (attempt < maxAttempts) {
+                        const retryDelay = this.isMobile ? 4000 * attempt : 2000 * attempt;
+                        this.game.eventLogger.logSystem(`🔄 Reintentando en ${retryDelay/1000} segundos...`);
+                        setTimeout(() => {
+                            this.attemptConnection(hostId, attempt + 1);
+                        }, retryDelay);
+                    } else {
+                        this.game.eventLogger.logSystem('❌ Conexión falló en todos los intentos');
+                        this.updateStatus('Conexión falló - Verifica tu red');
+                    }
+                } else {
+                    this.updateStatus(`Error: ${error.type || 'desconocido'}`);
+                }
+            });
 
-    } catch (error) {
-        this.game.eventLogger.logSystem(`💥 Error crítico: ${error.message}`);
-        this.updateStatus('Error crítico');
-    }
-}
-
- async joinGame(hostId) {
-    try {
-        this.updateStatus('Iniciando cliente...', false);
-        this.game.eventLogger.logSystem(`🔍 Conectando a: ${hostId.substring(0, 8)}`);
-        
-        // Configuración más robusta para móviles
-        this.peer = new Peer({
-            debug: 0,
-            config: {
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-                    { urls: 'stun:global.stun.twilio.com:3478' }
-                ],
-                iceCandidatePoolSize: 10,
-                iceTransportPolicy: 'all'
-            }
-        });
-
-        this.peer.on('open', (id) => {
-            this.myPlayerId = id;
-            this.game.eventLogger.logSystem(`✅ Cliente listo: ${id.substring(0, 8)}`);
-            this.attemptConnection(hostId, 1); // Intentar conexión con reintentos
-        });
-
-        this.peer.on('error', (error) => {
-            this.game.eventLogger.logSystem(`❌ Error peer: ${error.type || error.message}`);
-            this.updateStatus(`Error: ${error.type || 'desconocido'}`);
-        });
-
-    } catch (error) {
-        this.game.eventLogger.logSystem(`💥 Error crítico: ${error.message}`);
-        this.updateStatus('Error crítico');
-    }
-}
-
-// Nuevo método para manejar reintentos
-attemptConnection(hostId, attempt) {
-    const maxAttempts = 3;
-    
-    this.game.eventLogger.logSystem(`🔄 Intento ${attempt}/${maxAttempts} conectando...`);
-    this.updateStatus(`Conectando... (${attempt}/${maxAttempts})`, false);
-    
-    try {
-        const conn = this.peer.connect(hostId, {
-            reliable: true,
-            serialization: 'json',
-            metadata: { attempt: attempt }
-        });
-
-        // Timeout por intento
-        const attemptTimeout = setTimeout(() => {
-            this.game.eventLogger.logSystem(`⏰ Timeout intento ${attempt}`);
-            
+        } catch (connectError) {
+            this.game.eventLogger.logSystem(`💥 Error creando conexión: ${connectError.message}`);
             if (attempt < maxAttempts) {
-                // Reintentar después de un delay
+                const retryDelay = this.isMobile ? 3000 * attempt : 2000 * attempt;
                 setTimeout(() => {
                     this.attemptConnection(hostId, attempt + 1);
-                }, 2000 * attempt); // Delay incremental
+                }, retryDelay);
             } else {
-                this.game.eventLogger.logSystem('❌ Todos los intentos fallaron');
-                this.updateStatus('Conexión falló - Intenta de nuevo');
+                this.updateStatus('Error de conexión');
             }
-        }, 15000);
+        }
+    }
 
-        conn.on('open', () => {
-            clearTimeout(attemptTimeout);
-            this.game.eventLogger.logSystem(`🎉 ¡Conectado en intento ${attempt}!`);
-            this.updateStatus('Conectado', true);
+    // 3. Modify handleNewPlayer method - replace the existing one
+    handleNewPlayer(conn) {
+        const clientId = conn.peer.substring(0, 8);
+        const isClientMobile = conn.metadata?.isMobile || false;
+        
+        this.game.eventLogger.logSystem(`🤝 Manejando conexión: ${clientId} ${isClientMobile ? '(móvil)' : ''}`);
+
+        // Add connection ready check
+        const setupConnection = () => {
+            this.connections.set(conn.peer, conn);
+            this.updateStatus(`Conectado (${this.connections.size + 1} jugadores)`, true);
+            this.updatePlayersList();
+            this.game.eventLogger.logSystem(`✅ Canal de datos abierto: ${clientId}`);
+
+            if (this.isHost && this.game.gameStarted && this.game.playerShip) {
+                // Longer delay for mobile clients
+                const delay = isClientMobile ? 2000 : 1000;
+                setTimeout(() => {
+                    this.sendGameState(conn);
+                    this.game.eventLogger.logSystem(`📤 Estado enviado a: ${clientId}`);
+                }, delay);
+            }
+        };
+
+        if (conn.open) {
+            setupConnection();
+        } else {
+            conn.on('open', setupConnection);
+        }
+
+        conn.on('data', (data) => {
+            this.handleMessage(data, conn.peer);
+        });
+
+        conn.on('close', () => {
+            this.game.eventLogger.logSystem(`🔌 Desconectado: ${clientId}`);
+            this.handlePlayerDisconnect(conn.peer);
         });
 
         conn.on('error', (error) => {
-            clearTimeout(attemptTimeout);
+            const errorType = error.type || 'desconocido';
+            this.game.eventLogger.logSystem(`⚠️ Error conexión ${clientId}: ${errorType}`);
             
-            if (error.type === 'negotiation-failed') {
-                this.game.eventLogger.logSystem(`❌ Negociación falló en intento ${attempt}`);
+            // More robust error handling
+            if (errorType === 'connection-failed' || errorType === 'disconnected') {
+                setTimeout(() => {
+                    this.handlePlayerDisconnect(conn.peer);
+                }, 3000); // Longer delay for mobile
+            }
+        });
+    }
+
+    // 4. Modify hostGame method to add mobile peer waiting - replace the existing one
+    async hostGame() {
+        try {
+            this.updateStatus('Iniciando servidor...', false);
+            this.game.eventLogger.logSystem('🚀 Creando servidor...');
+
+            this.peer = new Peer({
+                debug: 0,
+                config: {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' },
+                        { urls: 'stun:global.stun.twilio.com:3478' }
+                    ],
+                    iceCandidatePoolSize: 10,
+                    iceTransportPolicy: 'all'
+                }
+            });
+
+            this.peer.on('open', (id) => {
+                this.myPlayerId = id;
+                this.isHost = true;
+                this.updateStatus('Servidor activo', true);
+                this.showGameCode(id);
+                this.game.eventLogger.logSystem(`✅ Servidor activo: ${id.substring(0, 8)}`);
+            });
+
+            this.peer.on('connection', (conn) => {
+                const clientId = conn.peer.substring(0, 8);
+                const attempt = conn.metadata?.attempt || 1;
+                const isClientMobile = conn.metadata?.isMobile || false;
                 
-                if (attempt < maxAttempts) {
-                    this.game.eventLogger.logSystem(`🔄 Reintentando en ${2 * attempt} segundos...`);
-                    setTimeout(() => {
-                        this.attemptConnection(hostId, attempt + 1);
-                    }, 2000 * attempt);
-                } else {
-                    this.game.eventLogger.logSystem('❌ Negociación falló en todos los intentos');
-                    this.updateStatus('Fallo de negociación - Intenta de nuevo');
-                }
-            } else {
-                this.game.eventLogger.logSystem(`❌ Error: ${error.type || error.message}`);
+                this.game.eventLogger.logSystem(`📞 Conexión entrante de: ${clientId} (intento ${attempt}) ${isClientMobile ? '(móvil)' : ''}`);
+                
+                // Longer delay for mobile clients
+                const setupDelay = isClientMobile ? 1000 : 500;
+                setTimeout(() => {
+                    this.handleNewPlayer(conn);
+                }, setupDelay);
+            });
+
+            this.peer.on('error', (error) => {
+                this.game.eventLogger.logSystem(`❌ Error servidor: ${error.type || error.message}`);
                 this.updateStatus(`Error: ${error.type || 'desconocido'}`);
-            }
-        });
+            });
 
-        this.handleNewPlayer(conn);
-        
-    } catch (connectError) {
-        this.game.eventLogger.logSystem(`💥 Error creando conexión: ${connectError.message}`);
-        
-        if (attempt < maxAttempts) {
-            setTimeout(() => {
-                this.attemptConnection(hostId, attempt + 1);
-            }, 2000 * attempt);
-        } else {
-            this.updateStatus('Error de conexión');
+        } catch (error) {
+            this.game.eventLogger.logSystem(`💥 Error crítico: ${error.message}`);
+            this.updateStatus('Error crítico');
         }
     }
-}
 
-handleNewPlayer(conn) {
-    const clientId = conn.peer.substring(0, 8);
-    this.game.eventLogger.logSystem(`🤝 Manejando conexión: ${clientId}`);
-    
-    conn.on('open', () => {
-        this.connections.set(conn.peer, conn);
-        this.updateStatus(`Conectado (${this.connections.size + 1} jugadores)`, true);
-        this.updatePlayersList();
-        
-        this.game.eventLogger.logSystem(`✅ Canal de datos abierto: ${clientId}`);
-        
-        // Enviar estado después de confirmar conexión
-        if (this.isHost && this.game.gameStarted && this.game.playerShip) {
-            setTimeout(() => {
-                this.sendGameState(conn);
-                this.game.eventLogger.logSystem(`📤 Estado enviado a: ${clientId}`);
-            }, 1000);
-        }
-    });
+    // 5. Modify joinGame method to add mobile peer waiting - replace the existing one
+    async joinGame(hostId) {
+        try {
+            this.updateStatus('Iniciando cliente...', false);
+            this.game.eventLogger.logSystem(`🔍 Conectando a: ${hostId.substring(0, 8)}`);
 
-    conn.on('data', (data) => {
-        this.handleMessage(data, conn.peer);
-    });
-
-    conn.on('close', () => {
-        this.game.eventLogger.logSystem(`🔌 Desconectado: ${clientId}`);
-        this.handlePlayerDisconnect(conn.peer);
-    });
-
-    conn.on('error', (error) => {
-        const errorType = error.type || 'desconocido';
-        this.game.eventLogger.logSystem(`⚠️ Error conexión ${clientId}: ${errorType}`);
-        
-        // Solo desconectar en errores realmente críticos
-        if (errorType === 'connection-failed' || errorType === 'disconnected') {
-            setTimeout(() => {
-                this.handlePlayerDisconnect(conn.peer);
-            }, 2000); // Dar tiempo antes de limpiar
-        }
-        // Para negotiation-failed, no hacer nada - el cliente reintentará
-    });
-}
-
-    handleMessage(data, playerId) {
-    this.game.eventLogger.logSystem(`Mensaje recibido: ${data.type} de ${playerId.substring(0, 8)}`);
-    
-    switch (data.type) {
-        case 'playerUpdate':
-            this.updateRemotePlayer(playerId, data);
-            break;
-        case 'playerJoined':
-            this.updateRemotePlayer(playerId, data);
-            // Solo el host loggea cuando alguien se une
-            if (this.isHost) {
-                this.game.eventLogger.logSystem(`Jugador ${playerId.substring(0, 8)} se unió al juego`);
-            }
-            break;
-        case 'gameState':
-            this.handleGameState(data);
-            break;
-    }
-}
-
-    sendGameState(conn) {
-    // Verificar que la conexión esté realmente abierta
-    if (!conn || !conn.open) {
-        this.game.eventLogger.logSystem(`⚠️ Conexión no disponible para enviar estado`);
-        return;
-    }
-    
-    try {
-        const gameState = {
-            type: 'gameState',
-            player: {
-                id: this.myPlayerId,
-                position: this.game.playerShip.position,
-                rotation: this.game.playerShip.rotation.y,
-                health: this.game.player.health,
-                score: this.game.player.score,
-                shipType: this.game.selectedShipType
-            }
-        };
-        
-        conn.send(gameState);
-        this.game.eventLogger.logSystem(`📨 Estado enviado exitosamente`);
-        
-    } catch (error) {
-        this.game.eventLogger.logSystem(`❌ Error enviando estado: ${error.message}`);
-    }
-}
-
-    updateRemotePlayer(playerId, data) {
-    if (!this.remotePlayers.has(playerId)) {
-        const shipType = data.player.shipType || 'player';
-        const remoteShip = this.game.createRemotePlayerShip(shipType);
-        this.remotePlayers.set(playerId, {
-            ship: remoteShip,
-            lastUpdate: Date.now(),
-            ...data.player
-        });
-        this.game.scene.add(remoteShip);
-        this.game.eventLogger.logSystem(`Nave remota creada para ${playerId.substring(0, 8)}`);
-    }
-
-    const remotePlayer = this.remotePlayers.get(playerId);
-    if (data.player.position) {
-        remotePlayer.ship.position.copy(data.player.position);
-        remotePlayer.ship.position.y = 5; // Asegurar altura correcta
-    }
-    if (data.player.rotation !== undefined) {
-        remotePlayer.ship.rotation.y = data.player.rotation;
-    }
-    remotePlayer.lastUpdate = Date.now();
-}
-
-    broadcastPlayerUpdate() {
-    if (this.connections.size === 0) return;
-
-    const currentPos = this.game.playerShip.position;
-    const currentRot = this.game.playerShip.rotation.y;
-    
-    // Enviar siempre si es la primera vez o si se movió
-    const moved = Math.abs(currentPos.x - this.lastSentPosition.x) > 0.5 ||
-                  Math.abs(currentPos.z - this.lastSentPosition.z) > 0.5 ||
-                  Math.abs(currentRot - this.lastSentPosition.rotation) > 0.1 ||
-                  this.lastSentPosition.x === 0; // Primera vez
-
-    if (moved) {
-        const updateData = {
-            type: 'playerUpdate',
-            player: {
-                position: currentPos,
-                rotation: currentRot,
-                health: this.game.player.health,
-                score: this.game.player.score,
-                shipType: this.game.selectedShipType
-            }
-        };
-
-        this.connections.forEach(conn => {
-            if (conn.open) {
-                try {
-                    conn.send(updateData);
-                } catch (error) {
-                    this.game.eventLogger.logSystem(`Error enviando actualización: ${error.message}`);
+            this.peer = new Peer({
+                debug: 0,
+                config: {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' },
+                        { urls: 'stun:global.stun.twilio.com:3478' }
+                    ],
+                    iceCandidatePoolSize: 10,
+                    iceTransportPolicy: 'all'
                 }
-            }
-        });
+            });
 
-        this.lastSentPosition = {
-            x: currentPos.x,
-            z: currentPos.z,
-            rotation: currentRot
-        };
-    }
-}
+            // Add peer ready state checking
+            const waitForPeerReady = () => {
+                if (this.peer.open) {
+                    this.myPlayerId = this.peer.id;
+                    this.game.eventLogger.logSystem(`✅ Cliente listo: ${this.peer.id.substring(0, 8)}`);
+                    
+                    // Wait a bit longer for mobile before attempting connection
+                    const connectDelay = this.isMobile ? 2000 : 500;
+                    setTimeout(() => {
+                        this.attemptConnection(hostId, 1);
+                    }, connectDelay);
+                } else {
+                    // Wait for peer to be ready
+                    setTimeout(waitForPeerReady, 100);
+                }
+            };
 
-    handlePlayerDisconnect(playerId) {
-    // Verificar si realmente está en las conexiones
-    if (!this.connections.has(playerId)) {
-        return; // Ya fue removido
-    }
-    
-    this.connections.delete(playerId);
-    
-    if (this.remotePlayers.has(playerId)) {
-        this.game.scene.remove(this.remotePlayers.get(playerId).ship);
-        this.remotePlayers.delete(playerId);
-        this.game.eventLogger.logSystem(`👋 Jugador ${playerId.substring(0, 8)} se desconectó`);
-    }
-    
-    this.updateStatus(`Conectado (${this.connections.size + 1} jugadores)`, this.connections.size > 0 || this.isHost);
-    this.updatePlayersList();
-}
+            this.peer.on('open', (id) => {
+                waitForPeerReady();
+            });
 
-    updateStatus(message, connected = false) {
-        const status = document.getElementById('mpStatus');
-        status.textContent = message;
-        status.className = connected ? 'connected' : '';
-    }
+            this.peer.on('error', (error) => {
+                this.game.eventLogger.logSystem(`❌ Error peer: ${error.type || error.message}`);
+                this.updateStatus(`Error: ${error.type || 'desconocido'}`);
+            });
 
-    showGameCode(code) {
-        document.getElementById('gameCode').textContent = code;
-        document.getElementById('gameCodeDisplay').style.display = 'block';
-        document.getElementById('joinGameDiv').style.display = 'none';
-        document.getElementById('hostGameBtn').style.display = 'none';
-    }
-
-    updatePlayersList() {
-        const content = document.getElementById('playersContent');
-        let html = `<div class="player-item">Tú (Host: ${this.isHost})</div>`;
-        
-        this.connections.forEach((conn, playerId) => {
-            html += `<div class="player-item">${playerId.substring(0, 8)}</div>`;
-        });
-        
-        content.innerHTML = html;
-    }
-
-    update() {
-        if (this.peer && this.peer.open) {
-            this.broadcastPlayerUpdate();
-            this.cleanupStaleRemotePlayers();
+        } catch (error) {
+            this.game.eventLogger.logSystem(`💥 Error crítico: ${error.message}`);
+            this.updateStatus('Error crítico');
         }
     }
-
-    cleanupStaleRemotePlayers() {
-    const now = Date.now();
-    this.remotePlayers.forEach((player, playerId) => {
-        // Aumentar a 30 segundos para móviles
-        if (now - player.lastUpdate > 38000) {
-            this.game.eventLogger.logSystem(`⏰ Jugador ${playerId.substring(0, 8)} timeout`);
-            this.handlePlayerDisconnect(playerId);
-        }
-    });
-}
 }
       class SpaceShooter {
         constructor() {

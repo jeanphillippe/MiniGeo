@@ -2487,39 +2487,47 @@ handleGameState(data) {
     }
 
     handleNewPlayer(conn) {
-        conn.on('open', () => {
-            this.connections.set(conn.peer, conn);
-            this.updateStatus(`Conectado (${this.connections.size + 1} jugadores)`, true);
-            this.updatePlayersList();
+    conn.on('open', () => {
+        this.connections.set(conn.peer, conn);
+        this.updateStatus(`Conectado (${this.connections.size + 1} jugadores)`, true);
+        this.updatePlayersList();
+        
+        // El host envía su estado al nuevo jugador
+        if (this.isHost && this.game.gameStarted && this.game.playerShip) {
             this.sendGameState(conn);
-            this.game.eventLogger.logSystem(`Jugador ${conn.peer.substring(0, 8)} se unió`);
-        });
+        }
+        
+        // Logging
+        this.game.eventLogger.logSystem(`Jugador ${conn.peer.substring(0, 8)} conectado`);
+    });
 
-        conn.on('data', (data) => {
-            this.handleMessage(data, conn.peer);
-        });
+    conn.on('data', (data) => {
+        this.handleMessage(data, conn.peer);
+    });
 
-        conn.on('close', () => {
-            this.handlePlayerDisconnect(conn.peer);
-        });
+    conn.on('close', () => {
+        this.handlePlayerDisconnect(conn.peer);
+    });
 
-        conn.on('error', (error) => {
-            console.error('Connection error:', error);
-            this.handlePlayerDisconnect(conn.peer);
-        });
-    }
+    conn.on('error', (error) => {
+        this.game.eventLogger.logSystem(`Error de conexión: ${error.message}`);
+        this.handlePlayerDisconnect(conn.peer);
+    });
+}
 
     handleMessage(data, playerId) {
+    this.game.eventLogger.logSystem(`Mensaje recibido: ${data.type} de ${playerId.substring(0, 8)}`);
+    
     switch (data.type) {
         case 'playerUpdate':
             this.updateRemotePlayer(playerId, data);
             break;
         case 'playerJoined':
             this.updateRemotePlayer(playerId, data);
-            this.game.eventLogger.logSystem(`Jugador ${playerId.substring(0, 8)} se unió`);
-            break;
-        case 'chatMessage':
-            this.game.eventLogger.logSystem(`${playerId.substring(0, 8)}: ${data.message}`);
+            // Solo el host loggea cuando alguien se une
+            if (this.isHost) {
+                this.game.eventLogger.logSystem(`Jugador ${playerId.substring(0, 8)} se unió al juego`);
+            }
             break;
         case 'gameState':
             this.handleGameState(data);
@@ -2552,11 +2560,13 @@ handleGameState(data) {
             ...data.player
         });
         this.game.scene.add(remoteShip);
+        this.game.eventLogger.logSystem(`Nave remota creada para ${playerId.substring(0, 8)}`);
     }
 
     const remotePlayer = this.remotePlayers.get(playerId);
     if (data.player.position) {
         remotePlayer.ship.position.copy(data.player.position);
+        remotePlayer.ship.position.y = 5; // Asegurar altura correcta
     }
     if (data.player.rotation !== undefined) {
         remotePlayer.ship.rotation.y = data.player.rotation;
@@ -2565,43 +2575,46 @@ handleGameState(data) {
 }
 
     broadcastPlayerUpdate() {
-        if (this.connections.size === 0) return;
+    if (this.connections.size === 0) return;
 
-        const currentPos = this.game.playerShip.position;
-        const currentRot = this.game.playerShip.rotation.y;
+    const currentPos = this.game.playerShip.position;
+    const currentRot = this.game.playerShip.rotation.y;
+    
+    // Enviar siempre si es la primera vez o si se movió
+    const moved = Math.abs(currentPos.x - this.lastSentPosition.x) > 0.5 ||
+                  Math.abs(currentPos.z - this.lastSentPosition.z) > 0.5 ||
+                  Math.abs(currentRot - this.lastSentPosition.rotation) > 0.1 ||
+                  this.lastSentPosition.x === 0; // Primera vez
 
-        const moved = Math.abs(currentPos.x - this.lastSentPosition.x) > 0.5 ||
-                     Math.abs(currentPos.z - this.lastSentPosition.z) > 0.5 ||
-                     Math.abs(currentRot - this.lastSentPosition.rotation) > 0.1;
+    if (moved) {
+        const updateData = {
+            type: 'playerUpdate',
+            player: {
+                position: currentPos,
+                rotation: currentRot,
+                health: this.game.player.health,
+                score: this.game.player.score,
+                shipType: this.game.selectedShipType
+            }
+        };
 
-        if (moved) {
-            const updateData = {
-                type: 'playerUpdate',
-                player: {
-                    position: currentPos,
-                    rotation: currentRot,
-                    health: this.game.player.health,
-                    score: this.game.player.score
+        this.connections.forEach(conn => {
+            if (conn.open) {
+                try {
+                    conn.send(updateData);
+                } catch (error) {
+                    this.game.eventLogger.logSystem(`Error enviando actualización: ${error.message}`);
                 }
-            };
+            }
+        });
 
-            this.connections.forEach(conn => {
-                if (conn.open) {
-                    try {
-                        conn.send(updateData);
-                    } catch (error) {
-                        console.warn('Failed to send update:', error);
-                    }
-                }
-            });
-
-            this.lastSentPosition = {
-                x: currentPos.x,
-                z: currentPos.z,
-                rotation: currentRot
-            };
-        }
+        this.lastSentPosition = {
+            x: currentPos.x,
+            z: currentPos.z,
+            rotation: currentRot
+        };
     }
+}
 
     handlePlayerDisconnect(playerId) {
         this.connections.delete(playerId);
@@ -2650,7 +2663,8 @@ handleGameState(data) {
     cleanupStaleRemotePlayers() {
         const now = Date.now();
         this.remotePlayers.forEach((player, playerId) => {
-            if (now - player.lastUpdate > 5000) {
+            if (now - player.lastUpdate > 35000) {
+               this.game.eventLogger.logSystem(`Jugador ${playerId.substring(0, 8)} perdió conexión`);
                 this.handlePlayerDisconnect(playerId);
             }
         });
@@ -5546,15 +5560,16 @@ async selectShip(shipType){
     await this.audioManager.start();
     this.audioManager.playPowerUp();
     this.gameStarted = true;
-      if (this.multiplayerManager && this.multiplayerManager.connections.size > 0) {
-    console.log('🎮 Game started, notifying other players');
+    // En el método selectShip, reemplaza la parte del multiplayer:
+if (this.multiplayerManager && this.multiplayerManager.connections.size > 0) {
+    this.eventLogger.logSystem('🎮 Sincronizando nave seleccionada...');
+    
+    // Enviar estado del juego a todos
     this.multiplayerManager.connections.forEach(conn => {
-        setTimeout(() => {
-            this.multiplayerManager.sendGameState(conn);
-        }, 1000);
+        this.multiplayerManager.sendGameState(conn);
     });
     
-    // Send player joined message
+    // Enviar mensaje de que el jugador se unió
     const joinMessage = {
         type: 'playerJoined',
         player: {
@@ -5565,7 +5580,12 @@ async selectShip(shipType){
         }
     };
     this.multiplayerManager.broadcastMessage(joinMessage);
-    this.eventLogger.logSystem('🌐 Sincronizando con otros jugadores...');
+    
+    // Forzar primera actualización después de un momento
+    setTimeout(() => {
+        this.multiplayerManager.lastSentPosition = { x: 0, z: 0, rotation: 0 };
+        this.multiplayerManager.broadcastPlayerUpdate();
+    }, 1000);
 }
     if(!this.initialWaypointSet){
         const asteriaPlanet = this.findPlanetByName('Asteria Prime');

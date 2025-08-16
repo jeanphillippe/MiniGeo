@@ -2463,8 +2463,7 @@ document.getElementById('testConnectionBtn').addEventListener('click', () => {
             debug: 0,
             config: {
                 iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' }
+                    { urls: 'stun:stun.l.google.com:19302' }
                 ]
             }
         });
@@ -2514,8 +2513,7 @@ document.getElementById('testConnectionBtn').addEventListener('click', () => {
             debug: 0,
             config: {
                 iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' }
+                    { urls: 'stun:stun.l.google.com:19302' }
                 ]
             }
         });

@@ -1204,6 +1204,383 @@ nebula.position.set(
           }
         }
       }
+      // WebRTC Multiplayer Manager using PeerJS
+class MultiplayerManager {
+    constructor(game) {
+        this.game = game;
+        this.peer = null;
+        this.connections = new Map(); // peerId -> connection
+        this.players = new Map(); // peerId -> player data
+        this.roomId = this.getRoomId();
+        this.myId = null;
+        this.syncInterval = null;
+        this.lastSyncTime = 0;
+        this.syncRate = 1000 / 20; // 20 FPS sync rate
+        
+        this.setupPeer();
+    }
+getRoomId() {
+    // Check URL parameter first
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomParam = urlParams.get('room');
+    if (roomParam) return roomParam;
+    
+    // Check hash
+    const hash = window.location.hash.substring(1);
+    if (hash) return hash;
+    
+    // Default room
+    return 'main-lobby';
+}
+
+    async setupPeer() {
+        // Import PeerJS from CDN
+        if (!window.Peer) {
+            await this.loadPeerJS();
+        }
+
+        // Create peer with room-based ID discovery
+        this.peer = new Peer(null, {
+            host: 'broker-cloud.freeboard.io',
+            port: 443,
+            path: '/peerjs',
+            secure: true
+        });
+
+        this.peer.on('open', (id) => {
+            this.myId = id;
+            console.log('Connected with ID:', id);
+            this.discoverPeers();
+            this.startSyncLoop();
+        });
+
+        this.peer.on('connection', (conn) => {
+            this.handleIncomingConnection(conn);
+        });
+
+        this.peer.on('error', (err) => {
+            console.warn('Peer error:', err);
+        });
+    }
+
+    async loadPeerJS() {
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js';
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    }
+
+    async discoverPeers() {
+        // Simple peer discovery using localStorage for same-origin coordination
+        const storageKey = `mp_room_${this.roomId}`;
+        const existingPeers = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        
+        // Add our ID to the room
+        const updatedPeers = [...existingPeers.filter(id => id !== this.myId), this.myId];
+        localStorage.setItem(storageKey, JSON.stringify(updatedPeers));
+        
+        // Connect to existing peers
+        for (const peerId of existingPeers) {
+            if (peerId !== this.myId && !this.connections.has(peerId)) {
+                await this.connectToPeer(peerId);
+            }
+        }
+
+        // Clean up disconnected peers periodically
+        setInterval(() => this.cleanupPeers(), 10000);
+    }
+
+    async connectToPeer(peerId) {
+        try {
+            const conn = this.peer.connect(peerId, { reliable: true });
+            this.handleConnection(conn);
+        } catch (err) {
+            console.warn('Failed to connect to peer:', peerId, err);
+        }
+    }
+
+    handleIncomingConnection(conn) {
+        this.handleConnection(conn);
+    }
+
+    handleConnection(conn) {
+        conn.on('open', () => {
+            console.log('Connected to peer:', conn.peer);
+            this.connections.set(conn.peer, conn);
+            
+            // Send initial player data
+            this.sendToPlayer(conn.peer, {
+                type: 'player_join',
+                player: this.getMyPlayerData()
+            });
+
+            // Log the connection
+            this.game.eventLogger?.logSystem(`Jugador ${conn.peer.substring(0, 8)} se unió`);
+        });
+
+        conn.on('data', (data) => {
+            this.handleMessage(conn.peer, data);
+        });
+
+        conn.on('close', () => {
+            this.handlePlayerLeave(conn.peer);
+        });
+
+        conn.on('error', (err) => {
+            console.warn('Connection error:', err);
+            this.handlePlayerLeave(conn.peer);
+        });
+    }
+
+    handleMessage(fromPeer, data) {
+        switch (data.type) {
+            case 'player_join':
+                this.handlePlayerJoin(fromPeer, data.player);
+                break;
+            case 'player_update':
+                this.handlePlayerUpdate(fromPeer, data.player);
+                break;
+            case 'player_leave':
+                this.handlePlayerLeave(fromPeer);
+                break;
+            case 'event':
+                this.handleRemoteEvent(data.event);
+                break;
+        }
+    }
+
+    handlePlayerJoin(peerId, playerData) {
+        // Create visual representation of the remote player
+        const remotePlayer = {
+            id: peerId,
+            ship: this.createRemotePlayerShip(playerData),
+            lastUpdate: Date.now(),
+            ...playerData
+        };
+        
+        this.players.set(peerId, remotePlayer);
+        this.game.scene.add(remotePlayer.ship);
+        
+        // Send our data back if we haven't already
+        if (!this.connections.has(peerId)) return;
+        
+        this.sendToPlayer(peerId, {
+            type: 'player_join',
+            player: this.getMyPlayerData()
+        });
+    }
+
+    handlePlayerUpdate(peerId, playerData) {
+        const player = this.players.get(peerId);
+        if (!player) return;
+
+        // Smooth interpolation for position updates
+        const target = {
+            x: playerData.x,
+            y: playerData.y || 5,
+            z: playerData.z
+        };
+
+        // Lerp to new position for smooth movement
+        if (player.ship) {
+            const lerpFactor = 0.3;
+            player.ship.position.lerp(target, lerpFactor);
+            player.ship.rotation.y = playerData.rotation || 0;
+        }
+
+        // Update other data
+        Object.assign(player, playerData);
+        player.lastUpdate = Date.now();
+    }
+
+    handlePlayerLeave(peerId) {
+        const player = this.players.get(peerId);
+        if (player) {
+            if (player.ship) {
+                this.game.scene.remove(player.ship);
+            }
+            this.players.delete(peerId);
+            this.game.eventLogger?.logSystem(`Jugador ${peerId.substring(0, 8)} se desconectó`);
+        }
+        
+        this.connections.delete(peerId);
+        
+        // Update localStorage
+        const storageKey = `mp_room_${this.roomId}`;
+        const peers = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        const updatedPeers = peers.filter(id => id !== peerId);
+        localStorage.setItem(storageKey, JSON.stringify(updatedPeers));
+    }
+
+    handleRemoteEvent(event) {
+        // Handle events from other players
+        if (this.game.eventLogger) {
+            this.game.eventLogger.logEvent(event.message, event.type);
+        }
+    }
+
+    createRemotePlayerShip(playerData) {
+        // Create a ship using the same factory but with different colors
+        const ship = ShipFactory.create(playerData.shipType || 'fighter');
+        
+        // Make it visually distinct (different color/transparency)
+        ship.traverse((child) => {
+            if (child.isMesh) {
+                child.material = child.material.clone();
+                child.material.transparent = true;
+                child.material.opacity = 0.8;
+                
+                // Tint with a different color
+                const hue = this.hashStringToHue(playerData.id || 'default');
+                child.material.color.multiplyScalar(0.7);
+                child.material.emissive = new THREE.Color().setHSL(hue, 0.5, 0.3);
+            }
+        });
+
+        return ship;
+    }
+
+    hashStringToHue(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        return (hash % 360) / 360;
+    }
+
+    getMyPlayerData() {
+        if (!this.game.playerShip) return {};
+        
+        return {
+            id: this.myId,
+            x: this.game.playerShip.position.x,
+            y: this.game.playerShip.position.y,
+            z: this.game.playerShip.position.z,
+            rotation: this.game.playerShip.rotation.y,
+            health: this.game.player.health,
+            shipType: this.game.selectedShipType,
+            score: this.game.player.score
+        };
+    }
+
+    startSyncLoop() {
+        this.syncInterval = setInterval(() => {
+            if (this.connections.size > 0 && this.game.gameStarted && this.game.playerShip) {
+                this.broadcastPlayerUpdate();
+            }
+            this.cleanupStaleePlayers();
+        }, this.syncRate);
+    }
+
+    broadcastPlayerUpdate() {
+        const playerData = this.getMyPlayerData();
+        this.broadcast({
+            type: 'player_update',
+            player: playerData
+        });
+    }
+
+    broadcast(message) {
+        this.connections.forEach((conn) => {
+            if (conn.open) {
+                try {
+                    conn.send(message);
+                } catch (err) {
+                    console.warn('Failed to send to peer:', conn.peer, err);
+                }
+            }
+        });
+    }
+
+    sendToPlayer(peerId, message) {
+        const conn = this.connections.get(peerId);
+        if (conn && conn.open) {
+            try {
+                conn.send(message);
+            } catch (err) {
+                console.warn('Failed to send to player:', peerId, err);
+            }
+        }
+    }
+
+    broadcastEvent(message, type = 'system') {
+        this.broadcast({
+            type: 'event',
+            event: { message, type }
+        });
+    }
+
+    cleanupStaleePlayers() {
+        const now = Date.now();
+        const timeout = 10000; // 10 seconds
+
+        this.players.forEach((player, peerId) => {
+            if (now - player.lastUpdate > timeout) {
+                this.handlePlayerLeave(peerId);
+            }
+        });
+    }
+
+    cleanupPeers() {
+        const storageKey = `mp_room_${this.roomId}`;
+        const peers = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        
+        // Keep only connected peers and ourselves
+        const activePeers = [this.myId, ...Array.from(this.connections.keys())];
+        const cleanedPeers = peers.filter(id => activePeers.includes(id));
+        
+        localStorage.setItem(storageKey, JSON.stringify(cleanedPeers));
+    }
+
+    // Public methods for game integration
+    getConnectedPlayers() {
+        return Array.from(this.players.values());
+    }
+
+    getPlayerPositions() {
+        const positions = [];
+        this.players.forEach((player) => {
+            if (player.ship) {
+                positions.push({
+                    id: player.id,
+                    position: player.ship.position,
+                    health: player.health || 100
+                });
+            }
+        });
+        return positions;
+    }
+
+    shutdown() {
+        if (this.syncInterval) {
+            clearInterval(this.syncInterval);
+        }
+
+        // Notify others we're leaving
+        this.broadcast({
+            type: 'player_leave'
+        });
+
+        // Close all connections
+        this.connections.forEach((conn) => {
+            conn.close();
+        });
+
+        // Clean up our peer
+        if (this.peer) {
+            this.peer.destroy();
+        }
+
+        // Remove from localStorage
+        const storageKey = `mp_room_${this.roomId}`;
+        const peers = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        const updatedPeers = peers.filter(id => id !== this.myId);
+        localStorage.setItem(storageKey, JSON.stringify(updatedPeers));
+    }
+}
       class MinimapManager {
         constructor() {
           this.canvas = document.getElementById('minimapCanvas');
@@ -1212,6 +1589,13 @@ nebula.position.set(
             this.waypoint = null;
           this.setupEvents()
         }
+        hashStringToHue(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return ((hash % 360) + 360) % 360 / 360;
+}
 setupEvents(){
     document.getElementById('minimapToggle').addEventListener('click',()=>{
         this.toggleExpanded();
@@ -1336,7 +1720,7 @@ setWaypoint(event){
             this.canvas.width = this.canvas.height = 120
           }
         }
-update(playerPos,planets,enemies){
+update(playerPos, planets, enemies, otherPlayers = []) {
     const ctx=this.ctx;
     const size=this.expanded?300:120;
     const scale=this.expanded?0.8:0.3;
@@ -1415,7 +1799,36 @@ update(playerPos,planets,enemies){
             ctx.fill();
         }
     });
-    
+    otherPlayers.forEach(player => {
+        if (!player.position) return;
+        const relX = (player.position.x - playerPos.x) * scale + centerX;
+        const relY = (player.position.z - playerPos.z) * scale + centerY;
+        
+        if (relX >= -5 && relX <= size + 5 && relY >= -5 && relY <= size + 5) {
+            // Draw player with unique color
+            const hue = this.hashStringToHue(player.id || 'default');
+            ctx.fillStyle = `hsl(${hue * 360}, 70%, 60%)`;
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(relX, relY, 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            
+            // Health indicator
+            if (player.health && player.health < 100) {
+                const healthBarWidth = 12;
+                const healthBarHeight = 2;
+                const healthPercent = player.health / 100;
+                
+                ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
+                ctx.fillRect(relX - healthBarWidth/2, relY - 8, healthBarWidth, healthBarHeight);
+                
+                ctx.fillStyle = 'rgba(0, 255, 0, 0.8)';
+                ctx.fillRect(relX - healthBarWidth/2, relY - 8, healthBarWidth * healthPercent, healthBarHeight);
+            }
+        }
+    });
     // Draw waypoint
     if(this.waypoint){
         const waypointX=(this.waypoint.x-playerPos.x)*scale+centerX;
@@ -2471,6 +2884,7 @@ showWaypointSetFeedback(x, y) {
     this.bullets=[];
     this.enemyBullets=[];
     this.artifacts=[];
+    this.multiplayerManager = new MultiplayerManager(this);
     this.mines=[];
     this.enemies=[];
     this.planets=[];
@@ -3549,6 +3963,27 @@ fireHomingMissile(){
             })
           }
         }
+        updateMultiplayerDisplay() {
+    // Update multiplayer player positions and sync
+    const players = this.multiplayerManager.getConnectedPlayers();
+    
+    // Remove stale player ships that are no longer connected
+    this.scene.children.forEach(child => {
+        if (child.userData.isMultiplayerShip) {
+            const stillConnected = players.some(p => p.id === child.userData.playerId);
+            if (!stillConnected) {
+                this.scene.remove(child);
+            }
+        }
+    });
+}
+updateMultiplayerStatus() {
+    const statusElement = document.getElementById('playerCount');
+    if (statusElement && this.multiplayerManager) {
+        const connectedCount = this.multiplayerManager.connections.size;
+        statusElement.textContent = `Jugadores: ${connectedCount + 1}`;
+    }
+}
         update() {
           if (!this.gameStarted) return;
           this.updateLanding();
@@ -3569,6 +4004,9 @@ this.updateEMPBursts();
 this.updateHomingMissiles(); 
 this.updateTractorBeam();
 this.updateEnemyEMPRecovery();
+if (this.multiplayerManager) {
+    this.updateMultiplayerDisplay();
+}
           this.updateCollisions();
           this.updateBackground();
           this.updateEffects();
@@ -3576,6 +4014,7 @@ this.updateEnemyEMPRecovery();
     this.updateWaypointIndicator(); // Update 3D indicator
     if (this.waypointReachedCooldown > 0) this.waypointReachedCooldown--;
           this.updateMinimap();
+          this.updateMultiplayerStatus();
           this.updateExplosions()
         }
  updateAllies(){
@@ -4365,8 +4804,10 @@ this.audioManager.playSprite(randomSound, this.playerShip.position, this.playerS
         }
         updateMinimap() {
           if (this.minimapManager) {
-            this.minimapManager.update(this.playerShip.position, this.planets, this.enemies)
-          }
+        // Get other players for minimap display
+        const otherPlayers = this.multiplayerManager ? this.multiplayerManager.getPlayerPositions() : [];
+        this.minimapManager.update(this.playerShip.position, this.planets, this.enemies, otherPlayers);
+    }
         }
         updateCoordinates() {
           document.getElementById('posX').textContent = Math.round(this.playerShip.position.x);
@@ -4634,6 +5075,9 @@ setTimeout(() => {
         gameOver() {
           this.gameStarted = !1;
           this.audioManager.stopLaser();
+          if (this.multiplayerManager) {
+    this.multiplayerManager.broadcastEvent(`Jugador eliminado (Puntaje: ${this.player.score})`, 'system');
+}
           setTimeout(() => {
             this.showGameOverScreen()
           }, 500)
@@ -4795,6 +5239,11 @@ if(this.playerShip && this.playerShip.userData.shipType !== this.selectedShipTyp
     this.updateHUD();
 }
         setupEventListeners() {
+          window.addEventListener('beforeunload', () => {
+    if (this.multiplayerManager) {
+        this.multiplayerManager.shutdown();
+    }
+});
           document.addEventListener('keydown', (e) => {
             this.keys[e.code] = !0;
             if (e.code === 'KeyE') {
@@ -5004,27 +5453,32 @@ async renderShipPreview(canvas, shipType) {
     const ctx = canvas.getContext('2d');
     ctx.drawImage(this.previewRenderer.domElement, 0, 0);
 }
-async selectShip(shipType){
+async selectShip(shipType) {
     this.selectedShipType = shipType;
-     if(!this.playerShip) {
+    if (!this.playerShip) {
         this.createPlayer();
     }
-    // Remover selector
-    const selector = document.getElementById('shipSelector');
-    if(selector) selector.remove();
     
-    // Continuar con el inicio del juego
+    const selector = document.getElementById('shipSelector');
+    if (selector) selector.remove();
+    
     await this.audioManager.start();
     this.audioManager.playPowerUp();
+    
+    // Initialize multiplayer connection
+    if (this.multiplayerManager) {
+        console.log('Connecting to multiplayer...');
+    }
+    
     this.gameStarted = true;
     
-    if(!this.initialWaypointSet){
+    if (!this.initialWaypointSet) {
         const asteriaPlanet = this.findPlanetByName('Asteria Prime');
-        if(asteriaPlanet){
+        if (asteriaPlanet) {
             this.minimapManager.waypoint = {
-                x: asteriaPlanet.center.x, 
-                z: asteriaPlanet.center.z, 
-                planet: asteriaPlanet, 
+                x: asteriaPlanet.center.x,
+                z: asteriaPlanet.center.z,
+                planet: asteriaPlanet,
                 type: 'planet'
             };
             this.initialWaypointSet = true;

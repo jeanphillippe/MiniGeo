@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multiplayer Test</title>
+    <title>Cross-Network Multiplayer Test</title>
     <style>
         body {
             margin: 0;
@@ -16,6 +16,8 @@
         #gameCanvas {
             border: 1px solid #333;
             background: #001122;
+            display: block;
+            margin: 0 auto;
         }
         
         #ui {
@@ -23,19 +25,22 @@
             top: 10px;
             left: 10px;
             z-index: 100;
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            border: 1px solid #333;
         }
         
         #events {
             position: fixed;
             top: 10px;
             right: 10px;
-            width: 300px;
+            width: 350px;
             height: 400px;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.9);
             border: 1px solid #00f2fe;
             padding: 10px;
             overflow-y: auto;
-            font-size: 12px;
+            font-size: 11px;
         }
         
         .event {
@@ -43,76 +48,151 @@
             padding: 2px;
             border-left: 2px solid #00f2fe;
             padding-left: 5px;
+            word-wrap: break-word;
+        }
+        
+        .event.error {
+            border-left-color: #ff4757;
+            color: #ff4757;
+        }
+        
+        .event.success {
+            border-left-color: #2ed573;
+            color: #2ed573;
+        }
+        
+        #diagnostics {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            padding: 10px;
+            border: 1px solid #333;
+            font-size: 12px;
         }
         
         #instructions {
             position: fixed;
             bottom: 10px;
-            left: 10px;
+            right: 10px;
             color: #aaa;
+            font-size: 12px;
         }
         
         button {
             background: #00f2fe;
             color: #000;
             border: none;
-            padding: 5px 10px;
+            padding: 8px 12px;
             margin: 2px;
             cursor: pointer;
             font-family: inherit;
+            font-size: 12px;
+        }
+        
+        button:hover {
+            background: #0088cc;
+        }
+        
+        input {
+            background: #333;
+            color: #fff;
+            border: 1px solid #666;
+            padding: 5px;
+            font-family: inherit;
+            font-size: 12px;
+        }
+        
+        .connection-status {
+            padding: 5px;
+            margin: 2px 0;
+            border-radius: 3px;
+        }
+        
+        .status-connecting {
+            background: #feca57;
+            color: #000;
+        }
+        
+        .status-connected {
+            background: #2ed573;
+            color: #000;
+        }
+        
+        .status-failed {
+            background: #ff4757;
+            color: #fff;
         }
     </style>
 </head>
 <body>
     <div id="ui">
+        <div><strong>Network Multiplayer Test</strong></div>
         <div>Player ID: <span id="playerId">Connecting...</span></div>
-        <div>Room: <span id="roomId">lobby-test</span></div>
+        <div>Room: <span id="roomId">cross-network-test</span></div>
         <div>Connections: <span id="connectionCount">0</span></div>
-        <button onclick="multiplayer.manualConnect()">Manual Connect</button>
-        <button onclick="clearEvents()">Clear Events</button>
+        <div>Network: <span id="networkType">Unknown</span></div>
+        <hr style="border-color: #333;">
+        <div>
+            <input type="text" id="manualId" placeholder="Enter peer ID" style="width: 150px;">
+            <button onclick="multiplayer.manualConnect()">Connect</button>
+        </div>
+        <button onclick="multiplayer.testSTUN()">Test STUN</button>
+        <button onclick="clearEvents()">Clear Log</button>
+        <button onclick="copyConnectionInfo()">Copy ID</button>
     </div>
     
-    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <canvas id="gameCanvas" width="600" height="400"></canvas>
     
     <div id="events">
-        <div style="color: #00f2fe; margin-bottom: 10px;">EVENTS LOG</div>
+        <div style="color: #00f2fe; margin-bottom: 10px;"><strong>CONNECTION LOG</strong></div>
+    </div>
+    
+    <div id="diagnostics">
+        <div><strong>Diagnostics:</strong></div>
+        <div id="iceState">ICE: gathering</div>
+        <div id="connectionState">Connection: new</div>
+        <div id="candidates">Candidates: 0</div>
     </div>
     
     <div id="instructions">
-        Use WASD or Arrow Keys to move • Open multiple tabs to test multiplayer
+        Use WASD to move • Share your Player ID with others<br>
+        Works across different networks and mobile data
     </div>
 
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <script>
-        // Simple event logger for testing
+        // Enhanced event logger with better formatting
         class EventLogger {
             constructor() {
                 this.eventsContainer = document.getElementById('events');
+                this.maxEvents = 100;
             }
             
-            logSystem(message) {
-                this.addEvent(message, 'system');
+            logSystem(message, type = 'info') {
+                this.addEvent(message, type);
             }
             
-            logEvent(message, type = 'system') {
+            logEvent(message, type = 'info') {
                 this.addEvent(message, type);
             }
             
             addEvent(message, type) {
                 const event = document.createElement('div');
-                event.className = 'event';
-                event.innerHTML = `<span style="color: #666;">${new Date().toLocaleTimeString()}</span> ${message}`;
+                event.className = `event ${type}`;
+                const timestamp = new Date().toLocaleTimeString();
+                event.innerHTML = `<span style="color: #666;">${timestamp}</span> ${message}`;
                 this.eventsContainer.appendChild(event);
                 this.eventsContainer.scrollTop = this.eventsContainer.scrollHeight;
                 
-                // Keep only last 50 events
-                while (this.eventsContainer.children.length > 51) { // +1 for header
+                // Keep only recent events
+                while (this.eventsContainer.children.length > this.maxEvents + 1) {
                     this.eventsContainer.removeChild(this.eventsContainer.children[1]);
                 }
             }
         }
 
-        // Simple player class
+        // Enhanced player with better visuals
         class Player {
             constructor(x, y, color = '#00f2fe', isLocal = false) {
                 this.x = x;
@@ -121,44 +201,69 @@
                 this.targetY = y;
                 this.color = color;
                 this.isLocal = isLocal;
-                this.size = 20;
-                this.speed = 5;
+                this.size = 15;
+                this.speed = 3;
                 this.id = null;
+                this.lastUpdate = Date.now();
             }
             
             update() {
                 if (!this.isLocal) {
                     // Smooth interpolation for remote players
-                    this.x += (this.targetX - this.x) * 0.15;
-                    this.y += (this.targetY - this.y) * 0.15;
+                    const lerp = 0.2;
+                    this.x += (this.targetX - this.x) * lerp;
+                    this.y += (this.targetY - this.y) * lerp;
                 }
             }
             
             draw(ctx) {
+                // Draw player as circle with glow effect
+                ctx.save();
+                
+                // Glow effect
+                ctx.shadowColor = this.color;
+                ctx.shadowBlur = this.isLocal ? 15 : 10;
+                
                 ctx.fillStyle = this.color;
-                ctx.fillRect(this.x - this.size/2, this.y - this.size/2, this.size, this.size);
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
                 
                 // Draw ID
                 if (this.id) {
+                    ctx.shadowBlur = 0;
                     ctx.fillStyle = '#fff';
-                    ctx.font = '12px Courier New';
+                    ctx.font = '10px Courier New';
                     ctx.textAlign = 'center';
-                    ctx.fillText(this.id.substring(0, 8), this.x, this.y - this.size);
+                    ctx.fillText(this.id.substring(0, 8), this.x, this.y - this.size - 5);
                 }
+                
+                // Connection indicator
+                if (!this.isLocal) {
+                    const timeSinceUpdate = Date.now() - this.lastUpdate;
+                    const opacity = Math.max(0.2, 1 - timeSinceUpdate / 5000);
+                    ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y + this.size + 8, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                ctx.restore();
             }
             
             moveTo(x, y) {
                 if (this.isLocal) {
-                    this.x = Math.max(this.size/2, Math.min(800 - this.size/2, x));
-                    this.y = Math.max(this.size/2, Math.min(600 - this.size/2, y));
+                    this.x = Math.max(this.size, Math.min(600 - this.size, x));
+                    this.y = Math.max(this.size, Math.min(400 - this.size, y));
                 } else {
                     this.targetX = x;
                     this.targetY = y;
+                    this.lastUpdate = Date.now();
                 }
             }
         }
 
-        // Simplified multiplayer manager based on the provided solution
+        // Robust multiplayer manager with enhanced TURN support
         class MultiplayerManager {
             constructor() {
                 this.peer = null;
@@ -172,27 +277,47 @@
                 this.connectionQueue = [];
                 this.processingQueue = false;
                 this.lastLogTime = 0;
-                this.logThrottle = 1000;
+                this.logThrottle = 500; // Reduced throttle for better debugging
                 this.lastLogMessage = '';
+                this.iceState = 'new';
+                this.connectionStates = new Map();
                 
                 this.eventLogger = new EventLogger();
+                this.detectNetworkType();
                 this.setupPeer();
             }
 
             getRoomId() {
                 const urlParams = new URLSearchParams(window.location.search);
                 const roomParam = urlParams.get('room');
-                return roomParam || 'lobby-test';
+                return roomParam || 'cross-network-test';
             }
 
-            logThrottled(message) {
+            detectNetworkType() {
+                const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                let networkType = 'Unknown';
+                
+                if (connection) {
+                    networkType = connection.effectiveType || connection.type || 'Unknown';
+                }
+                
+                // Detect if likely mobile
+                if (/Mobi|Android/i.test(navigator.userAgent)) {
+                    networkType += ' (Mobile)';
+                }
+                
+                document.getElementById('networkType').textContent = networkType;
+                this.eventLogger.logSystem(`📱 Network: ${networkType}`);
+            }
+
+            logThrottled(message, type = 'info') {
                 const now = Date.now();
                 if (message === this.lastLogMessage && now - this.lastLogTime < this.logThrottle) {
                     return;
                 }
                 this.lastLogMessage = message;
                 this.lastLogTime = now;
-                this.eventLogger.logSystem(message);
+                this.eventLogger.logSystem(message, type);
             }
 
             async setupPeer() {
@@ -200,28 +325,71 @@
                     this.peer.destroy();
                 }
 
-                const uniqueId = `${this.roomId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                // Generate shorter, more user-friendly ID
+                const shortId = Math.random().toString(36).substr(2, 8).toUpperCase();
+                const uniqueId = `${this.roomId}-${shortId}`;
 
+                this.eventLogger.logSystem(`🔧 Initializing peer with enhanced TURN...`);
+
+                // Enhanced TURN configuration with multiple providers
                 this.peer = new Peer(uniqueId, {
-                    debug: 0,
+                    debug: 1,
                     config: {
-                        'iceServers': [
+                        iceServers: [
+                            // Google STUN servers
                             { urls: 'stun:stun.l.google.com:19302' },
                             { urls: 'stun:stun1.l.google.com:19302' },
+                            { urls: 'stun:stun2.l.google.com:19302' },
+                            
+                            // Cloudflare STUN
+                            { urls: 'stun:stun.cloudflare.com:3478' },
+                            
+                            // Metered TURN servers (multiple endpoints)
                             {
                                 urls: 'turn:global.relay.metered.ca:80',
                                 username: '3193b9b660a19a308918301b',
                                 credential: 'G3FEKpAfkkGyFNhn'
+                            },
+                            {
+                                urls: 'turn:global.relay.metered.ca:80?transport=tcp',
+                                username: '3193b9b660a19a308918301b',
+                                credential: 'G3FEKpAfkkGyFNhn'
+                            },
+                            {
+                                urls: 'turn:global.relay.metered.ca:443',
+                                username: '3193b9b660a19a308918301b',
+                                credential: 'G3FEKpAfkkGyFNhn'
+                            },
+                            {
+                                urls: 'turn:global.relay.metered.ca:443?transport=tcp',
+                                username: '3193b9b660a19a308918301b',
+                                credential: 'G3FEKpAfkkGyFNhn'
+                            },
+                            
+                            // Additional free TURN servers for redundancy
+                            {
+                                urls: 'turn:openrelay.metered.ca:80',
+                                username: 'openrelayproject',
+                                credential: 'openrelayproject'
+                            },
+                            {
+                                urls: 'turn:openrelay.metered.ca:443',
+                                username: 'openrelayproject',
+                                credential: 'openrelayproject'
                             }
-                        ]
+                        ],
+                        iceCandidatePoolSize: 15, // Increased for better connectivity
+                        iceTransportPolicy: 'all',
+                        bundlePolicy: 'max-bundle',
+                        rtcpMuxPolicy: 'require'
                     }
                 });
 
                 this.peer.on('open', (id) => {
                     this.myId = id;
                     this.isReady = true;
-                    this.logThrottled(`🔗 Connected with ID: ${id.substring(0, 8)}...`);
-                    document.getElementById('playerId').textContent = id.substring(0, 8);
+                    this.logThrottled(`🔗 Connected! ID: ${id}`, 'success');
+                    document.getElementById('playerId').textContent = id;
                     document.getElementById('roomId').textContent = this.roomId;
                     
                     this.clearStaleRoomData();
@@ -232,23 +400,90 @@
                 });
 
                 this.peer.on('connection', (conn) => {
-                    this.logThrottled(`📞 Incoming connection from ${conn.peer.substring(0, 8)}`);
+                    this.logThrottled(`📞 Incoming connection from ${conn.peer}`, 'info');
                     this.handleConnection(conn);
                 });
 
                 this.peer.on('error', (err) => {
+                    console.error('Peer error:', err);
+                    
                     if (err.type === 'peer-unavailable') {
-                        this.logThrottled(`❌ Peer unavailable - cleaning stale data`);
+                        this.logThrottled(`❌ Peer unavailable - ID may be offline`, 'error');
                         this.clearStaleRoomData();
                         return;
                     }
                     
-                    this.logThrottled(`⚠️ PeerJS Error: ${err.type || err.message}`);
+                    this.logThrottled(`⚠️ PeerJS Error: ${err.type || err.message}`, 'error');
                     
-                    if (err.type === 'network' || err.type === 'server-error') {
+                    if (err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error') {
+                        this.logThrottled(`🔄 Attempting reconnection in 5s...`, 'info');
                         setTimeout(() => this.setupPeer(), 5000);
                     }
                 });
+
+                this.peer.on('disconnected', () => {
+                    this.logThrottled(`🔌 Disconnected from signaling server`, 'error');
+                    this.isReady = false;
+                    
+                    setTimeout(() => {
+                        if (this.peer && !this.peer.destroyed) {
+                            this.peer.reconnect();
+                        } else {
+                            this.setupPeer();
+                        }
+                    }, 3000);
+                });
+            }
+
+            async testSTUN() {
+                this.logThrottled(`🧪 Testing STUN/TURN connectivity...`);
+                
+                try {
+                    const pc = new RTCPeerConnection({
+                        iceServers: [
+                            { urls: 'stun:stun.l.google.com:19302' },
+                            {
+                                urls: 'turn:global.relay.metered.ca:80',
+                                username: '3193b9b660a19a308918301b',
+                                credential: 'G3FEKpAfkkGyFNhn'
+                            }
+                        ]
+                    });
+
+                    let candidateCount = 0;
+                    let stunWorking = false;
+                    let turnWorking = false;
+
+                    pc.onicecandidate = (event) => {
+                        if (event.candidate) {
+                            candidateCount++;
+                            const candidate = event.candidate.candidate;
+                            
+                            if (candidate.includes('srflx')) {
+                                stunWorking = true;
+                                this.logThrottled(`✅ STUN working - got server reflexive candidate`, 'success');
+                            }
+                            if (candidate.includes('relay')) {
+                                turnWorking = true;
+                                this.logThrottled(`✅ TURN working - got relay candidate`, 'success');
+                            }
+                            
+                            document.getElementById('candidates').textContent = `Candidates: ${candidateCount}`;
+                        } else {
+                            // ICE gathering complete
+                            this.logThrottled(`🔍 ICE gathering complete. STUN: ${stunWorking ? '✅' : '❌'}, TURN: ${turnWorking ? '✅' : '❌'}`);
+                            pc.close();
+                        }
+                    };
+
+                    // Create a data channel to trigger ICE gathering
+                    pc.createDataChannel('test');
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+
+                } catch (err) {
+                    this.logThrottled(`❌ STUN/TURN test failed: ${err.message}`, 'error');
+                }
             }
 
             clearStaleRoomData() {
@@ -264,11 +499,12 @@
                 if (!this.isReady) return;
                 
                 this.updateRoomPresence();
-                this.logThrottled(`🔍 Starting player discovery...`);
+                this.logThrottled(`🔍 Starting cross-network discovery...`);
                 
+                // Less frequent discovery for cross-network stability
                 this.discoveryInterval = setInterval(() => {
                     this.discoverPeers();
-                }, 8000);
+                }, 10000); // 10 seconds
                 
                 this.processConnectionQueue();
             }
@@ -281,8 +517,8 @@
                 const roomData = JSON.parse(localStorage.getItem(roomKey) || '{}');
                 const presenceData = JSON.parse(localStorage.getItem(presenceKey) || '{}');
                 
-                // Clean up old entries
-                const cutoffTime = now - 120000;
+                // Clean up old entries (5 minutes for cross-network)
+                const cutoffTime = now - 300000;
                 Object.keys(presenceData).forEach(id => {
                     if (presenceData[id] < cutoffTime) {
                         delete presenceData[id];
@@ -290,7 +526,12 @@
                     }
                 });
                 
-                roomData[this.myId] = { id: this.myId, joinedAt: now, lastSeen: now };
+                roomData[this.myId] = { 
+                    id: this.myId, 
+                    joinedAt: now, 
+                    lastSeen: now,
+                    userAgent: navigator.userAgent.substring(0, 50) // For debugging
+                };
                 presenceData[this.myId] = now;
                 
                 localStorage.setItem(roomKey, JSON.stringify(roomData));
@@ -318,8 +559,9 @@
                     });
                     this.processConnectionQueue();
                 } else {
-                    if (Date.now() % 30000 < 8000) {
-                        this.logThrottled(`🔍 Looking for other players...`);
+                    // Only log occasionally
+                    if (Date.now() % 60000 < 10000) {
+                        this.logThrottled(`🔍 Waiting for players... (Room: ${this.roomId})`);
                     }
                 }
             }
@@ -333,13 +575,13 @@
                     const peerId = this.connectionQueue.shift();
                     
                     if (!this.connections.has(peerId) && peerId !== this.myId) {
-                        this.logThrottled(`🔄 Attempting connection to ${peerId.substring(0, 8)}`);
+                        this.logThrottled(`🔄 Attempting cross-network connection to ${peerId}`);
                         
                         try {
                             await this.connectToPeerWithValidation(peerId);
-                            await new Promise(resolve => setTimeout(resolve, 2000));
+                            await new Promise(resolve => setTimeout(resolve, 3000)); // Longer delay for cross-network
                         } catch (err) {
-                            console.warn('Connection failed:', err);
+                            this.logThrottled(`❌ Connection failed: ${err.message}`, 'error');
                         }
                     }
                 }
@@ -352,26 +594,31 @@
                     const conn = this.peer.connect(peerId, {
                         reliable: true,
                         serialization: 'json',
-                        metadata: { roomId: this.roomId, timestamp: Date.now() }
+                        metadata: { 
+                            roomId: this.roomId, 
+                            timestamp: Date.now(),
+                            userAgent: navigator.userAgent.substring(0, 50)
+                        }
                     });
 
+                    // Longer timeout for cross-network
                     const timeout = setTimeout(() => {
-                        this.logThrottled(`⏰ Timeout with ${peerId.substring(0, 8)} - peer unavailable`);
+                        this.logThrottled(`⏰ Connection timeout with ${peerId} (20s)`, 'error');
                         conn.close();
                         this.removePeerFromRoom(peerId);
                         reject(new Error('Connection timeout'));
-                    }, 12000);
+                    }, 20000);
 
                     conn.on('open', () => {
                         clearTimeout(timeout);
-                        this.logThrottled(`✅ Successfully connected to ${peerId.substring(0, 8)}`);
+                        this.logThrottled(`✅ Cross-network connection established with ${peerId}`, 'success');
                         resolve();
                     });
 
                     conn.on('error', (err) => {
                         clearTimeout(timeout);
+                        this.logThrottled(`❌ Connection error with ${peerId}: ${err.type}`, 'error');
                         if (err.type === 'peer-unavailable') {
-                            this.logThrottled(`❌ Peer ${peerId.substring(0, 8)} unavailable - removing`);
                             this.removePeerFromRoom(peerId);
                         }
                         reject(err);
@@ -398,9 +645,33 @@
             handleConnection(conn) {
                 const peerId = conn.peer;
                 
+                // Enhanced connection monitoring
+                if (conn.peerConnection) {
+                    conn.peerConnection.oniceconnectionstatechange = () => {
+                        const state = conn.peerConnection.iceConnectionState;
+                        this.iceState = state;
+                        document.getElementById('iceState').textContent = `ICE: ${state}`;
+                        
+                        if (state === 'connected' || state === 'completed') {
+                            this.logThrottled(`🧊 ICE connected with ${peerId}`, 'success');
+                        } else if (state === 'failed') {
+                            this.logThrottled(`💥 ICE failed with ${peerId}`, 'error');
+                        } else if (state === 'disconnected') {
+                            this.logThrottled(`📡 ICE disconnected from ${peerId}`, 'error');
+                        }
+                    };
+                    
+                    conn.peerConnection.onconnectionstatechange = () => {
+                        const state = conn.peerConnection.connectionState;
+                        this.connectionStates.set(peerId, state);
+                        document.getElementById('connectionState').textContent = `Connection: ${state}`;
+                        this.logThrottled(`🔗 Connection state with ${peerId}: ${state}`);
+                    };
+                }
+                
                 conn.on('open', () => {
                     this.connections.set(peerId, conn);
-                    this.logThrottled(`🎉 ${peerId.substring(0, 8)} connected`);
+                    this.logThrottled(`🎉 Successfully connected to ${peerId}`, 'success');
                     document.getElementById('connectionCount').textContent = this.connections.size;
                     
                     setTimeout(() => {
@@ -408,7 +679,7 @@
                             type: 'player_join',
                             player: this.getMyPlayerData()
                         });
-                    }, 200);
+                    }, 500);
                 });
 
                 conn.on('data', (data) => {
@@ -416,12 +687,12 @@
                 });
 
                 conn.on('close', () => {
-                    this.logThrottled(`🔌 ${peerId.substring(0, 8)} disconnected`);
+                    this.logThrottled(`🔌 ${peerId} disconnected`);
                     this.handlePlayerLeave(peerId);
                 });
 
                 conn.on('error', (err) => {
-                    this.logThrottled(`⚠️ Error with ${peerId.substring(0, 8)}: ${err.type}`);
+                    this.logThrottled(`⚠️ Connection error with ${peerId}: ${err.type}`, 'error');
                     this.handlePlayerLeave(peerId);
                 });
             }
@@ -445,7 +716,7 @@
             handlePlayerJoin(peerId, playerData) {
                 if (!playerData) return;
 
-                this.logThrottled(`🚀 ${peerId.substring(0, 8)} joined the game`);
+                this.logThrottled(`🚀 ${peerId} joined from different network`, 'success');
                 
                 // Add remote player to game
                 game.addRemotePlayer(peerId, playerData);
@@ -455,7 +726,7 @@
                         type: 'player_join',
                         player: this.getMyPlayerData()
                     });
-                }, 300);
+                }, 500);
             }
 
             handlePlayerUpdate(peerId, playerData) {
@@ -467,9 +738,10 @@
 
             handlePlayerLeave(peerId) {
                 this.connections.delete(peerId);
+                this.connectionStates.delete(peerId);
                 this.removePeerFromRoom(peerId);
                 game.removeRemotePlayer(peerId);
-                this.logThrottled(`👋 ${peerId.substring(0, 8)} left the game`);
+                this.logThrottled(`👋 ${peerId} left the game`);
                 document.getElementById('connectionCount').textContent = this.connections.size;
             }
 
@@ -477,7 +749,8 @@
                 return {
                     id: this.myId,
                     x: game.localPlayer.x,
-                    y: game.localPlayer.y
+                    y: game.localPlayer.y,
+                    timestamp: Date.now()
                 };
             }
 
@@ -485,9 +758,10 @@
                 this.heartbeatInterval = setInterval(() => {
                     this.updateRoomPresence();
                     
-                    if (Date.now() % 15000 < 5000) {
+                    // Less frequent status updates
+                    if (Date.now() % 30000 < 5000) {
                         if (this.connections.size > 0) {
-                            this.logThrottled(`📊 ${this.connections.size + 1} players connected`);
+                            this.logThrottled(`📊 ${this.connections.size + 1} players connected across networks`);
                         }
                     }
                 }, 5000);
@@ -502,15 +776,18 @@
             }
 
             broadcast(message) {
+                let successCount = 0;
                 this.connections.forEach((conn, peerId) => {
                     if (conn.open) {
                         try {
                             conn.send(message);
+                            successCount++;
                         } catch (err) {
                             console.warn('Failed to send to peer:', peerId);
                         }
                     }
                 });
+                return successCount;
             }
 
             sendToPlayer(peerId, message) {
@@ -532,24 +809,30 @@
                     return;
                 }
 
-                const peerId = prompt(`Your ID: ${this.myId}\n\nEnter other player's ID:`);
+                const input = document.getElementById('manualId');
+                const peerId = input.value.trim();
                 
                 if (peerId && peerId !== this.myId && peerId.length > 5) {
-                    this.logThrottled(`🔧 Manual connection to ${peerId.substring(0, 8)}...`);
+                    this.logThrottled(`🔧 Manual cross-network connection to ${peerId}...`);
                     this.connectionQueue.push(peerId);
                     this.processConnectionQueue();
+                    input.value = '';
+                } else {
+                    alert('Please enter a valid peer ID');
                 }
             }
         }
 
-        // Simple game class
+        // Enhanced game with better mobile support
         class Game {
             constructor() {
                 this.canvas = document.getElementById('gameCanvas');
                 this.ctx = this.canvas.getContext('2d');
-                this.localPlayer = new Player(400, 300, '#00f2fe', true);
+                this.localPlayer = new Player(300, 200, '#00f2fe', true);
+                this.localPlayer.id = 'YOU';
                 this.remotePlayers = new Map();
                 this.keys = {};
+                this.lastBroadcast = 0;
                 
                 this.setupInput();
                 this.gameLoop();
@@ -562,6 +845,29 @@
                 
                 document.addEventListener('keyup', (e) => {
                     this.keys[e.code] = false;
+                });
+                
+                // Touch controls for mobile
+                let touchStartX = 0;
+                let touchStartY = 0;
+                
+                this.canvas.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const rect = this.canvas.getBoundingClientRect();
+                    touchStartX = touch.clientX - rect.left;
+                    touchStartY = touch.clientY - rect.top;
+                });
+                
+                this.canvas.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const rect = this.canvas.getBoundingClientRect();
+                    const x = touch.clientX - rect.left;
+                    const y = touch.clientY - rect.top;
+                    
+                    this.localPlayer.moveTo(x, y);
+                    this.broadcastPositionIfNeeded();
                 });
             }
             
@@ -587,24 +893,57 @@
                     moved = true;
                 }
                 
-                // Broadcast position if moved
-                if (moved && multiplayer && multiplayer.connections.size > 0) {
-                    multiplayer.broadcastPlayerUpdate();
+                if (moved) {
+                    this.broadcastPositionIfNeeded();
                 }
                 
                 // Update remote players
                 this.remotePlayers.forEach(player => player.update());
             }
             
+            broadcastPositionIfNeeded() {
+                const now = Date.now();
+                if (now - this.lastBroadcast > 50 && multiplayer && multiplayer.connections.size > 0) { // 20fps max
+                    multiplayer.broadcastPlayerUpdate();
+                    this.lastBroadcast = now;
+                }
+            }
+            
             render() {
-                this.ctx.fillStyle = '#001122';
-                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                // Clear with gradient background
+                const gradient = this.ctx.createLinearGradient(0, 0, 0, 400);
+                gradient.addColorStop(0, '#001122');
+                gradient.addColorStop(1, '#000033');
+                this.ctx.fillStyle = gradient;
+                this.ctx.fillRect(0, 0, 600, 400);
+                
+                // Draw grid
+                this.ctx.strokeStyle = 'rgba(0, 242, 254, 0.1)';
+                this.ctx.lineWidth = 1;
+                for (let x = 0; x < 600; x += 50) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, 0);
+                    this.ctx.lineTo(x, 400);
+                    this.ctx.stroke();
+                }
+                for (let y = 0; y < 400; y += 50) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, y);
+                    this.ctx.lineTo(600, y);
+                    this.ctx.stroke();
+                }
                 
                 // Draw local player
                 this.localPlayer.draw(this.ctx);
                 
                 // Draw remote players
                 this.remotePlayers.forEach(player => player.draw(this.ctx));
+                
+                // Draw connection count
+                this.ctx.fillStyle = '#fff';
+                this.ctx.font = '12px Courier New';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`Connected: ${multiplayer ? multiplayer.connections.size : 0}`, 10, 30);
             }
             
             gameLoop() {
@@ -614,7 +953,7 @@
             }
             
             addRemotePlayer(peerId, playerData) {
-                const colors = ['#ff4757', '#2ed573', '#feca57', '#ff9ff3', '#54a0ff'];
+                const colors = ['#ff4757', '#2ed573', '#feca57', '#ff9ff3', '#54a0ff', '#5f27cd'];
                 const color = colors[this.remotePlayers.size % colors.length];
                 
                 const player = new Player(playerData.x, playerData.y, color, false);
@@ -627,15 +966,30 @@
             }
         }
 
+        // Helper functions
+        function clearEvents() {
+            const events = document.getElementById('events');
+            events.innerHTML = '<div style="color: #00f2fe; margin-bottom: 10px;"><strong>CONNECTION LOG</strong></div>';
+        }
+
+        function copyConnectionInfo() {
+            if (multiplayer && multiplayer.myId) {
+                navigator.clipboard.writeText(multiplayer.myId).then(() => {
+                    alert(`ID copied: ${multiplayer.myId}\nShare this with other players!`);
+                });
+            }
+        }
+
         // Initialize everything
         const game = new Game();
         const multiplayer = new MultiplayerManager();
 
-        // Helper function for testing
-        function clearEvents() {
-            const events = document.getElementById('events');
-            events.innerHTML = '<div style="color: #00f2fe; margin-bottom: 10px;">EVENTS LOG</div>';
-        }
+        // Auto-test STUN on load
+        setTimeout(() => {
+            if (multiplayer.isReady) {
+                multiplayer.testSTUN();
+            }
+        }, 3000);
     </script>
 </body>
 </html>

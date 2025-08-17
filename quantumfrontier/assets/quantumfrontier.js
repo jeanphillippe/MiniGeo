@@ -1203,7 +1203,7 @@ nebula.position.set(
           }
         }
       }
-      class MultiplayerManager {
+ class MultiplayerManager {
     constructor(game) {
         this.game = game;
         this.peer = null;
@@ -1213,14 +1213,16 @@ nebula.position.set(
         this.myId = null;
         this.syncInterval = null;
         this.lastSyncTime = 0;
-        this.syncRate = 1000 / 30; // Increased sync rate for smoother movement
+        this.syncRate = 1000 / 30;
         this.isHost = false;
         this.connectionAttempts = new Map();
-        this.maxConnectionAttempts = 3;
+        this.maxConnectionAttempts = 5;
         
-        // Simplified state management
-        this.isConnecting = false;
-        this.connectionTimeouts = new Map();
+        // Enhanced state management
+        this.isReady = false;
+        this.pendingConnections = new Set();
+        this.discoveryInterval = null;
+        this.heartbeatInterval = null;
         
         this.game.eventLogger?.logSystem(`🌐 Inicializando multijugador...`);
         this.game.eventLogger?.logSystem(`🏠 Sala: ${this.roomId}`);
@@ -1246,9 +1248,9 @@ nebula.position.set(
             await this.loadPeerJS();
         }
 
-        // Optimized PeerJS configuration with Metered TURN servers
+        // More aggressive PeerJS configuration
         this.peer = new Peer(null, {
-            debug: 1,
+            debug: 2, // Increased debug level
             config: {
                 'iceServers': [
                     { urls: 'stun:stun.l.google.com:19302' },
@@ -1268,49 +1270,76 @@ nebula.position.set(
                         urls: 'turn:global.relay.metered.ca:443',
                         username: '3193b9b660a19a308918301b',
                         credential: 'G3FEKpAfkkGyFNhn'
+                    },
+                    {
+                        urls: 'turn:global.relay.metered.ca:443?transport=tcp',
+                        username: '3193b9b660a19a308918301b',
+                        credential: 'G3FEKpAfkkGyFNhn'
                     }
                 ],
                 'iceCandidatePoolSize': 10,
                 'iceTransportPolicy': 'all',
                 'bundlePolicy': 'max-bundle',
                 'rtcpMuxPolicy': 'require'
-            }
+            },
+            // Increased timeouts
+            pingInterval: 5000,
+            timeout: 30000
         });
 
         this.peer.on('open', (id) => {
             this.myId = id;
+            this.isReady = true;
             this.game.eventLogger?.logSystem(`🔗 Conectado con ID: ${id.substring(0, 8)}...`);
             
-            // Start simplified discovery
-            this.startRoomDiscovery();
-            this.startSyncLoop();
-            
-            // Periodic reconnection attempts
-            setInterval(() => {
-                this.maintainConnections();
-            }, 10000);
+            // Wait a moment before starting discovery to ensure peer is fully ready
+            setTimeout(() => {
+                this.startRoomManagement();
+                this.startSyncLoop();
+                this.startHeartbeat();
+            }, 1000);
         });
 
         this.peer.on('connection', (conn) => {
             this.game.eventLogger?.logSystem(`📞 Conexión entrante de ${conn.peer.substring(0, 8)}`);
-            this.handleConnection(conn);
+            this.handleIncomingConnection(conn);
         });
 
         this.peer.on('error', (err) => {
-            console.warn('Peer error:', err);
-            this.game.eventLogger?.logSystem(`⚠️ Error de conexión: ${err.type || 'Desconocido'}`);
+            console.error('Peer error:', err);
+            this.game.eventLogger?.logSystem(`⚠️ Error PeerJS: ${err.type || err.message}`);
             
-            // Auto-reconnect on network errors
-            if (err.type === 'network' || err.type === 'server-error') {
+            // More aggressive reconnection
+            if (err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error') {
+                this.game.eventLogger?.logSystem(`🔄 Reconectando en 3 segundos...`);
                 setTimeout(() => {
-                    this.setupPeer();
-                }, 5000);
+                    this.reconnect();
+                }, 3000);
             }
+        });
+
+        this.peer.on('disconnected', () => {
+            this.game.eventLogger?.logSystem(`🔌 Desconectado del servidor PeerJS`);
+            this.isReady = false;
+            
+            // Try to reconnect
+            setTimeout(() => {
+                if (!this.peer.destroyed) {
+                    this.peer.reconnect();
+                } else {
+                    this.reconnect();
+                }
+            }, 2000);
         });
     }
 
     async loadPeerJS() {
         return new Promise((resolve, reject) => {
+            if (window.Peer) {
+                resolve();
+                return;
+            }
+            
             const script = document.createElement('script');
             script.src = 'https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js';
             script.onload = resolve;
@@ -1319,161 +1348,273 @@ nebula.position.set(
         });
     }
 
-    startRoomDiscovery() {
-        // Simplified room management with single storage key
-        const roomKey = `mp_room_${this.roomId}`;
-        
-        // Get existing players in room
-        const existingPlayers = JSON.parse(localStorage.getItem(roomKey) || '[]');
-        
-        // Add ourselves to the room
-        if (!existingPlayers.includes(this.myId)) {
-            existingPlayers.push(this.myId);
-            localStorage.setItem(roomKey, JSON.stringify(existingPlayers));
-        }
+    reconnect() {
+        this.game.eventLogger?.logSystem(`🔄 Reiniciando conexión...`);
+        this.cleanup();
+        setTimeout(() => {
+            this.setupPeer();
+        }, 1000);
+    }
 
-        // Determine if we're the host (first player)
-        this.isHost = existingPlayers[0] === this.myId;
+    startRoomManagement() {
+        if (!this.isReady) return;
+        
+        // Enhanced room presence with timestamp
+        const roomKey = `mp_room_${this.roomId}`;
+        const presenceKey = `mp_presence_${this.roomId}`;
+        
+        // Get current room data
+        const roomData = JSON.parse(localStorage.getItem(roomKey) || '{}');
+        const presenceData = JSON.parse(localStorage.getItem(presenceKey) || '{}');
+        
+        // Add ourselves with timestamp
+        const now = Date.now();
+        roomData[this.myId] = {
+            id: this.myId,
+            joinedAt: now,
+            lastSeen: now
+        };
+        presenceData[this.myId] = now;
+        
+        localStorage.setItem(roomKey, JSON.stringify(roomData));
+        localStorage.setItem(presenceKey, JSON.stringify(presenceData));
+        
+        // Determine host (oldest player)
+        const players = Object.values(roomData);
+        players.sort((a, b) => a.joinedAt - b.joinedAt);
+        this.isHost = players.length > 0 && players[0].id === this.myId;
         
         if (this.isHost) {
             this.game.eventLogger?.logSystem(`👑 Eres el host de la sala`);
         }
-
-        // Connect to existing players
-        existingPlayers.forEach(peerId => {
-            if (peerId !== this.myId && !this.connections.has(peerId)) {
-                this.connectToPeer(peerId);
-            }
-        });
-
-        // Broadcast presence every 5 seconds
-        this.presenceInterval = setInterval(() => {
-            this.broadcastPresence();
+        
+        this.game.eventLogger?.logSystem(`🔍 Buscando jugadores en sala... (${players.length} total)`);
+        
+        // Start discovery process
+        this.discoverAndConnect();
+        
+        // Regular discovery updates
+        this.discoveryInterval = setInterval(() => {
+            this.discoverAndConnect();
         }, 5000);
-
-        this.game.eventLogger?.logSystem(`🔍 Buscando jugadores... (${existingPlayers.length - 1} en sala)`);
     }
 
-    broadcastPresence() {
+    discoverAndConnect() {
+        if (!this.isReady) return;
+        
         const roomKey = `mp_room_${this.roomId}`;
-        const players = JSON.parse(localStorage.getItem(roomKey) || '[]');
+        const presenceKey = `mp_presence_${this.roomId}`;
+        const now = Date.now();
         
-        // Clean up disconnected players
-        const activePlayers = players.filter(id => 
-            id === this.myId || this.connections.has(id)
-        );
+        // Clean up old entries (older than 30 seconds)
+        const roomData = JSON.parse(localStorage.getItem(roomKey) || '{}');
+        const presenceData = JSON.parse(localStorage.getItem(presenceKey) || '{}');
         
-        // Add ourselves if not present
-        if (!activePlayers.includes(this.myId)) {
-            activePlayers.push(this.myId);
-        }
+        // Update our presence
+        presenceData[this.myId] = now;
         
-        localStorage.setItem(roomKey, JSON.stringify(activePlayers));
-        
-        // Try to connect to new players
-        activePlayers.forEach(peerId => {
-            if (peerId !== this.myId && !this.connections.has(peerId)) {
-                this.connectToPeer(peerId);
+        // Clean up stale entries
+        Object.keys(presenceData).forEach(id => {
+            if (now - presenceData[id] > 30000) {
+                delete presenceData[id];
+                delete roomData[id];
             }
         });
+        
+        // Update our room data
+        if (roomData[this.myId]) {
+            roomData[this.myId].lastSeen = now;
+        }
+        
+        localStorage.setItem(roomKey, JSON.stringify(roomData));
+        localStorage.setItem(presenceKey, JSON.stringify(presenceData));
+        
+        // Find players to connect to
+        const activePlayers = Object.keys(roomData).filter(id => 
+            id !== this.myId && 
+            !this.connections.has(id) && 
+            !this.pendingConnections.has(id)
+        );
+        
+        if (activePlayers.length > 0) {
+            this.game.eventLogger?.logSystem(`👥 Encontrados ${activePlayers.length} jugadores para conectar`);
+            
+            // Connect to each player with delay to prevent race conditions
+            activePlayers.forEach((peerId, index) => {
+                setTimeout(() => {
+                    this.connectToPeer(peerId);
+                }, index * 1000); // Stagger connections
+            });
+        }
     }
 
     async connectToPeer(peerId) {
-        if (this.connections.has(peerId) || this.isConnecting) {
+        if (!this.isReady || this.connections.has(peerId) || this.pendingConnections.has(peerId)) {
             return;
         }
 
         const attempts = this.connectionAttempts.get(peerId) || 0;
         if (attempts >= this.maxConnectionAttempts) {
+            this.game.eventLogger?.logSystem(`❌ Max intentos alcanzados para ${peerId.substring(0, 8)}`);
             return;
         }
 
         this.connectionAttempts.set(peerId, attempts + 1);
-        this.game.eventLogger?.logSystem(`🔄 Conectando con ${peerId.substring(0, 8)} (intento ${attempts + 1})`);
+        this.pendingConnections.add(peerId);
+        
+        this.game.eventLogger?.logSystem(`🔄 Conectando con ${peerId.substring(0, 8)} (intento ${attempts + 1}/${this.maxConnectionAttempts})`);
 
         try {
             const conn = this.peer.connect(peerId, {
                 reliable: true,
-                serialization: 'json'
+                serialization: 'json',
+                metadata: {
+                    roomId: this.roomId,
+                    playerId: this.myId,
+                    timestamp: Date.now()
+                }
             });
 
-            // Set connection timeout
+            // Enhanced connection timeout with progress tracking
             const timeout = setTimeout(() => {
                 if (!conn.open) {
-                    this.game.eventLogger?.logSystem(`⏰ Timeout conectando con ${peerId.substring(0, 8)}`);
+                    this.game.eventLogger?.logSystem(`⏰ Timeout conectando con ${peerId.substring(0, 8)} después de 15s`);
+                    this.pendingConnections.delete(peerId);
                     conn.close();
+                    
+                    // Retry with delay if under max attempts
+                    if (attempts < this.maxConnectionAttempts) {
+                        setTimeout(() => {
+                            this.connectToPeer(peerId);
+                        }, 3000);
+                    }
                 }
-            }, 10000);
-
-            this.connectionTimeouts.set(peerId, timeout);
+            }, 15000); // Increased timeout
 
             conn.on('open', () => {
-                clearTimeout(this.connectionTimeouts.get(peerId));
-                this.connectionTimeouts.delete(peerId);
-                this.connectionAttempts.delete(peerId);
-                this.game.eventLogger?.logSystem(`✅ Conectado con ${peerId.substring(0, 8)}`);
+                clearTimeout(timeout);
+                this.pendingConnections.delete(peerId);
+                this.connectionAttempts.delete(peerId); // Reset attempts on success
+                this.game.eventLogger?.logSystem(`✅ Conectado exitosamente con ${peerId.substring(0, 8)}`);
+            });
+
+            // Monitor connection state
+            let connectionStateLogged = false;
+            const checkConnection = () => {
+                if (conn.peerConnection && !connectionStateLogged) {
+                    const state = conn.peerConnection.connectionState;
+                    if (state !== 'new' && state !== 'connecting') {
+                        connectionStateLogged = true;
+                        this.game.eventLogger?.logSystem(`🔗 Estado de conexión con ${peerId.substring(0, 8)}: ${state}`);
+                    }
+                }
+            };
+            
+            const stateCheckInterval = setInterval(checkConnection, 1000);
+            
+            conn.on('open', () => {
+                clearInterval(stateCheckInterval);
+            });
+            
+            conn.on('close', () => {
+                clearInterval(stateCheckInterval);
             });
 
             this.handleConnection(conn);
 
         } catch (err) {
-            this.game.eventLogger?.logSystem(`❌ Error conectando con ${peerId.substring(0, 8)}: ${err.message}`);
+            this.pendingConnections.delete(peerId);
+            this.game.eventLogger?.logSystem(`❌ Error iniciando conexión con ${peerId.substring(0, 8)}: ${err.message}`);
+            
+            // Retry with delay
+            setTimeout(() => {
+                this.connectToPeer(peerId);
+            }, 5000);
         }
     }
 
+    handleIncomingConnection(conn) {
+        this.game.eventLogger?.logSystem(`📥 Procesando conexión entrante de ${conn.peer.substring(0, 8)}`);
+        
+        // Validate connection metadata
+        if (conn.metadata && conn.metadata.roomId !== this.roomId) {
+            this.game.eventLogger?.logSystem(`❌ Sala incorrecta de ${conn.peer.substring(0, 8)}`);
+            conn.close();
+            return;
+        }
+        
+        this.handleConnection(conn);
+    }
+
     handleConnection(conn) {
+        const peerId = conn.peer;
+        
         conn.on('open', () => {
-            this.connections.set(conn.peer, conn);
-            this.game.eventLogger?.logSystem(`🔗 ${conn.peer.substring(0, 8)} conectado`);
+            this.connections.set(peerId, conn);
+            this.game.eventLogger?.logSystem(`🎉 Conexión establecida con ${peerId.substring(0, 8)}`);
             
-            // Send our player data immediately
-            this.sendToPlayer(conn.peer, {
-                type: 'player_join',
-                player: this.getMyPlayerData()
-            });
+            // Immediately exchange player data
+            setTimeout(() => {
+                this.sendToPlayer(peerId, {
+                    type: 'player_join',
+                    player: this.getMyPlayerData()
+                });
+            }, 100);
             
             // Log connection event
-            this.logPlayerEvent(`${conn.peer.substring(0, 8)} se conectó`, 'player-join');
+            this.logPlayerEvent(`🔗 ${peerId.substring(0, 8)} se conectó`, 'player-join');
         });
 
         conn.on('data', (data) => {
-            this.handleMessage(conn.peer, data);
+            try {
+                this.handleMessage(peerId, data);
+            } catch (err) {
+                console.warn('Error handling message from', peerId, err);
+            }
         });
 
         conn.on('close', () => {
-            this.game.eventLogger?.logSystem(`🔌 ${conn.peer.substring(0, 8)} desconectado`);
-            this.handlePlayerLeave(conn.peer);
-            this.logPlayerEvent(`${conn.peer.substring(0, 8)} se desconectó`, 'system');
+            this.game.eventLogger?.logSystem(`🔌 ${peerId.substring(0, 8)} cerró la conexión`);
+            this.handlePlayerLeave(peerId);
         });
 
         conn.on('error', (err) => {
-            console.warn('Connection error:', err);
-            this.game.eventLogger?.logSystem(`⚠️ Error con ${conn.peer.substring(0, 8)}`);
-            this.handlePlayerLeave(conn.peer);
+            console.error('Connection error with', peerId, err);
+            this.game.eventLogger?.logSystem(`⚠️ Error de conexión con ${peerId.substring(0, 8)}: ${err.type || err.message}`);
+            this.handlePlayerLeave(peerId);
         });
 
-        // Enhanced ICE connection monitoring
+        // Enhanced ICE monitoring
         if (conn.peerConnection) {
             conn.peerConnection.oniceconnectionstatechange = () => {
                 const state = conn.peerConnection.iceConnectionState;
+                this.game.eventLogger?.logSystem(`🧊 ICE con ${peerId.substring(0, 8)}: ${state}`);
                 
                 if (state === 'connected' || state === 'completed') {
-                    this.game.eventLogger?.logSystem(`🧊 ICE conectado con ${conn.peer.substring(0, 8)}`);
-                } else if (state === 'failed' || state === 'disconnected') {
-                    this.game.eventLogger?.logSystem(`🧊 ICE falló con ${conn.peer.substring(0, 8)} (${state})`);
+                    this.game.eventLogger?.logSystem(`🎯 ICE conectado exitosamente con ${peerId.substring(0, 8)}`);
+                } else if (state === 'failed') {
+                    this.game.eventLogger?.logSystem(`💥 ICE falló con ${peerId.substring(0, 8)}`);
+                    this.handlePlayerLeave(peerId);
                     
-                    // Auto-reconnect after ICE failure
+                    // Attempt reconnection
                     setTimeout(() => {
-                        if (!this.connections.has(conn.peer)) {
-                            this.connectToPeer(conn.peer);
+                        if (!this.connections.has(peerId)) {
+                            this.connectToPeer(peerId);
                         }
-                    }, 3000);
+                    }, 5000);
+                } else if (state === 'disconnected') {
+                    this.game.eventLogger?.logSystem(`📡 ICE desconectado de ${peerId.substring(0, 8)}`);
                 }
             };
         }
     }
 
     handleMessage(fromPeer, data) {
+        if (!data || typeof data !== 'object') {
+            console.warn('Invalid message from', fromPeer, data);
+            return;
+        }
+
         switch (data.type) {
             case 'player_join':
                 this.handlePlayerJoin(fromPeer, data.player);
@@ -1487,18 +1628,27 @@ nebula.position.set(
             case 'event':
                 this.handleRemoteEvent(data.event);
                 break;
+            default:
+                console.warn('Unknown message type from', fromPeer, data.type);
         }
     }
 
     handlePlayerJoin(peerId, playerData) {
+        if (!playerData) {
+            console.warn('Invalid player data from', peerId);
+            return;
+        }
+
+        this.game.eventLogger?.logSystem(`🚀 ${peerId.substring(0, 8)} enviando datos de unión`);
+
         // Create remote player ship
         const remotePlayer = {
             id: peerId,
             ship: this.createRemotePlayerShip(playerData),
             lastUpdate: Date.now(),
-            targetPosition: new THREE.Vector3(),
-            targetRotation: 0,
-            interpolationSpeed: 0.15,
+            targetPosition: new THREE.Vector3(playerData.x || 0, playerData.y || 5, playerData.z || 0),
+            targetRotation: playerData.rotation || 0,
+            interpolationSpeed: 0.2,
             ...playerData
         };
 
@@ -1506,27 +1656,33 @@ nebula.position.set(
         this.game.scene.add(remotePlayer.ship);
 
         const shipType = playerData.shipType || 'desconocida';
-        this.game.eventLogger?.logSystem(`🚀 ${peerId.substring(0, 8)} se unió (${shipType})`);
+        this.game.eventLogger?.logSystem(`👋 ${peerId.substring(0, 8)} se unió con nave ${shipType}`);
         this.logPlayerEvent(`${peerId.substring(0, 8)} entró al juego`, 'player-join');
 
-        // Send our data back if we haven't already
-        if (this.connections.has(peerId)) {
+        // Send our data back
+        setTimeout(() => {
             this.sendToPlayer(peerId, {
                 type: 'player_join',
                 player: this.getMyPlayerData()
             });
-        }
+        }, 200);
     }
 
     handlePlayerUpdate(peerId, playerData) {
         const player = this.players.get(peerId);
-        if (!player) return;
+        if (!player || !playerData) return;
 
         // Update target position for smooth interpolation
-        player.targetPosition.set(playerData.x, playerData.y || 5, playerData.z);
-        player.targetRotation = playerData.rotation || 0;
-        player.health = playerData.health;
-        player.score = playerData.score;
+        if (typeof playerData.x === 'number' && typeof playerData.z === 'number') {
+            player.targetPosition.set(playerData.x, playerData.y || 5, playerData.z);
+        }
+        
+        if (typeof playerData.rotation === 'number') {
+            player.targetRotation = playerData.rotation;
+        }
+        
+        player.health = playerData.health || player.health;
+        player.score = playerData.score || player.score;
         player.lastUpdate = Date.now();
 
         // Update player data
@@ -1545,23 +1701,23 @@ nebula.position.set(
         }
 
         this.connections.delete(peerId);
+        this.pendingConnections.delete(peerId);
         
-        // Clean up connection tracking
-        this.connectionAttempts.delete(peerId);
-        if (this.connectionTimeouts.has(peerId)) {
-            clearTimeout(this.connectionTimeouts.get(peerId));
-            this.connectionTimeouts.delete(peerId);
-        }
-
-        // Update room storage
+        // Clean up room storage
         const roomKey = `mp_room_${this.roomId}`;
-        const players = JSON.parse(localStorage.getItem(roomKey) || '[]');
-        const updatedPlayers = players.filter(id => id !== peerId);
-        localStorage.setItem(roomKey, JSON.stringify(updatedPlayers));
+        const presenceKey = `mp_presence_${this.roomId}`;
+        const roomData = JSON.parse(localStorage.getItem(roomKey) || '{}');
+        const presenceData = JSON.parse(localStorage.getItem(presenceKey) || '{}');
+        
+        delete roomData[peerId];
+        delete presenceData[peerId];
+        
+        localStorage.setItem(roomKey, JSON.stringify(roomData));
+        localStorage.setItem(presenceKey, JSON.stringify(presenceData));
     }
 
     handleRemoteEvent(event) {
-        if (this.game.eventLogger) {
+        if (this.game.eventLogger && event) {
             this.game.eventLogger.logEvent(event.message, event.type);
         }
     }
@@ -1569,24 +1725,23 @@ nebula.position.set(
     createRemotePlayerShip(playerData) {
         const ship = ShipFactory.create(playerData.shipType || 'fighter');
         
-        // Make remote ships visually distinct but fully visible
+        // Enhanced visual distinction
         ship.traverse((child) => {
             if (child.isMesh) {
                 child.material = child.material.clone();
                 child.material.transparent = true;
-                child.material.opacity = 0.9; // Increased opacity
+                child.material.opacity = 0.95;
                 
                 // Generate consistent color based on player ID
                 const hue = this.hashStringToHue(playerData.id || 'default');
-                child.material.emissive = new THREE.Color().setHSL(hue, 0.6, 0.4);
-                child.material.emissiveIntensity = 0.3;
+                child.material.emissive = new THREE.Color().setHSL(hue, 0.7, 0.5);
+                child.material.emissiveIntensity = 0.4;
                 
-                // Add subtle outline effect
-                child.material.color.multiplyScalar(1.1);
+                // Brighten the ship
+                child.material.color.multiplyScalar(1.2);
             }
         });
 
-        // Add name label (optional)
         ship.userData.playerId = playerData.id;
         ship.userData.isMultiplayerShip = true;
 
@@ -1602,7 +1757,18 @@ nebula.position.set(
     }
 
     getMyPlayerData() {
-        if (!this.game.playerShip) return {};
+        if (!this.game.playerShip) {
+            return {
+                id: this.myId,
+                x: 0,
+                y: 5,
+                z: 0,
+                rotation: 0,
+                health: 100,
+                shipType: this.game.selectedShipType || 'player',
+                score: 0
+            };
+        }
         
         return {
             id: this.myId,
@@ -1625,11 +1791,28 @@ nebula.position.set(
             // Update remote player positions with smooth interpolation
             this.updateRemotePlayers();
             
-            // Log status periodically
-            if (Date.now() % 30000 < this.syncRate) {
-                this.logConnectionStatus();
-            }
         }, this.syncRate);
+    }
+
+    startHeartbeat() {
+        this.heartbeatInterval = setInterval(() => {
+            // Update presence
+            const presenceKey = `mp_presence_${this.roomId}`;
+            const presenceData = JSON.parse(localStorage.getItem(presenceKey) || '{}');
+            presenceData[this.myId] = Date.now();
+            localStorage.setItem(presenceKey, JSON.stringify(presenceData));
+            
+            // Log connection status
+            if (this.connections.size > 0) {
+                this.game.eventLogger?.logSystem(`📊 ${this.connections.size + 1} jugadores conectados`);
+            } else if (Date.now() % 30000 < 5000) { // Every 30 seconds
+                this.game.eventLogger?.logSystem(`🔍 Buscando otros jugadores...`);
+            }
+            
+            // Check for stale players
+            this.cleanupStalePlayers();
+            
+        }, 5000);
     }
 
     updateRemotePlayers() {
@@ -1652,6 +1835,18 @@ nebula.position.set(
         });
     }
 
+    cleanupStalePlayers() {
+        const now = Date.now();
+        const timeout = 20000; // 20 seconds
+
+        this.players.forEach((player, peerId) => {
+            if (now - player.lastUpdate > timeout) {
+                this.game.eventLogger?.logSystem(`⏰ ${peerId.substring(0, 8)} timeout por inactividad`);
+                this.handlePlayerLeave(peerId);
+            }
+        });
+    }
+
     broadcastPlayerUpdate() {
         const playerData = this.getMyPlayerData();
         this.broadcast({
@@ -1661,15 +1856,28 @@ nebula.position.set(
     }
 
     broadcast(message) {
-        this.connections.forEach((conn) => {
+        let successCount = 0;
+        let failCount = 0;
+
+        this.connections.forEach((conn, peerId) => {
             if (conn.open) {
                 try {
                     conn.send(message);
+                    successCount++;
                 } catch (err) {
-                    console.warn('Failed to send to peer:', conn.peer, err);
+                    console.warn('Failed to send to peer:', peerId, err);
+                    failCount++;
+                    // Don't immediately remove, let heartbeat handle it
                 }
+            } else {
+                failCount++;
             }
         });
+
+        // Log broadcast issues if they occur
+        if (failCount > 0 && Date.now() % 10000 < this.syncRate) {
+            this.game.eventLogger?.logSystem(`⚠️ ${failCount} conexiones fallidas en broadcast`);
+        }
     }
 
     sendToPlayer(peerId, message) {
@@ -1677,10 +1885,13 @@ nebula.position.set(
         if (conn && conn.open) {
             try {
                 conn.send(message);
+                return true;
             } catch (err) {
                 console.warn('Failed to send to player:', peerId, err);
+                return false;
             }
         }
+        return false;
     }
 
     broadcastEvent(message, type = 'system') {
@@ -1697,45 +1908,15 @@ nebula.position.set(
         this.broadcastEvent(message, type);
     }
 
-    logConnectionStatus() {
-        if (this.connections.size > 0) {
-            this.game.eventLogger?.logSystem(`📊 ${this.connections.size + 1} jugadores conectados`);
-        }
-    }
-
-    maintainConnections() {
-        // Check for stale connections
-        this.players.forEach((player, peerId) => {
-            const timeSinceUpdate = Date.now() - player.lastUpdate;
-            if (timeSinceUpdate > 15000) { // 15 seconds timeout
-                this.game.eventLogger?.logSystem(`⏰ ${peerId.substring(0, 8)} timeout`);
-                this.handlePlayerLeave(peerId);
-            }
-        });
-
-        // Attempt to reconnect to room players
-        const roomKey = `mp_room_${this.roomId}`;
-        const roomPlayers = JSON.parse(localStorage.getItem(roomKey) || '[]');
-        
-        roomPlayers.forEach(peerId => {
-            if (peerId !== this.myId && !this.connections.has(peerId)) {
-                const attempts = this.connectionAttempts.get(peerId) || 0;
-                if (attempts < this.maxConnectionAttempts) {
-                    this.connectToPeer(peerId);
-                }
-            }
-        });
-    }
-
     manualConnect() {
         const myId = this.myId;
         if (!myId) {
-            alert('Not connected to signaling server yet. Wait a moment and try again.');
+            alert('No conectado al servidor aún. Espera un momento e intenta de nuevo.');
             return;
         }
 
         const peerId = prompt(
-            `Your ID: ${myId}\n\nShare this ID with other player and get their ID.\n\nEnter other player's ID to connect:`
+            `Tu ID: ${myId}\n\nComparte este ID con otro jugador y obtén su ID.\n\nIngresa el ID del otro jugador:`
         );
         
         if (peerId && peerId !== myId && peerId.length > 5) {
@@ -1750,8 +1931,10 @@ nebula.position.set(
             roomId: this.roomId,
             connections: this.connections.size,
             players: this.players.size,
-            peerState: this.peer ? this.peer._open : 'closed',
-            isHost: this.isHost
+            peerState: this.peer ? (this.peer.open ? 'open' : 'closed') : 'null',
+            isHost: this.isHost,
+            isReady: this.isReady,
+            pendingConnections: this.pendingConnections.size
         };
     }
 
@@ -1773,34 +1956,62 @@ nebula.position.set(
         return positions;
     }
 
-    shutdown() {
+    cleanup() {
         if (this.syncInterval) {
             clearInterval(this.syncInterval);
+            this.syncInterval = null;
         }
         
-        if (this.presenceInterval) {
-            clearInterval(this.presenceInterval);
+        if (this.discoveryInterval) {
+            clearInterval(this.discoveryInterval);
+            this.discoveryInterval = null;
         }
 
-        // Clear all timeouts
-        this.connectionTimeouts.forEach(timeout => clearTimeout(timeout));
-        this.connectionTimeouts.clear();
-
-        this.broadcast({ type: 'player_leave' });
+        if (this.heartbeatInterval) {
+            clearInterval(this.heartbeatInterval);
+            this.heartbeatInterval = null;
+        }
 
         this.connections.forEach((conn) => {
-            conn.close();
+            try {
+                conn.close();
+            } catch (e) {
+                console.warn('Error closing connection:', e);
+            }
         });
+        this.connections.clear();
 
-        if (this.peer) {
+        this.players.forEach((player) => {
+            if (player.ship) {
+                this.game.scene.remove(player.ship);
+            }
+        });
+        this.players.clear();
+
+        this.pendingConnections.clear();
+        this.connectionAttempts.clear();
+    }
+
+    shutdown() {
+        this.broadcast({ type: 'player_leave' });
+
+        this.cleanup();
+
+        if (this.peer && !this.peer.destroyed) {
             this.peer.destroy();
         }
 
         // Clean up room storage
         const roomKey = `mp_room_${this.roomId}`;
-        const players = JSON.parse(localStorage.getItem(roomKey) || '[]');
-        const updatedPlayers = players.filter(id => id !== this.myId);
-        localStorage.setItem(roomKey, JSON.stringify(updatedPlayers));
+        const presenceKey = `mp_presence_${this.roomId}`;
+        const roomData = JSON.parse(localStorage.getItem(roomKey) || '{}');
+        const presenceData = JSON.parse(localStorage.getItem(presenceKey) || '{}');
+        
+        delete roomData[this.myId];
+        delete presenceData[this.myId];
+        
+        localStorage.setItem(roomKey, JSON.stringify(roomData));
+        localStorage.setItem(presenceKey, JSON.stringify(presenceData));
 
         this.game.eventLogger?.logSystem(`👋 Desconectado del multijugador`);
     }

@@ -1384,16 +1384,17 @@ nebula.position.set(
                           
                           // Cloudflare STUN (free, no signup)
                           { urls: 'stun:stun.cloudflare.com:3478' },
+                          { urls: 'stun:stun.relay.metered.ca:80' },
                           
                           // Option 1: Metered.ca FREE TURN (signup required)
                           // Go to https://www.metered.ca/tools/openrelay/ and get free credentials
                           // Replace with your actual credentials:
-                          /*
                           {
-                              urls: 'turn:a.relay.metered.ca:80',
-                              username: 'YOUR_USERNAME_HERE',
-                              credential: 'YOUR_PASSWORD_HERE'
+                              urls: 'turn:global.relay.metered.ca:80',
+                              username: '3193b9b660a19a308918301b',
+                              credential: 'G3FEKpAfkkGyFNhn'
                           },
+                          /*
                           {
                               urls: 'turn:a.relay.metered.ca:80?transport=tcp',
                               username: 'YOUR_USERNAME_HERE', 
@@ -1405,18 +1406,6 @@ nebula.position.set(
                               credential: 'YOUR_PASSWORD_HERE'
                           },
                           */
-                          
-                          // Option 2: Open Relay Project (truly free, no signup)
-                          {
-                              urls: 'turn:openrelay.metered.ca:80',
-                              username: 'openrelayproject',
-                              credential: 'openrelayproject'
-                          },
-                          {
-                              urls: 'turn:openrelay.metered.ca:80?transport=tcp',
-                              username: 'openrelayproject',
-                              credential: 'openrelayproject'
-                          },
                           
                           // Option 3: Backup STUN servers
                           { urls: 'stun:stun.relay.metered.ca:80' },

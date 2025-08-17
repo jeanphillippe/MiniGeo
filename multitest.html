@@ -3,660 +3,559 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minimal Multiplayer Test - WebSocket</title>
+    <title>Multiplayer Test</title>
     <style>
         body {
             margin: 0;
-            padding: 0;
             background: #000;
+            color: #fff;
             font-family: 'Courier New', monospace;
             overflow: hidden;
         }
         
-        #gameContainer {
-            width: 100vw;
-            height: 100vh;
-            position: relative;
+        #gameCanvas {
+            border: 1px solid #333;
+            background: #001122;
         }
         
         #ui {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            color: #00f2fe;
+            position: fixed;
+            top: 10px;
+            left: 10px;
             z-index: 100;
-            background: rgba(0, 0, 0, 0.8);
-            padding: 15px;
-            border-radius: 10px;
-            border: 2px solid rgba(0, 242, 254, 0.6);
-            max-width: 300px;
         }
         
-        #status {
-            margin-bottom: 10px;
-            padding: 5px;
-            background: rgba(255, 71, 87, 0.2);
-            border-radius: 5px;
+        #events {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 300px;
+            height: 400px;
+            background: rgba(0,0,0,0.8);
+            border: 1px solid #00f2fe;
+            padding: 10px;
+            overflow-y: auto;
             font-size: 12px;
         }
         
-        #status.connected {
-            background: rgba(0, 255, 136, 0.2);
+        .event {
+            margin: 2px 0;
+            padding: 2px;
+            border-left: 2px solid #00f2fe;
+            padding-left: 5px;
+        }
+        
+        #instructions {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            color: #aaa;
         }
         
         button {
-            background: rgba(0, 242, 254, 0.2);
-            border: 1px solid rgba(0, 242, 254, 0.6);
-            color: #00f2fe;
-            padding: 8px 15px;
-            border-radius: 5px;
+            background: #00f2fe;
+            color: #000;
+            border: none;
+            padding: 5px 10px;
+            margin: 2px;
             cursor: pointer;
-            margin: 2px;
             font-family: inherit;
-            font-size: 11px;
-        }
-        
-        button:hover {
-            background: rgba(0, 242, 254, 0.4);
-        }
-        
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        
-        input {
-            background: rgba(0, 0, 0, 0.5);
-            border: 1px solid rgba(0, 242, 254, 0.6);
-            color: #fff;
-            padding: 5px;
-            border-radius: 5px;
-            font-family: inherit;
-            margin: 2px;
-            width: 120px;
-            font-size: 11px;
-        }
-        
-        #gameCode {
-            background: rgba(0, 255, 136, 0.2);
-            padding: 10px;
-            border-radius: 5px;
-            margin: 10px 0;
-            font-weight: bold;
-            font-size: 11px;
-        }
-        
-        #controls {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            color: #00f2fe;
-            background: rgba(0, 0, 0, 0.8);
-            padding: 10px;
-            border-radius: 5px;
-            border: 1px solid rgba(0, 242, 254, 0.3);
-            font-size: 12px;
-        }
-        
-        #info {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            color: #feca57;
-            background: rgba(0, 0, 0, 0.8);
-            padding: 10px;
-            border-radius: 5px;
-            border: 1px solid rgba(254, 202, 87, 0.3);
-            font-size: 12px;
-        }
-        
-        .player-list {
-            margin-top: 10px;
-        }
-        
-        .player-item {
-            background: rgba(0, 242, 254, 0.1);
-            padding: 3px 8px;
-            margin: 2px 0;
-            border-radius: 3px;
-            font-size: 10px;
-        }
-        
-        #debugInfo {
-            margin-top: 10px;
-            font-size: 9px;
-            color: #888;
-            max-height: 100px;
-            overflow-y: auto;
         }
     </style>
 </head>
 <body>
-    <div id="gameContainer">
-        <div id="ui">
-            <div id="status">Disconnected</div>
-            <button id="hostBtn">Create Room</button>
-            <div>
-                <input id="gameCodeInput" placeholder="Room Code">
-                <button id="joinBtn">Join</button>
-            </div>
-            <div id="gameCode" style="display: none;">
-                Room: <span id="codeText"></span>
-                <button id="copyBtn">Copy</button>
-            </div>
-            <div class="player-list">
-                <div>Players:</div>
-                <div id="playersList">None</div>
-            </div>
-            <div id="debugInfo">
-                Ready to test multiplayer!
-            </div>
-        </div>
-        
-        <div id="controls">
-            WASD: Move<br>
-            SPACE: Shoot<br>
-            Mouse: Look
-        </div>
-        
-        <div id="info">
-            <div>Position: <span id="position">0, 0</span></div>
-            <div>Players: <span id="playerCount">1</span></div>
-            <div>Ping: <span id="ping">-</span>ms</div>
-        </div>
+    <div id="ui">
+        <div>Player ID: <span id="playerId">Connecting...</span></div>
+        <div>Room: <span id="roomId">lobby-test</span></div>
+        <div>Connections: <span id="connectionCount">0</span></div>
+        <button onclick="multiplayer.manualConnect()">Manual Connect</button>
+        <button onclick="clearEvents()">Clear Events</button>
+    </div>
+    
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    
+    <div id="events">
+        <div style="color: #00f2fe; margin-bottom: 10px;">EVENTS LOG</div>
+    </div>
+    
+    <div id="instructions">
+        Use WASD or Arrow Keys to move • Open multiple tabs to test multiplayer
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
-    
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <script>
-        class MultiplayerTestPusher {
+        // Simple event logger for testing
+        class EventLogger {
             constructor() {
-                this.scene = new THREE.Scene();
-                this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-                this.renderer = new THREE.WebGLRenderer({ antialias: true });
-                this.renderer.setSize(window.innerWidth, window.innerHeight);
-                this.renderer.setClearColor(0x000011);
-                document.getElementById('gameContainer').appendChild(this.renderer.domElement);
-                
-                // Game state
-                this.myPlayer = null;
-                this.remotePlayers = new Map();
-                this.bullets = [];
-                this.keys = {};
-                this.mouse = { x: 0, y: 0 };
-                this.lastShotTime = 0;
-                
-                // Multiplayer
-                this.pusher = null;
-                this.channel = null;
-                this.isHost = false;
-                this.myPlayerId = null;
-                this.roomCode = null;
-                this.lastSentData = { x: 0, z: 0, rotation: 0 };
-                this.connectionTimeout = null;
-                this.pingInterval = null;
-                this.lastPingTime = 0;
-                
-                this.init();
-                this.setupEventListeners();
-                this.connectToPusher();
-                this.animate();
+                this.eventsContainer = document.getElementById('events');
             }
             
-            init() {
-                // Lighting
-                const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
-                this.scene.add(ambientLight);
-                
-                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-                directionalLight.position.set(1, 1, 1);
-                this.scene.add(directionalLight);
-                
-                // Create player ship
-                this.createPlayer();
-                
-                // Position camera
-                this.camera.position.set(0, 20, 30);
-                this.camera.lookAt(0, 0, 0);
-                
-                // Create simple ground plane
-                const groundGeometry = new THREE.PlaneGeometry(200, 200);
-                const groundMaterial = new THREE.MeshLambertMaterial({ 
-                    color: 0x002244,
-                    transparent: true,
-                    opacity: 0.3
-                });
-                const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-                ground.rotation.x = -Math.PI / 2;
-                ground.position.y = -1;
-                this.scene.add(ground);
-                
-                // Add grid
-                const gridHelper = new THREE.GridHelper(200, 20, 0x00f2fe, 0x003366);
-                gridHelper.position.y = -0.9;
-                this.scene.add(gridHelper);
+            logSystem(message) {
+                this.addEvent(message, 'system');
             }
             
-            connectToPusher() {
-                this.updateDebugInfo('🔗 Connecting to Pusher...');
-                
-                // Using Pusher's free tier - public app key for testing
-                this.pusher = new Pusher('d6acdfb87b6f4a32f1fb', {
-                    cluster: 'us2',
-                    forceTLS: true
-                });
-                
-                this.pusher.connection.bind('connected', () => {
-                    this.myPlayerId = this.pusher.connection.socket_id;
-                    this.updateDebugInfo('✅ Connected to Pusher!');
-                    this.updateStatus('Connected to relay server', true);
-                    console.log('Connected with ID:', this.myPlayerId);
-                    this.startPingMonitoring();
-                });
-                
-                this.pusher.connection.bind('disconnected', () => {
-                    this.updateDebugInfo('❌ Disconnected from Pusher');
-                    this.updateStatus('Disconnected', false);
-                    this.clearPingMonitoring();
-                });
-                
-                this.pusher.connection.bind('error', (error) => {
-                    this.updateDebugInfo(`❌ Pusher error: ${error.message || 'Connection failed'}`);
-                    this.updateStatus('Connection failed', false);
-                    console.error('Pusher error:', error);
-                });
-                
-                this.pusher.connection.bind('state_change', (states) => {
-                    console.log('Pusher state:', states.current);
-                    if (states.current === 'connected') {
-                        this.updateDebugInfo('🎉 Real-time connection established!');
-                    }
-                });
+            logEvent(message, type = 'system') {
+                this.addEvent(message, type);
             }
             
-            joinChannel(roomCode) {
-                if (this.channel) {
-                    this.pusher.unsubscribe(this.channel.name);
-                }
+            addEvent(message, type) {
+                const event = document.createElement('div');
+                event.className = 'event';
+                event.innerHTML = `<span style="color: #666;">${new Date().toLocaleTimeString()}</span> ${message}`;
+                this.eventsContainer.appendChild(event);
+                this.eventsContainer.scrollTop = this.eventsContainer.scrollHeight;
                 
-                this.roomCode = roomCode;
-                this.channel = this.pusher.subscribe(`room-${roomCode}`);
-                
-                this.channel.bind('player-joined', (data) => {
-                    if (data.playerId !== this.myPlayerId) {
-                        this.updateDebugInfo(`📥 Player joined: ${data.playerId.substring(0, 8)}`);
-                        this.createRemotePlayer(data.playerId);
-                        this.updatePlayerCount();
-                    }
-                });
-                
-                this.channel.bind('player-left', (data) => {
-                    if (data.playerId !== this.myPlayerId) {
-                        this.updateDebugInfo(`📤 Player left: ${data.playerId.substring(0, 8)}`);
-                        this.removeRemotePlayer(data.playerId);
-                        this.updatePlayerCount();
-                    }
-                });
-                
-                this.channel.bind('player-update', (data) => {
-                    if (data.playerId !== this.myPlayerId) {
-                        this.updateRemotePlayer(data.playerId, data);
-                    }
-                });
-                
-                this.channel.bind('player-shoot', (data) => {
-                    if (data.playerId !== this.myPlayerId) {
-                        this.handleRemoteShoot(data);
-                    }
-                });
-                
-                this.channel.bind('ping-response', (data) => {
-                    if (data.responseToPlayerId === this.myPlayerId) {
-                        const ping = Date.now() - this.lastPingTime;
-                        document.getElementById('ping').textContent = ping;
-                    }
-                });
-                
-                // Announce our presence
-                this.triggerEvent('player-joined', {
-                    playerId: this.myPlayerId,
-                    timestamp: Date.now()
-                });
-            }
-            
-            triggerEvent(eventName, data) {
-                if (!this.channel) return;
-                
-                // Using client events (must start with "client-")
-                this.channel.trigger(`client-${eventName}`, {
-                    ...data,
-                    playerId: this.myPlayerId
-                });
-            }
-            
-            startPingMonitoring() {
-                this.pingInterval = setInterval(() => {
-                    this.lastPingTime = Date.now();
-                    this.triggerEvent('ping', { timestamp: this.lastPingTime });
-                    
-                    // Self-respond to calculate basic latency
-                    setTimeout(() => {
-                        const ping = Date.now() - this.lastPingTime;
-                        document.getElementById('ping').textContent = Math.floor(ping / 2); // Approximate round-trip
-                    }, 50);
-                }, 3000);
-            }
-            
-            clearPingMonitoring() {
-                if (this.pingInterval) {
-                    clearInterval(this.pingInterval);
-                    this.pingInterval = null;
-                }
-                document.getElementById('ping').textContent = '-';
-            }
-            
-            createPlayer() {
-                // Simple ship geometry
-                const geometry = new THREE.ConeGeometry(1, 3, 8);
-                const material = new THREE.MeshLambertMaterial({ color: 0x00f2fe });
-                this.myPlayer = new THREE.Mesh(geometry, material);
-                this.myPlayer.position.set(0, 0, 0);
-                this.myPlayer.rotation.x = Math.PI / 2;
-                this.scene.add(this.myPlayer);
-                
-                // Add engine glow
-                const glowGeometry = new THREE.SphereGeometry(0.5, 8, 8);
-                const glowMaterial = new THREE.MeshBasicMaterial({ 
-                    color: 0x00ffff,
-                    transparent: true,
-                    opacity: 0.6
-                });
-                const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-                glow.position.z = -2;
-                this.myPlayer.add(glow);
-            }
-            
-            createRemotePlayer(playerId) {
-                if (this.remotePlayers.has(playerId)) return;
-                
-                const geometry = new THREE.ConeGeometry(1, 3, 8);
-                const material = new THREE.MeshLambertMaterial({ color: 0xff6b6b });
-                const player = new THREE.Mesh(geometry, material);
-                player.rotation.x = Math.PI / 2;
-                
-                // Add engine glow
-                const glowGeometry = new THREE.SphereGeometry(0.5, 8, 8);
-                const glowMaterial = new THREE.MeshBasicMaterial({ 
-                    color: 0xff6b6b,
-                    transparent: true,
-                    opacity: 0.6
-                });
-                const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-                glow.position.z = -2;
-                player.add(glow);
-                
-                this.scene.add(player);
-                this.remotePlayers.set(playerId, {
-                    mesh: player,
-                    lastUpdate: Date.now()
-                });
-                
-                this.updatePlayerCount();
-            }
-            
-            removeRemotePlayer(playerId) {
-                if (this.remotePlayers.has(playerId)) {
-                    this.scene.remove(this.remotePlayers.get(playerId).mesh);
-                    this.remotePlayers.delete(playerId);
-                    this.updatePlayerCount();
+                // Keep only last 50 events
+                while (this.eventsContainer.children.length > 51) { // +1 for header
+                    this.eventsContainer.removeChild(this.eventsContainer.children[1]);
                 }
             }
-            
-            updateRemotePlayer(playerId, data) {
-                if (!this.remotePlayers.has(playerId)) {
-                    this.createRemotePlayer(playerId);
-                }
-                
-                const remotePlayer = this.remotePlayers.get(playerId);
-                if (data.position) {
-                    remotePlayer.mesh.position.copy(data.position);
-                }
-                if (data.rotation !== undefined) {
-                    remotePlayer.mesh.rotation.y = data.rotation;
-                }
-                remotePlayer.lastUpdate = Date.now();
+        }
+
+        // Simple player class
+        class Player {
+            constructor(x, y, color = '#00f2fe', isLocal = false) {
+                this.x = x;
+                this.y = y;
+                this.targetX = x;
+                this.targetY = y;
+                this.color = color;
+                this.isLocal = isLocal;
+                this.size = 20;
+                this.speed = 5;
+                this.id = null;
             }
             
-            createBullet(position, direction, isLocal = true) {
-                const geometry = new THREE.SphereGeometry(0.1, 8, 8);
-                const material = new THREE.MeshBasicMaterial({ 
-                    color: isLocal ? 0x00ff00 : 0xff0000 
-                });
-                const bullet = new THREE.Mesh(geometry, material);
-                bullet.position.copy(position);
-                
-                const velocity = direction.clone().multiplyScalar(50);
-                
-                this.bullets.push({
-                    mesh: bullet,
-                    velocity: velocity,
-                    life: 100,
-                    isLocal: isLocal
-                });
-                
-                this.scene.add(bullet);
-            }
-            
-            handleRemoteShoot(data) {
-                if (data.position && data.direction) {
-                    this.createBullet(
-                        new THREE.Vector3().copy(data.position),
-                        new THREE.Vector3().copy(data.direction),
-                        false
-                    );
-                }
-            }
-            
-            // Game Functions
-            hostGame() {
-                if (!this.pusher || this.pusher.connection.state !== 'connected') {
-                    this.updateDebugInfo('❌ Not connected to Pusher');
-                    return;
-                }
-                
-                // Generate a simple 4-character room code
-                const roomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
-                this.isHost = true;
-                
-                this.updateDebugInfo(`🏠 Creating room: ${roomCode}`);
-                this.showGameCode(roomCode);
-                this.updateStatus(`Room ${roomCode} created`, true);
-                
-                this.joinChannel(roomCode);
-            }
-            
-            joinGame(roomCode) {
-                if (!roomCode || roomCode.trim() === '') {
-                    this.updateDebugInfo('❌ Please enter a room code');
-                    return;
-                }
-                
-                if (!this.pusher || this.pusher.connection.state !== 'connected') {
-                    this.updateDebugInfo('❌ Not connected to Pusher');
-                    return;
-                }
-                
-                const code = roomCode.trim().toUpperCase();
-                this.updateDebugInfo(`🚪 Joining room: ${code}`);
-                this.updateStatus(`Joining room ${code}...`, true);
-                
-                this.joinChannel(code);
-                
-                setTimeout(() => {
-                    this.updateStatus(`Joined room ${code}`, true);
-                }, 1000);
-            }
-            
-            broadcastPlayerUpdate() {
-                if (!this.channel) return;
-                
-                const currentPos = this.myPlayer.position;
-                const currentRot = this.myPlayer.rotation.y;
-                
-                // Only send if moved significantly
-                const moved = Math.abs(currentPos.x - this.lastSentData.x) > 0.1 ||
-                             Math.abs(currentPos.z - this.lastSentData.z) > 0.1 ||
-                             Math.abs(currentRot - this.lastSentData.rotation) > 0.05;
-                
-                if (moved) {
-                    this.triggerEvent('player-update', {
-                        position: currentPos,
-                        rotation: currentRot,
-                        timestamp: Date.now()
-                    });
-                    
-                    this.lastSentData = {
-                        x: currentPos.x,
-                        z: currentPos.z,
-                        rotation: currentRot
-                    };
-                }
-            }
-            
-            broadcastShoot(position, direction) {
-                if (!this.channel) return;
-                
-                this.triggerEvent('player-shoot', {
-                    position: position,
-                    direction: direction,
-                    timestamp: Date.now()
-                });
-            }
-            
-            // UI Functions
-            updateStatus(message, connected = false) {
-                const status = document.getElementById('status');
-                status.textContent = message;
-                status.className = connected ? 'connected' : '';
-            }
-            
-            showGameCode(code) {
-                document.getElementById('codeText').textContent = code;
-                document.getElementById('gameCode').style.display = 'block';
-            }
-            
-            updatePlayerCount() {
-                document.getElementById('playerCount').textContent = this.remotePlayers.size + 1;
-            }
-            
-            updateDebugInfo(message) {
-                const debugDiv = document.getElementById('debugInfo');
-                const timestamp = new Date().toLocaleTimeString();
-                debugDiv.innerHTML = `[${timestamp}] ${message}<br>` + debugDiv.innerHTML;
-                console.log(`[${timestamp}] ${message}`);
-                
-                // Keep only last 8 messages
-                const lines = debugDiv.innerHTML.split('<br>');
-                if (lines.length > 8) {
-                    debugDiv.innerHTML = lines.slice(0, 8).join('<br>');
-                }
-            }
-            
-            // Game Loop
             update() {
-                if (!this.myPlayer) return;
-                
-                // Handle input
-                let moveX = 0, moveZ = 0;
-                
-                if (this.keys['KeyW']) moveZ -= 1;
-                if (this.keys['KeyS']) moveZ += 1;
-                if (this.keys['KeyA']) moveX -= 1;
-                if (this.keys['KeyD']) moveX += 1;
-                
-                // Normalize movement
-                if (moveX !== 0 || moveZ !== 0) {
-                    const length = Math.sqrt(moveX * moveX + moveZ * moveZ);
-                    moveX /= length;
-                    moveZ /= length;
-                    
-                    this.myPlayer.position.x += moveX * 0.5;
-                    this.myPlayer.position.z += moveZ * 0.5;
+                if (!this.isLocal) {
+                    // Smooth interpolation for remote players
+                    this.x += (this.targetX - this.x) * 0.15;
+                    this.y += (this.targetY - this.y) * 0.15;
                 }
-                
-                // Mouse look
-                this.myPlayer.rotation.y = this.mouse.x * 0.01;
-                
-                // Shooting
-                if (this.keys['Space']) {
-                    const now = Date.now();
-                    if (now - this.lastShotTime > 200) { // 200ms cooldown
-                        this.shoot();
-                        this.lastShotTime = now;
-                    }
-                }
-                
-                // Update bullets
-                this.updateBullets();
-                
-                // Update camera to follow player
-                this.camera.position.x = this.myPlayer.position.x;
-                this.camera.position.z = this.myPlayer.position.z + 30;
-                this.camera.lookAt(this.myPlayer.position);
-                
-                // Update position display
-                document.getElementById('position').textContent = 
-                    `${Math.round(this.myPlayer.position.x)}, ${Math.round(this.myPlayer.position.z)}`;
-                
-                // Broadcast player state
-                this.broadcastPlayerUpdate();
-                
-                // Clean up stale remote players
-                this.cleanupRemotePlayers();
             }
             
-            shoot() {
-                const direction = new THREE.Vector3(
-                    Math.sin(this.myPlayer.rotation.y),
-                    0,
-                    Math.cos(this.myPlayer.rotation.y)
+            draw(ctx) {
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x - this.size/2, this.y - this.size/2, this.size, this.size);
+                
+                // Draw ID
+                if (this.id) {
+                    ctx.fillStyle = '#fff';
+                    ctx.font = '12px Courier New';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(this.id.substring(0, 8), this.x, this.y - this.size);
+                }
+            }
+            
+            moveTo(x, y) {
+                if (this.isLocal) {
+                    this.x = Math.max(this.size/2, Math.min(800 - this.size/2, x));
+                    this.y = Math.max(this.size/2, Math.min(600 - this.size/2, y));
+                } else {
+                    this.targetX = x;
+                    this.targetY = y;
+                }
+            }
+        }
+
+        // Simplified multiplayer manager based on the provided solution
+        class MultiplayerManager {
+            constructor() {
+                this.peer = null;
+                this.connections = new Map();
+                this.players = new Map();
+                this.roomId = this.getRoomId();
+                this.myId = null;
+                this.isReady = false;
+                this.discoveryInterval = null;
+                this.heartbeatInterval = null;
+                this.connectionQueue = [];
+                this.processingQueue = false;
+                this.lastLogTime = 0;
+                this.logThrottle = 1000;
+                this.lastLogMessage = '';
+                
+                this.eventLogger = new EventLogger();
+                this.setupPeer();
+            }
+
+            getRoomId() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const roomParam = urlParams.get('room');
+                return roomParam || 'lobby-test';
+            }
+
+            logThrottled(message) {
+                const now = Date.now();
+                if (message === this.lastLogMessage && now - this.lastLogTime < this.logThrottle) {
+                    return;
+                }
+                this.lastLogMessage = message;
+                this.lastLogTime = now;
+                this.eventLogger.logSystem(message);
+            }
+
+            async setupPeer() {
+                if (this.peer && !this.peer.destroyed) {
+                    this.peer.destroy();
+                }
+
+                const uniqueId = `${this.roomId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+                this.peer = new Peer(uniqueId, {
+                    debug: 0,
+                    config: {
+                        'iceServers': [
+                            { urls: 'stun:stun.l.google.com:19302' },
+                            { urls: 'stun:stun1.l.google.com:19302' },
+                            {
+                                urls: 'turn:global.relay.metered.ca:80',
+                                username: '3193b9b660a19a308918301b',
+                                credential: 'G3FEKpAfkkGyFNhn'
+                            }
+                        ]
+                    }
+                });
+
+                this.peer.on('open', (id) => {
+                    this.myId = id;
+                    this.isReady = true;
+                    this.logThrottled(`🔗 Connected with ID: ${id.substring(0, 8)}...`);
+                    document.getElementById('playerId').textContent = id.substring(0, 8);
+                    document.getElementById('roomId').textContent = this.roomId;
+                    
+                    this.clearStaleRoomData();
+                    setTimeout(() => {
+                        this.startRoomManagement();
+                        this.startHeartbeat();
+                    }, 2000);
+                });
+
+                this.peer.on('connection', (conn) => {
+                    this.logThrottled(`📞 Incoming connection from ${conn.peer.substring(0, 8)}`);
+                    this.handleConnection(conn);
+                });
+
+                this.peer.on('error', (err) => {
+                    if (err.type === 'peer-unavailable') {
+                        this.logThrottled(`❌ Peer unavailable - cleaning stale data`);
+                        this.clearStaleRoomData();
+                        return;
+                    }
+                    
+                    this.logThrottled(`⚠️ PeerJS Error: ${err.type || err.message}`);
+                    
+                    if (err.type === 'network' || err.type === 'server-error') {
+                        setTimeout(() => this.setupPeer(), 5000);
+                    }
+                });
+            }
+
+            clearStaleRoomData() {
+                const roomKey = `mp_room_${this.roomId}`;
+                const presenceKey = `mp_presence_${this.roomId}`;
+                localStorage.removeItem(roomKey);
+                localStorage.removeItem(presenceKey);
+                this.connectionQueue = [];
+                this.logThrottled(`🧹 Cleared stale room data`);
+            }
+
+            startRoomManagement() {
+                if (!this.isReady) return;
+                
+                this.updateRoomPresence();
+                this.logThrottled(`🔍 Starting player discovery...`);
+                
+                this.discoveryInterval = setInterval(() => {
+                    this.discoverPeers();
+                }, 8000);
+                
+                this.processConnectionQueue();
+            }
+
+            updateRoomPresence() {
+                const roomKey = `mp_room_${this.roomId}`;
+                const presenceKey = `mp_presence_${this.roomId}`;
+                const now = Date.now();
+                
+                const roomData = JSON.parse(localStorage.getItem(roomKey) || '{}');
+                const presenceData = JSON.parse(localStorage.getItem(presenceKey) || '{}');
+                
+                // Clean up old entries
+                const cutoffTime = now - 120000;
+                Object.keys(presenceData).forEach(id => {
+                    if (presenceData[id] < cutoffTime) {
+                        delete presenceData[id];
+                        delete roomData[id];
+                    }
+                });
+                
+                roomData[this.myId] = { id: this.myId, joinedAt: now, lastSeen: now };
+                presenceData[this.myId] = now;
+                
+                localStorage.setItem(roomKey, JSON.stringify(roomData));
+                localStorage.setItem(presenceKey, JSON.stringify(presenceData));
+            }
+
+            async discoverPeers() {
+                if (!this.isReady) return;
+                
+                this.updateRoomPresence();
+                
+                const roomKey = `mp_room_${this.roomId}`;
+                const roomData = JSON.parse(localStorage.getItem(roomKey) || '{}');
+                
+                const otherPlayers = Object.keys(roomData).filter(id => 
+                    id !== this.myId && !this.connections.has(id)
                 );
                 
-                const bulletPos = this.myPlayer.position.clone();
-                bulletPos.add(direction.clone().multiplyScalar(2));
-                
-                this.createBullet(bulletPos, direction, true);
-                this.broadcastShoot(bulletPos, direction);
+                if (otherPlayers.length > 0) {
+                    this.logThrottled(`👥 Found ${otherPlayers.length} potential players`);
+                    otherPlayers.forEach(peerId => {
+                        if (!this.connectionQueue.includes(peerId)) {
+                            this.connectionQueue.push(peerId);
+                        }
+                    });
+                    this.processConnectionQueue();
+                } else {
+                    if (Date.now() % 30000 < 8000) {
+                        this.logThrottled(`🔍 Looking for other players...`);
+                    }
+                }
             }
-            
-            updateBullets() {
-                this.bullets = this.bullets.filter(bullet => {
-                    bullet.mesh.position.add(bullet.velocity.clone().multiplyScalar(0.016)); // Assuming 60fps
-                    bullet.life--;
+
+            async processConnectionQueue() {
+                if (this.processingQueue || this.connectionQueue.length === 0) return;
+                
+                this.processingQueue = true;
+                
+                while (this.connectionQueue.length > 0) {
+                    const peerId = this.connectionQueue.shift();
                     
-                    if (bullet.life <= 0) {
-                        this.scene.remove(bullet.mesh);
+                    if (!this.connections.has(peerId) && peerId !== this.myId) {
+                        this.logThrottled(`🔄 Attempting connection to ${peerId.substring(0, 8)}`);
+                        
+                        try {
+                            await this.connectToPeerWithValidation(peerId);
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                        } catch (err) {
+                            console.warn('Connection failed:', err);
+                        }
+                    }
+                }
+                
+                this.processingQueue = false;
+            }
+
+            async connectToPeerWithValidation(peerId) {
+                return new Promise((resolve, reject) => {
+                    const conn = this.peer.connect(peerId, {
+                        reliable: true,
+                        serialization: 'json',
+                        metadata: { roomId: this.roomId, timestamp: Date.now() }
+                    });
+
+                    const timeout = setTimeout(() => {
+                        this.logThrottled(`⏰ Timeout with ${peerId.substring(0, 8)} - peer unavailable`);
+                        conn.close();
+                        this.removePeerFromRoom(peerId);
+                        reject(new Error('Connection timeout'));
+                    }, 12000);
+
+                    conn.on('open', () => {
+                        clearTimeout(timeout);
+                        this.logThrottled(`✅ Successfully connected to ${peerId.substring(0, 8)}`);
+                        resolve();
+                    });
+
+                    conn.on('error', (err) => {
+                        clearTimeout(timeout);
+                        if (err.type === 'peer-unavailable') {
+                            this.logThrottled(`❌ Peer ${peerId.substring(0, 8)} unavailable - removing`);
+                            this.removePeerFromRoom(peerId);
+                        }
+                        reject(err);
+                    });
+
+                    this.handleConnection(conn);
+                });
+            }
+
+            removePeerFromRoom(peerId) {
+                const roomKey = `mp_room_${this.roomId}`;
+                const presenceKey = `mp_presence_${this.roomId}`;
+                
+                const roomData = JSON.parse(localStorage.getItem(roomKey) || '{}');
+                const presenceData = JSON.parse(localStorage.getItem(presenceKey) || '{}');
+                
+                delete roomData[peerId];
+                delete presenceData[peerId];
+                
+                localStorage.setItem(roomKey, JSON.stringify(roomData));
+                localStorage.setItem(presenceKey, JSON.stringify(presenceData));
+            }
+
+            handleConnection(conn) {
+                const peerId = conn.peer;
+                
+                conn.on('open', () => {
+                    this.connections.set(peerId, conn);
+                    this.logThrottled(`🎉 ${peerId.substring(0, 8)} connected`);
+                    document.getElementById('connectionCount').textContent = this.connections.size;
+                    
+                    setTimeout(() => {
+                        this.sendToPlayer(peerId, {
+                            type: 'player_join',
+                            player: this.getMyPlayerData()
+                        });
+                    }, 200);
+                });
+
+                conn.on('data', (data) => {
+                    this.handleMessage(peerId, data);
+                });
+
+                conn.on('close', () => {
+                    this.logThrottled(`🔌 ${peerId.substring(0, 8)} disconnected`);
+                    this.handlePlayerLeave(peerId);
+                });
+
+                conn.on('error', (err) => {
+                    this.logThrottled(`⚠️ Error with ${peerId.substring(0, 8)}: ${err.type}`);
+                    this.handlePlayerLeave(peerId);
+                });
+            }
+
+            handleMessage(fromPeer, data) {
+                if (!data || typeof data !== 'object') return;
+
+                switch (data.type) {
+                    case 'player_join':
+                        this.handlePlayerJoin(fromPeer, data.player);
+                        break;
+                    case 'player_update':
+                        this.handlePlayerUpdate(fromPeer, data.player);
+                        break;
+                    case 'player_leave':
+                        this.handlePlayerLeave(fromPeer);
+                        break;
+                }
+            }
+
+            handlePlayerJoin(peerId, playerData) {
+                if (!playerData) return;
+
+                this.logThrottled(`🚀 ${peerId.substring(0, 8)} joined the game`);
+                
+                // Add remote player to game
+                game.addRemotePlayer(peerId, playerData);
+
+                setTimeout(() => {
+                    this.sendToPlayer(peerId, {
+                        type: 'player_join',
+                        player: this.getMyPlayerData()
+                    });
+                }, 300);
+            }
+
+            handlePlayerUpdate(peerId, playerData) {
+                if (game.remotePlayers.has(peerId)) {
+                    const player = game.remotePlayers.get(peerId);
+                    player.moveTo(playerData.x, playerData.y);
+                }
+            }
+
+            handlePlayerLeave(peerId) {
+                this.connections.delete(peerId);
+                this.removePeerFromRoom(peerId);
+                game.removeRemotePlayer(peerId);
+                this.logThrottled(`👋 ${peerId.substring(0, 8)} left the game`);
+                document.getElementById('connectionCount').textContent = this.connections.size;
+            }
+
+            getMyPlayerData() {
+                return {
+                    id: this.myId,
+                    x: game.localPlayer.x,
+                    y: game.localPlayer.y
+                };
+            }
+
+            startHeartbeat() {
+                this.heartbeatInterval = setInterval(() => {
+                    this.updateRoomPresence();
+                    
+                    if (Date.now() % 15000 < 5000) {
+                        if (this.connections.size > 0) {
+                            this.logThrottled(`📊 ${this.connections.size + 1} players connected`);
+                        }
+                    }
+                }, 5000);
+            }
+
+            broadcastPlayerUpdate() {
+                const playerData = this.getMyPlayerData();
+                this.broadcast({
+                    type: 'player_update',
+                    player: playerData
+                });
+            }
+
+            broadcast(message) {
+                this.connections.forEach((conn, peerId) => {
+                    if (conn.open) {
+                        try {
+                            conn.send(message);
+                        } catch (err) {
+                            console.warn('Failed to send to peer:', peerId);
+                        }
+                    }
+                });
+            }
+
+            sendToPlayer(peerId, message) {
+                const conn = this.connections.get(peerId);
+                if (conn && conn.open) {
+                    try {
+                        conn.send(message);
+                        return true;
+                    } catch (err) {
                         return false;
                     }
-                    
-                    return true;
-                });
+                }
+                return false;
+            }
+
+            manualConnect() {
+                if (!this.myId) {
+                    alert('Not connected yet. Wait a moment and try again.');
+                    return;
+                }
+
+                const peerId = prompt(`Your ID: ${this.myId}\n\nEnter other player's ID:`);
+                
+                if (peerId && peerId !== this.myId && peerId.length > 5) {
+                    this.logThrottled(`🔧 Manual connection to ${peerId.substring(0, 8)}...`);
+                    this.connectionQueue.push(peerId);
+                    this.processConnectionQueue();
+                }
+            }
+        }
+
+        // Simple game class
+        class Game {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.localPlayer = new Player(400, 300, '#00f2fe', true);
+                this.remotePlayers = new Map();
+                this.keys = {};
+                
+                this.setupInput();
+                this.gameLoop();
             }
             
-            cleanupRemotePlayers() {
-                const now = Date.now();
-                this.remotePlayers.forEach((player, playerId) => {
-                    if (now - player.lastUpdate > 10000) { // 10 second timeout
-                        console.log('Cleaning up stale player:', playerId);
-                        this.removeRemotePlayer(playerId);
-                    }
-                });
-            }
-            
-            // Event Listeners
-            setupEventListeners() {
-                // Keyboard
+            setupInput() {
                 document.addEventListener('keydown', (e) => {
                     this.keys[e.code] = true;
                 });
@@ -664,63 +563,79 @@
                 document.addEventListener('keyup', (e) => {
                     this.keys[e.code] = false;
                 });
-                
-                // Mouse
-                document.addEventListener('mousemove', (e) => {
-                    this.mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-                    this.mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-                });
-                
-                // UI buttons
-                document.getElementById('hostBtn').addEventListener('click', () => {
-                    this.hostGame();
-                });
-                
-                document.getElementById('joinBtn').addEventListener('click', () => {
-                    const code = document.getElementById('gameCodeInput').value.trim();
-                    if (code) {
-                        this.joinGame(code);
-                    }
-                });
-                
-                document.getElementById('copyBtn').addEventListener('click', () => {
-                    const code = document.getElementById('codeText').textContent;
-                    navigator.clipboard.writeText(code).then(() => {
-                        this.updateDebugInfo('📋 Code copied to clipboard');
-                    }).catch(() => {
-                        // Fallback for older browsers
-                        const textArea = document.createElement('textarea');
-                        textArea.value = code;
-                        document.body.appendChild(textArea);
-                        textArea.select();
-                        document.execCommand('copy');
-                        document.body.removeChild(textArea);
-                        this.updateDebugInfo('📋 Code copied (fallback)');
-                    });
-                });
-                
-                // Window resize
-                window.addEventListener('resize', () => {
-                    this.camera.aspect = window.innerWidth / window.innerHeight;
-                    this.camera.updateProjectionMatrix();
-                    this.renderer.setSize(window.innerWidth, window.innerHeight);
-                });
-                
-                // Initialize with helpful message
-                setTimeout(() => {
-                    this.updateDebugInfo('🎮 Ready! Create or join a room to test multiplayer.');
-                }, 1000);
             }
             
-            animate() {
-                requestAnimationFrame(() => this.animate());
+            update() {
+                let moved = false;
+                const oldX = this.localPlayer.x;
+                const oldY = this.localPlayer.y;
+                
+                if (this.keys.KeyW || this.keys.ArrowUp) {
+                    this.localPlayer.moveTo(this.localPlayer.x, this.localPlayer.y - this.localPlayer.speed);
+                    moved = true;
+                }
+                if (this.keys.KeyS || this.keys.ArrowDown) {
+                    this.localPlayer.moveTo(this.localPlayer.x, this.localPlayer.y + this.localPlayer.speed);
+                    moved = true;
+                }
+                if (this.keys.KeyA || this.keys.ArrowLeft) {
+                    this.localPlayer.moveTo(this.localPlayer.x - this.localPlayer.speed, this.localPlayer.y);
+                    moved = true;
+                }
+                if (this.keys.KeyD || this.keys.ArrowRight) {
+                    this.localPlayer.moveTo(this.localPlayer.x + this.localPlayer.speed, this.localPlayer.y);
+                    moved = true;
+                }
+                
+                // Broadcast position if moved
+                if (moved && multiplayer && multiplayer.connections.size > 0) {
+                    multiplayer.broadcastPlayerUpdate();
+                }
+                
+                // Update remote players
+                this.remotePlayers.forEach(player => player.update());
+            }
+            
+            render() {
+                this.ctx.fillStyle = '#001122';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // Draw local player
+                this.localPlayer.draw(this.ctx);
+                
+                // Draw remote players
+                this.remotePlayers.forEach(player => player.draw(this.ctx));
+            }
+            
+            gameLoop() {
                 this.update();
-                this.renderer.render(this.scene, this.camera);
+                this.render();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+            
+            addRemotePlayer(peerId, playerData) {
+                const colors = ['#ff4757', '#2ed573', '#feca57', '#ff9ff3', '#54a0ff'];
+                const color = colors[this.remotePlayers.size % colors.length];
+                
+                const player = new Player(playerData.x, playerData.y, color, false);
+                player.id = peerId;
+                this.remotePlayers.set(peerId, player);
+            }
+            
+            removeRemotePlayer(peerId) {
+                this.remotePlayers.delete(peerId);
             }
         }
-        
-        // Start the test
-        const game = new MultiplayerTestPusher();
+
+        // Initialize everything
+        const game = new Game();
+        const multiplayer = new MultiplayerManager();
+
+        // Helper function for testing
+        function clearEvents() {
+            const events = document.getElementById('events');
+            events.innerHTML = '<div style="color: #00f2fe; margin-bottom: 10px;">EVENTS LOG</div>';
+        }
     </script>
 </body>
 </html>

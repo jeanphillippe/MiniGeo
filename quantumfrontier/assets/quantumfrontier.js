@@ -877,7 +877,6 @@ static createIrregularPlanet(radius, irregularity = 0, style = 'highdetail') {
         currentAngle:initialAngle
     }
 }
-
       }
       class PerlinNoise {
         constructor(seed = Math.random()) {
@@ -1204,810 +1203,808 @@ nebula.position.set(
           }
         }
       }
-      // WebRTC Multiplayer Manager using PeerJS
-// WebRTC Multiplayer Manager using PeerJS
-class MultiplayerManager {
-    constructor(game) {
-        this.game = game;
-        this.peer = null;
-        this.connections = new Map(); // peerId -> connection
-        this.players = new Map(); // peerId -> player data
-        this.roomId = this.getRoomId();
-        this.myId = null;
-        this.syncInterval = null;
-        this.lastSyncTime = 0;
-        this.syncRate = 1000 / 20; // 20 FPS sync rate
-        
-        // WebSocket fallback
-        this.websocketFallback = null;
-        this.websocketMode = false;
-        
-        // Log multiplayer initialization
-        this.game.eventLogger?.logSystem(`🌐 Inicializando multijugador...`);
-        this.game.eventLogger?.logSystem(`🏠 Sala: ${this.roomId}`);
-        
-        this.setupPeer();
-    }
+      class MultiplayerManager {
+          constructor(game) {
+              this.game = game;
+              this.peer = null;
+              this.connections = new Map(); // peerId -> connection
+              this.players = new Map(); // peerId -> player data
+              this.roomId = this.getRoomId();
+              this.myId = null;
+              this.syncInterval = null;
+              this.lastSyncTime = 0;
+              this.syncRate = 1000 / 20; // 20 FPS sync rate
+              
+              // WebSocket fallback
+              this.websocketFallback = null;
+              this.websocketMode = false;
+              
+              // Log multiplayer initialization
+              this.game.eventLogger?.logSystem(`🌐 Inicializando multijugador...`);
+              this.game.eventLogger?.logSystem(`🏠 Sala: ${this.roomId}`);
+              
+              this.setupPeer();
+          }
 
-    getRoomId() {
-        // Check URL parameter first
-        const urlParams = new URLSearchParams(window.location.search);
-        const roomParam = urlParams.get('room');
-        if (roomParam) return roomParam;
-        
-        // Check hash
-        const hash = window.location.hash.substring(1);
-        if (hash) return hash;
-        
-        // Generate a simple shared room based on current hour to help players find each other
-        const now = new Date();
-        const hourlyRoom = `lobby-${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${now.getHours()}`;
-        
-        return hourlyRoom;
-    }
+          getRoomId() {
+              // Check URL parameter first
+              const urlParams = new URLSearchParams(window.location.search);
+              const roomParam = urlParams.get('room');
+              if (roomParam) return roomParam;
+              
+              // Check hash
+              const hash = window.location.hash.substring(1);
+              if (hash) return hash;
+              
+              // Generate a simple shared room based on current hour to help players find each other
+              const now = new Date();
+              const hourlyRoom = `lobby-${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${now.getHours()}`;
+              
+              return hourlyRoom;
+          }
 
-    // Force refresh peer discovery
-    refreshPeerDiscovery() {
-        this.game.eventLogger?.logSystem(`🔄 Actualizando búsqueda de jugadores...`);
-        this.announcePresence();
-        
-        // Try to connect to any peers we might have missed
-        const presenceKey = `mp_presence_${this.roomId}`;
-        const presence = JSON.parse(localStorage.getItem(presenceKey) || '{}');
-        
-        Object.keys(presence).forEach(async (peerId) => {
-            if (peerId !== this.myId && !this.connections.has(peerId)) {
-                await this.connectToPeerWithRetry(peerId, 2);
-            }
-        });
-    }
+          // Force refresh peer discovery
+          refreshPeerDiscovery() {
+              this.game.eventLogger?.logSystem(`🔄 Actualizando búsqueda de jugadores...`);
+              this.announcePresence();
+              
+              // Try to connect to any peers we might have missed
+              const presenceKey = `mp_presence_${this.roomId}`;
+              const presence = JSON.parse(localStorage.getItem(presenceKey) || '{}');
+              
+              Object.keys(presence).forEach(async (peerId) => {
+                  if (peerId !== this.myId && !this.connections.has(peerId)) {
+                      await this.connectToPeerWithRetry(peerId, 2);
+                  }
+              });
+          }
 
-    // Manual connection method for troubleshooting
-    manualConnect() {
-        const myId = this.myId;
-        if (!myId) {
-            alert('Not connected to signaling server yet. Wait a moment and try again.');
-            return;
-        }
-        
-        const peerId = prompt(`Your ID: ${myId}\n\nShare this ID with other player and get their ID.\n\nEnter other player's ID to connect:`);
-        if (peerId && peerId !== myId && peerId.length > 5) {
-            this.game.eventLogger?.logSystem(`🔧 Conexión manual con ${peerId.substring(0, 8)}...`);
-            this.connectToPeerWithRetry(peerId, 5);
-        }
-    }
+          // Manual connection method for troubleshooting
+          manualConnect() {
+              const myId = this.myId;
+              if (!myId) {
+                  alert('Not connected to signaling server yet. Wait a moment and try again.');
+                  return;
+              }
+              
+              const peerId = prompt(`Your ID: ${myId}\n\nShare this ID with other player and get their ID.\n\nEnter other player's ID to connect:`);
+              if (peerId && peerId !== myId && peerId.length > 5) {
+                  this.game.eventLogger?.logSystem(`🔧 Conexión manual con ${peerId.substring(0, 8)}...`);
+                  this.connectToPeerWithRetry(peerId, 5);
+              }
+          }
 
-    // WebSocket fallback when WebRTC fails
-    setupWebSocketFallback() {
-        if (this.websocketFallback) return; // Already set up
-        
-        try {
-            // Using a free WebSocket relay service
-            this.websocketFallback = new WebSocket('wss://echo.websocket.org');
-            
-            this.websocketFallback.onopen = () => {
-                this.game.eventLogger?.logSystem(`📡 Conectado vía WebSocket (modo respaldo)`);
-                this.websocketMode = true;
-                
-                // Announce presence in room
-                this.sendWebSocketMessage({
-                    type: 'join_room',
-                    room: this.roomId,
-                    player: this.getMyPlayerData()
-                });
-            };
-            
-            this.websocketFallback.onmessage = (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    if (data.room === this.roomId && data.sender !== this.myId) {
-                        this.handleWebSocketMessage(data);
-                    }
-                } catch (e) {
-                    console.warn('Invalid WebSocket message:', e);
-                }
-            };
-            
-            this.websocketFallback.onerror = () => {
-                this.game.eventLogger?.logSystem(`❌ WebSocket falló - modo offline`);
-            };
-            
-        } catch (err) {
-            console.warn('WebSocket fallback failed:', err);
-            this.game.eventLogger?.logSystem(`❌ Todos los métodos de conexión fallaron`);
-        }
-    }
+          // WebSocket fallback when WebRTC fails
+          setupWebSocketFallback() {
+              if (this.websocketFallback) return; // Already set up
+              
+              try {
+                  // Using a free WebSocket relay service
+                  this.websocketFallback = new WebSocket('wss://echo.websocket.org');
+                  
+                  this.websocketFallback.onopen = () => {
+                      this.game.eventLogger?.logSystem(`📡 Conectado vía WebSocket (modo respaldo)`);
+                      this.websocketMode = true;
+                      
+                      // Announce presence in room
+                      this.sendWebSocketMessage({
+                          type: 'join_room',
+                          room: this.roomId,
+                          player: this.getMyPlayerData()
+                      });
+                  };
+                  
+                  this.websocketFallback.onmessage = (event) => {
+                      try {
+                          const data = JSON.parse(event.data);
+                          if (data.room === this.roomId && data.sender !== this.myId) {
+                              this.handleWebSocketMessage(data);
+                          }
+                      } catch (e) {
+                          console.warn('Invalid WebSocket message:', e);
+                      }
+                  };
+                  
+                  this.websocketFallback.onerror = () => {
+                      this.game.eventLogger?.logSystem(`❌ WebSocket falló - modo offline`);
+                  };
+                  
+              } catch (err) {
+                  console.warn('WebSocket fallback failed:', err);
+                  this.game.eventLogger?.logSystem(`❌ Todos los métodos de conexión fallaron`);
+              }
+          }
 
-    sendWebSocketMessage(data) {
-        if (this.websocketFallback && this.websocketFallback.readyState === WebSocket.OPEN) {
-            this.websocketFallback.send(JSON.stringify({
-                ...data,
-                room: this.roomId,
-                sender: this.myId,
-                timestamp: Date.now()
-            }));
-        }
-    }
+          sendWebSocketMessage(data) {
+              if (this.websocketFallback && this.websocketFallback.readyState === WebSocket.OPEN) {
+                  this.websocketFallback.send(JSON.stringify({
+                      ...data,
+                      room: this.roomId,
+                      sender: this.myId,
+                      timestamp: Date.now()
+                  }));
+              }
+          }
 
-    handleWebSocketMessage(data) {
-        switch (data.type) {
-            case 'join_room':
-                this.handleWebSocketPlayerJoin(data.sender, data.player);
-                break;
-            case 'player_update':
-                this.handlePlayerUpdate(data.sender, data.player);
-                break;
-            case 'player_leave':
-                this.handlePlayerLeave(data.sender);
-                break;
-            case 'event':
-                this.handleRemoteEvent(data.event);
-                break;
-        }
-    }
+          handleWebSocketMessage(data) {
+              switch (data.type) {
+                  case 'join_room':
+                      this.handleWebSocketPlayerJoin(data.sender, data.player);
+                      break;
+                  case 'player_update':
+                      this.handlePlayerUpdate(data.sender, data.player);
+                      break;
+                  case 'player_leave':
+                      this.handlePlayerLeave(data.sender);
+                      break;
+                  case 'event':
+                      this.handleRemoteEvent(data.event);
+                      break;
+              }
+          }
 
-    handleWebSocketPlayerJoin(peerId, playerData) {
-        // Similar to WebRTC join but through WebSocket
-        if (!this.players.has(peerId)) {
-            const remotePlayer = {
-                id: peerId,
-                ship: this.createRemotePlayerShip(playerData),
-                lastUpdate: Date.now(),
-                ...playerData
-            };
-            
-            this.players.set(peerId, remotePlayer);
-            this.scene.add(remotePlayer.ship);
-            
-            const shipType = playerData.shipType || 'desconocida';
-            this.game.eventLogger?.logSystem(`🌐 ${peerId.substring(0, 8)} se unió vía WebSocket (${shipType})`);
-            
-            // Send our data back
-            this.sendWebSocketMessage({
-                type: 'join_room',
-                player: this.getMyPlayerData()
-            });
-        }
-    }
+          handleWebSocketPlayerJoin(peerId, playerData) {
+              // Similar to WebRTC join but through WebSocket
+              if (!this.players.has(peerId)) {
+                  const remotePlayer = {
+                      id: peerId,
+                      ship: this.createRemotePlayerShip(playerData),
+                      lastUpdate: Date.now(),
+                      ...playerData
+                  };
+                  
+                  this.players.set(peerId, remotePlayer);
+                  this.scene.add(remotePlayer.ship);
+                  
+                  const shipType = playerData.shipType || 'desconocida';
+                  this.game.eventLogger?.logSystem(`🌐 ${peerId.substring(0, 8)} se unió vía WebSocket (${shipType})`);
+                  
+                  // Send our data back
+                  this.sendWebSocketMessage({
+                      type: 'join_room',
+                      player: this.getMyPlayerData()
+                  });
+              }
+          }
 
-    async setupPeer() {
-        // Import PeerJS from CDN
-        if (!window.Peer) {
-            await this.loadPeerJS();
-        }
+          async setupPeer() {
+              // Import PeerJS from CDN
+              if (!window.Peer) {
+                  await this.loadPeerJS();
+              }
 
-        // Create peer with comprehensive STUN/TURN servers
-        this.peer = new Peer(null, {
-            debug: 1,
-            config: {
-                'iceServers': [
-                    // Google's free STUN servers (always free, no signup)
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-                    
-                    // Cloudflare STUN (free, no signup)
-                    { urls: 'stun:stun.cloudflare.com:3478' },
-                    
-                    // Option 1: Metered.ca FREE TURN (signup required)
-                    // Go to https://www.metered.ca/tools/openrelay/ and get free credentials
-                    // Replace with your actual credentials:
-                    /*
-                    {
-                        urls: 'turn:a.relay.metered.ca:80',
-                        username: 'YOUR_USERNAME_HERE',
-                        credential: 'YOUR_PASSWORD_HERE'
-                    },
-                    {
-                        urls: 'turn:a.relay.metered.ca:80?transport=tcp',
-                        username: 'YOUR_USERNAME_HERE', 
-                        credential: 'YOUR_PASSWORD_HERE'
-                    },
-                    {
-                        urls: 'turn:a.relay.metered.ca:443',
-                        username: 'YOUR_USERNAME_HERE',
-                        credential: 'YOUR_PASSWORD_HERE'
-                    },
-                    */
-                    
-                    // Option 2: Open Relay Project (truly free, no signup)
-                    {
-                        urls: 'turn:openrelay.metered.ca:80',
-                        username: 'openrelayproject',
-                        credential: 'openrelayproject'
-                    },
-                    {
-                        urls: 'turn:openrelay.metered.ca:80?transport=tcp',
-                        username: 'openrelayproject',
-                        credential: 'openrelayproject'
-                    },
-                    
-                    // Option 3: Backup STUN servers
-                    { urls: 'stun:stun.relay.metered.ca:80' },
-                    { urls: 'stun:global.stun.twilio.com:3478' }
-                ],
-                'iceCandidatePoolSize': 10,
-                'iceTransportPolicy': 'all',
-                'bundlePolicy': 'max-bundle',
-                'rtcpMuxPolicy': 'require'
-            }
-        });
+              // Create peer with comprehensive STUN/TURN servers
+              this.peer = new Peer(null, {
+                  debug: 1,
+                  config: {
+                      'iceServers': [
+                          // Google's free STUN servers (always free, no signup)
+                          { urls: 'stun:stun.l.google.com:19302' },
+                          { urls: 'stun:stun1.l.google.com:19302' },
+                          
+                          // Cloudflare STUN (free, no signup)
+                          { urls: 'stun:stun.cloudflare.com:3478' },
+                          
+                          // Option 1: Metered.ca FREE TURN (signup required)
+                          // Go to https://www.metered.ca/tools/openrelay/ and get free credentials
+                          // Replace with your actual credentials:
+                          /*
+                          {
+                              urls: 'turn:a.relay.metered.ca:80',
+                              username: 'YOUR_USERNAME_HERE',
+                              credential: 'YOUR_PASSWORD_HERE'
+                          },
+                          {
+                              urls: 'turn:a.relay.metered.ca:80?transport=tcp',
+                              username: 'YOUR_USERNAME_HERE', 
+                              credential: 'YOUR_PASSWORD_HERE'
+                          },
+                          {
+                              urls: 'turn:a.relay.metered.ca:443',
+                              username: 'YOUR_USERNAME_HERE',
+                              credential: 'YOUR_PASSWORD_HERE'
+                          },
+                          */
+                          
+                          // Option 2: Open Relay Project (truly free, no signup)
+                          {
+                              urls: 'turn:openrelay.metered.ca:80',
+                              username: 'openrelayproject',
+                              credential: 'openrelayproject'
+                          },
+                          {
+                              urls: 'turn:openrelay.metered.ca:80?transport=tcp',
+                              username: 'openrelayproject',
+                              credential: 'openrelayproject'
+                          },
+                          
+                          // Option 3: Backup STUN servers
+                          { urls: 'stun:stun.relay.metered.ca:80' },
+                          { urls: 'stun:global.stun.twilio.com:3478' }
+                      ],
+                      'iceCandidatePoolSize': 10,
+                      'iceTransportPolicy': 'all',
+                      'bundlePolicy': 'max-bundle',
+                      'rtcpMuxPolicy': 'require'
+                  }
+              });
 
-        this.peer.on('open', (id) => {
-            this.myId = id;
-            console.log('Connected with ID:', id);
-            this.game.eventLogger?.logSystem(`🔗 Conectado al servidor multijugador`);
-            this.game.eventLogger?.logSystem(`🆔 Tu ID: ${id.substring(0, 8)}...`);
-            this.discoverPeers();
-            this.startSyncLoop();
-            
-            // Auto-refresh peer discovery every 30 seconds to find new players
-            setInterval(() => {
-                if (this.connections.size === 0) {
-                    this.refreshPeerDiscovery();
-                }
-            }, 30000);
-        });
+              this.peer.on('open', (id) => {
+                  this.myId = id;
+                  console.log('Connected with ID:', id);
+                  this.game.eventLogger?.logSystem(`🔗 Conectado al servidor multijugador`);
+                  this.game.eventLogger?.logSystem(`🆔 Tu ID: ${id.substring(0, 8)}...`);
+                  this.discoverPeers();
+                  this.startSyncLoop();
+                  
+                  // Auto-refresh peer discovery every 30 seconds to find new players
+                  setInterval(() => {
+                      if (this.connections.size === 0) {
+                          this.refreshPeerDiscovery();
+                      }
+                  }, 30000);
+              });
 
-        this.peer.on('connection', (conn) => {
-            this.handleIncomingConnection(conn);
-        });
+              this.peer.on('connection', (conn) => {
+                  this.handleIncomingConnection(conn);
+              });
 
-        this.peer.on('error', (err) => {
-            console.warn('Peer error:', err);
-            this.game.eventLogger?.logSystem(`❌ Error de conexión: ${err.type || 'Desconocido'}`);
-            
-            // If WebRTC completely fails, try WebSocket fallback
-            if (err.type === 'network' || err.type === 'server-error') {
-                this.game.eventLogger?.logSystem(`🔄 Intentando conexión WebSocket como respaldo...`);
-                this.setupWebSocketFallback();
-            }
-        });
-    }
+              this.peer.on('error', (err) => {
+                  console.warn('Peer error:', err);
+                  this.game.eventLogger?.logSystem(`❌ Error de conexión: ${err.type || 'Desconocido'}`);
+                  
+                  // If WebRTC completely fails, try WebSocket fallback
+                  if (err.type === 'network' || err.type === 'server-error') {
+                      this.game.eventLogger?.logSystem(`🔄 Intentando conexión WebSocket como respaldo...`);
+                      this.setupWebSocketFallback();
+                  }
+              });
+          }
 
-    async loadPeerJS() {
-        return new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = 'https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js';
-            script.onload = resolve;
-            script.onerror = reject;
-            document.head.appendChild(script);
-        });
-    }
+          async loadPeerJS() {
+              return new Promise((resolve, reject) => {
+                  const script = document.createElement('script');
+                  script.src = 'https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js';
+                  script.onload = resolve;
+                  script.onerror = reject;
+                  document.head.appendChild(script);
+              });
+          }
 
-    async discoverPeers() {
-        // Enhanced peer discovery using multiple methods
-        this.game.eventLogger?.logSystem(`🏠 Buscando jugadores en sala: ${this.roomId}`);
-        
-        // Method 1: Try localStorage first (same device/browser)
-        const storageKey = `mp_room_${this.roomId}`;
-        const localPeers = JSON.parse(localStorage.getItem(storageKey) || '[]');
-        
-        // Method 2: Use PeerJS room discovery with periodic announcements
-        this.announcePresence();
-        this.startRoomBroadcast();
-        
-        // Add our ID to local storage
-        const updatedPeers = [...localPeers.filter(id => id !== this.myId), this.myId];
-        localStorage.setItem(storageKey, JSON.stringify(updatedPeers));
-        
-        if (localPeers.length > 0) {
-            this.game.eventLogger?.logSystem(`👥 Encontrados ${localPeers.length} jugadores locales`);
-            
-            // Connect to local peers
-            for (const peerId of localPeers) {
-                if (peerId !== this.myId && !this.connections.has(peerId)) {
-                    this.game.eventLogger?.logSystem(`📡 Conectando con ${peerId.substring(0, 8)}...`);
-                    await this.connectToPeerWithRetry(peerId);
-                }
-            }
-        } else {
-            this.game.eventLogger?.logSystem(`🔍 Esperando otros jugadores...`);
-        }
+          async discoverPeers() {
+              // Enhanced peer discovery using multiple methods
+              this.game.eventLogger?.logSystem(`🏠 Buscando jugadores en sala: ${this.roomId}`);
+              
+              // Method 1: Try localStorage first (same device/browser)
+              const storageKey = `mp_room_${this.roomId}`;
+              const localPeers = JSON.parse(localStorage.getItem(storageKey) || '[]');
+              
+              // Method 2: Use PeerJS room discovery with periodic announcements
+              this.announcePresence();
+              this.startRoomBroadcast();
+              
+              // Add our ID to local storage
+              const updatedPeers = [...localPeers.filter(id => id !== this.myId), this.myId];
+              localStorage.setItem(storageKey, JSON.stringify(updatedPeers));
+              
+              if (localPeers.length > 0) {
+                  this.game.eventLogger?.logSystem(`👥 Encontrados ${localPeers.length} jugadores locales`);
+                  
+                  // Connect to local peers
+                  for (const peerId of localPeers) {
+                      if (peerId !== this.myId && !this.connections.has(peerId)) {
+                          this.game.eventLogger?.logSystem(`📡 Conectando con ${peerId.substring(0, 8)}...`);
+                          await this.connectToPeerWithRetry(peerId);
+                      }
+                  }
+              } else {
+                  this.game.eventLogger?.logSystem(`🔍 Esperando otros jugadores...`);
+              }
 
-        // Clean up disconnected peers periodically
-        setInterval(() => this.cleanupPeers(), 10000);
-    }
+              // Clean up disconnected peers periodically
+              setInterval(() => this.cleanupPeers(), 10000);
+          }
 
-    // Announce presence in the room using a known pattern
-    announcePresence() {
-        // Create a room announcement peer ID that others can discover
-        const roomAnnouncement = `room_${this.roomId}_${Date.now()}`;
-        
-        // Try to connect to predictable room IDs that other players might be using
-        const roomPatterns = [
-            `${this.roomId}_host`,
-            `${this.roomId}_player1`,
-            `${this.roomId}_player2`,
-            `${this.roomId}_player3`
-        ];
-        
-        roomPatterns.forEach(async (pattern) => {
-            if (pattern !== this.myId) {
-                setTimeout(() => {
-                    this.tryConnectToRoomPeer(pattern);
-                }, Math.random() * 2000); // Random delay to avoid collision
-            }
-        });
-    }
+          // Announce presence in the room using a known pattern
+          announcePresence() {
+              // Create a room announcement peer ID that others can discover
+              const roomAnnouncement = `room_${this.roomId}_${Date.now()}`;
+              
+              // Try to connect to predictable room IDs that other players might be using
+              const roomPatterns = [
+                  `${this.roomId}_host`,
+                  `${this.roomId}_player1`,
+                  `${this.roomId}_player2`,
+                  `${this.roomId}_player3`
+              ];
+              
+              roomPatterns.forEach(async (pattern) => {
+                  if (pattern !== this.myId) {
+                      setTimeout(() => {
+                          this.tryConnectToRoomPeer(pattern);
+                      }, Math.random() * 2000); // Random delay to avoid collision
+                  }
+              });
+          }
 
-    async tryConnectToRoomPeer(peerId) {
-        try {
-            const conn = this.peer.connect(peerId, { 
-                reliable: true,
-                serialization: 'json'
-            });
-            
-            conn.on('open', () => {
-                this.game.eventLogger?.logSystem(`🎯 Encontrado jugador en sala: ${peerId.substring(0, 8)}`);
-            });
-            
-            this.handleConnection(conn);
-        } catch (err) {
-            // Silently fail for room discovery attempts
-            console.log('Room discovery attempt failed:', peerId);
-        }
-    }
+          async tryConnectToRoomPeer(peerId) {
+              try {
+                  const conn = this.peer.connect(peerId, { 
+                      reliable: true,
+                      serialization: 'json'
+                  });
+                  
+                  conn.on('open', () => {
+                      this.game.eventLogger?.logSystem(`🎯 Encontrado jugador en sala: ${peerId.substring(0, 8)}`);
+                  });
+                  
+                  this.handleConnection(conn);
+              } catch (err) {
+                  // Silently fail for room discovery attempts
+                  console.log('Room discovery attempt failed:', peerId);
+              }
+          }
 
-    startRoomBroadcast() {
-        // Periodically announce our presence for new players to find us
-        this.roomBroadcastInterval = setInterval(() => {
-            // Update our presence in localStorage with timestamp
-            const storageKey = `mp_presence_${this.roomId}`;
-            const presence = JSON.parse(localStorage.getItem(storageKey) || '{}');
-            presence[this.myId] = Date.now();
-            
-            // Remove old presence records (older than 30 seconds)
-            const now = Date.now();
-            Object.keys(presence).forEach(id => {
-                if (now - presence[id] > 30000) {
-                    delete presence[id];
-                }
-            });
-            
-            localStorage.setItem(storageKey, JSON.stringify(presence));
-            
-            // Try to connect to any new peers we discover
-            Object.keys(presence).forEach(async (peerId) => {
-                if (peerId !== this.myId && !this.connections.has(peerId)) {
-                    await this.connectToPeerWithRetry(peerId);
-                }
-            });
-        }, 5000); // Every 5 seconds
-    }
+          startRoomBroadcast() {
+              // Periodically announce our presence for new players to find us
+              this.roomBroadcastInterval = setInterval(() => {
+                  // Update our presence in localStorage with timestamp
+                  const storageKey = `mp_presence_${this.roomId}`;
+                  const presence = JSON.parse(localStorage.getItem(storageKey) || '{}');
+                  presence[this.myId] = Date.now();
+                  
+                  // Remove old presence records (older than 30 seconds)
+                  const now = Date.now();
+                  Object.keys(presence).forEach(id => {
+                      if (now - presence[id] > 30000) {
+                          delete presence[id];
+                      }
+                  });
+                  
+                  localStorage.setItem(storageKey, JSON.stringify(presence));
+                  
+                  // Try to connect to any new peers we discover
+                  Object.keys(presence).forEach(async (peerId) => {
+                      if (peerId !== this.myId && !this.connections.has(peerId)) {
+                          await this.connectToPeerWithRetry(peerId);
+                      }
+                  });
+              }, 5000); // Every 5 seconds
+          }
 
-    async connectToPeerWithRetry(peerId, maxRetries = 3) {
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-                this.game.eventLogger?.logSystem(`📡 Intento ${attempt}/${maxRetries} conectando con ${peerId.substring(0, 8)}`);
-                
-                const conn = this.peer.connect(peerId, { 
-                    reliable: true,
-                    serialization: 'json'
-                });
-                
-                // Set up connection timeout
-                const timeout = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Connection timeout')), 10000)
-                );
-                
-                const connection = new Promise((resolve) => {
-                    conn.on('open', () => resolve(conn));
-                    conn.on('error', (err) => {
-                        throw new Error(`Connection error: ${err.type || err.message}`);
-                    });
-                });
-                
-                // Race between connection and timeout
-                await Promise.race([connection, timeout]);
-                
-                this.handleConnection(conn);
-                this.game.eventLogger?.logSystem(`✅ Conectado con ${peerId.substring(0, 8)} (intento ${attempt})`);
-                return true;
-                
-            } catch (err) {
-                console.warn(`Connection attempt ${attempt} failed:`, err);
-                
-                if (attempt === maxRetries) {
-                    this.game.eventLogger?.logSystem(`❌ Falló conexión con ${peerId.substring(0, 8)} (${maxRetries} intentos)`);
-                    return false;
-                } else {
-                    // Wait before retry with exponential backoff
-                    await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-                }
-            }
-        }
-        return false;
-    }
+          async connectToPeerWithRetry(peerId, maxRetries = 3) {
+              for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                  try {
+                      this.game.eventLogger?.logSystem(`📡 Intento ${attempt}/${maxRetries} conectando con ${peerId.substring(0, 8)}`);
+                      
+                      const conn = this.peer.connect(peerId, { 
+                          reliable: true,
+                          serialization: 'json'
+                      });
+                      
+                      // Set up connection timeout
+                      const timeout = new Promise((_, reject) => 
+                          setTimeout(() => reject(new Error('Connection timeout')), 10000)
+                      );
+                      
+                      const connection = new Promise((resolve) => {
+                          conn.on('open', () => resolve(conn));
+                          conn.on('error', (err) => {
+                              throw new Error(`Connection error: ${err.type || err.message}`);
+                          });
+                      });
+                      
+                      // Race between connection and timeout
+                      await Promise.race([connection, timeout]);
+                      
+                      this.handleConnection(conn);
+                      this.game.eventLogger?.logSystem(`✅ Conectado con ${peerId.substring(0, 8)} (intento ${attempt})`);
+                      return true;
+                      
+                  } catch (err) {
+                      console.warn(`Connection attempt ${attempt} failed:`, err);
+                      
+                      if (attempt === maxRetries) {
+                          this.game.eventLogger?.logSystem(`❌ Falló conexión con ${peerId.substring(0, 8)} (${maxRetries} intentos)`);
+                          return false;
+                      } else {
+                          // Wait before retry with exponential backoff
+                          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+                      }
+                  }
+              }
+              return false;
+          }
 
-    async connectToPeer(peerId) {
-        return this.connectToPeerWithRetry(peerId, 1);
-    }
+          async connectToPeer(peerId) {
+              return this.connectToPeerWithRetry(peerId, 1);
+          }
 
-    handleIncomingConnection(conn) {
-        this.game.eventLogger?.logSystem(`📞 Conexión entrante de ${conn.peer.substring(0, 8)}`);
-        this.handleConnection(conn);
-    }
+          handleIncomingConnection(conn) {
+              this.game.eventLogger?.logSystem(`📞 Conexión entrante de ${conn.peer.substring(0, 8)}`);
+              this.handleConnection(conn);
+          }
 
-    handleConnection(conn) {
-        // Add connection state logging
-        conn.on('open', () => {
-            console.log('Connected to peer:', conn.peer);
-            this.connections.set(conn.peer, conn);
-            
-            // Log successful connection locally
-            this.game.eventLogger?.logSystem(`✅ Conectado con ${conn.peer.substring(0, 8)}`);
-            
-            // Send initial player data
-            this.sendToPlayer(conn.peer, {
-                type: 'player_join',
-                player: this.getMyPlayerData()
-            });
+          handleConnection(conn) {
+              // Add connection state logging
+              conn.on('open', () => {
+                  console.log('Connected to peer:', conn.peer);
+                  this.connections.set(conn.peer, conn);
+                  
+                  // Log successful connection locally
+                  this.game.eventLogger?.logSystem(`✅ Conectado con ${conn.peer.substring(0, 8)}`);
+                  
+                  // Send initial player data
+                  this.sendToPlayer(conn.peer, {
+                      type: 'player_join',
+                      player: this.getMyPlayerData()
+                  });
 
-            // Broadcast connection to all other players
-            this.broadcastEvent(`🔗 ${conn.peer.substring(0, 8)} se conectó`, 'system');
-        });
+                  // Broadcast connection to all other players
+                  this.broadcastEvent(`🔗 ${conn.peer.substring(0, 8)} se conectó`, 'system');
+              });
 
-        conn.on('data', (data) => {
-            this.handleMessage(conn.peer, data);
-        });
+              conn.on('data', (data) => {
+                  this.handleMessage(conn.peer, data);
+              });
 
-        conn.on('close', () => {
-            console.log('Connection closed with:', conn.peer);
-            this.game.eventLogger?.logSystem(`🔌 ${conn.peer.substring(0, 8)} se desconectó`);
-            this.broadcastEvent(`📴 ${conn.peer.substring(0, 8)} se desconectó`, 'system');
-            this.handlePlayerLeave(conn.peer);
-        });
+              conn.on('close', () => {
+                  console.log('Connection closed with:', conn.peer);
+                  this.game.eventLogger?.logSystem(`🔌 ${conn.peer.substring(0, 8)} se desconectó`);
+                  this.broadcastEvent(`📴 ${conn.peer.substring(0, 8)} se desconectó`, 'system');
+                  this.handlePlayerLeave(conn.peer);
+              });
 
-        conn.on('error', (err) => {
-            console.warn('Connection error:', err);
-            this.game.eventLogger?.logSystem(`⚠️ Error con ${conn.peer.substring(0, 8)}: ${err.type || 'Desconocido'}`);
-            this.handlePlayerLeave(conn.peer);
-        });
+              conn.on('error', (err) => {
+                  console.warn('Connection error:', err);
+                  this.game.eventLogger?.logSystem(`⚠️ Error con ${conn.peer.substring(0, 8)}: ${err.type || 'Desconocido'}`);
+                  this.handlePlayerLeave(conn.peer);
+              });
 
-        // Add ICE connection state monitoring
-        if (conn.peerConnection) {
-            conn.peerConnection.oniceconnectionstatechange = () => {
-                const state = conn.peerConnection.iceConnectionState;
-                console.log(`ICE connection state with ${conn.peer}:`, state);
-                
-                if (state === 'failed' || state === 'disconnected') {
-                    this.game.eventLogger?.logSystem(`🧊 ICE falló con ${conn.peer.substring(0, 8)} (${state})`);
-                    setTimeout(() => {
-                        if (conn.peerConnection.iceConnectionState === 'failed') {
-                            this.handlePlayerLeave(conn.peer);
-                        }
-                    }, 5000); // Give it 5 seconds to recover
-                } else if (state === 'connected') {
-                    this.game.eventLogger?.logSystem(`🧊 ICE conectado con ${conn.peer.substring(0, 8)}`);
-                }
-            };
-        }
-    }
+              // Add ICE connection state monitoring
+              if (conn.peerConnection) {
+                  conn.peerConnection.oniceconnectionstatechange = () => {
+                      const state = conn.peerConnection.iceConnectionState;
+                      console.log(`ICE connection state with ${conn.peer}:`, state);
+                      
+                      if (state === 'failed' || state === 'disconnected') {
+                          this.game.eventLogger?.logSystem(`🧊 ICE falló con ${conn.peer.substring(0, 8)} (${state})`);
+                          setTimeout(() => {
+                              if (conn.peerConnection.iceConnectionState === 'failed') {
+                                  this.handlePlayerLeave(conn.peer);
+                              }
+                          }, 5000); // Give it 5 seconds to recover
+                      } else if (state === 'connected') {
+                          this.game.eventLogger?.logSystem(`🧊 ICE conectado con ${conn.peer.substring(0, 8)}`);
+                      }
+                  };
+              }
+          }
 
-    handleMessage(fromPeer, data) {
-        switch (data.type) {
-            case 'player_join':
-                this.handlePlayerJoin(fromPeer, data.player);
-                break;
-            case 'player_update':
-                this.handlePlayerUpdate(fromPeer, data.player);
-                break;
-            case 'player_leave':
-                this.handlePlayerLeave(fromPeer);
-                break;
-            case 'event':
-                this.handleRemoteEvent(data.event);
-                break;
-        }
-    }
+          handleMessage(fromPeer, data) {
+              switch (data.type) {
+                  case 'player_join':
+                      this.handlePlayerJoin(fromPeer, data.player);
+                      break;
+                  case 'player_update':
+                      this.handlePlayerUpdate(fromPeer, data.player);
+                      break;
+                  case 'player_leave':
+                      this.handlePlayerLeave(fromPeer);
+                      break;
+                  case 'event':
+                      this.handleRemoteEvent(data.event);
+                      break;
+              }
+          }
 
-    handlePlayerJoin(peerId, playerData) {
-        // Create visual representation of the remote player
-        const remotePlayer = {
-            id: peerId,
-            ship: this.createRemotePlayerShip(playerData),
-            lastUpdate: Date.now(),
-            ...playerData
-        };
-        
-        this.players.set(peerId, remotePlayer);
-        this.game.scene.add(remotePlayer.ship);
-        
-        // Log player join locally and broadcast to others
-        const shipType = playerData.shipType || 'desconocida';
-        this.game.eventLogger?.logSystem(`🚀 ${peerId.substring(0, 8)} se unió (${shipType})`);
-        this.broadcastEvent(`👋 ${peerId.substring(0, 8)} entró al juego`, 'player-join');
-        
-        // Send our data back if we haven't already
-        if (!this.connections.has(peerId)) return;
-        
-        this.sendToPlayer(peerId, {
-            type: 'player_join',
-            player: this.getMyPlayerData()
-        });
-    }
+          handlePlayerJoin(peerId, playerData) {
+              // Create visual representation of the remote player
+              const remotePlayer = {
+                  id: peerId,
+                  ship: this.createRemotePlayerShip(playerData),
+                  lastUpdate: Date.now(),
+                  ...playerData
+              };
+              
+              this.players.set(peerId, remotePlayer);
+              this.game.scene.add(remotePlayer.ship);
+              
+              // Log player join locally and broadcast to others
+              const shipType = playerData.shipType || 'desconocida';
+              this.game.eventLogger?.logSystem(`🚀 ${peerId.substring(0, 8)} se unió (${shipType})`);
+              this.broadcastEvent(`👋 ${peerId.substring(0, 8)} entró al juego`, 'player-join');
+              
+              // Send our data back if we haven't already
+              if (!this.connections.has(peerId)) return;
+              
+              this.sendToPlayer(peerId, {
+                  type: 'player_join',
+                  player: this.getMyPlayerData()
+              });
+          }
 
-    handlePlayerUpdate(peerId, playerData) {
-        const player = this.players.get(peerId);
-        if (!player) return;
+          handlePlayerUpdate(peerId, playerData) {
+              const player = this.players.get(peerId);
+              if (!player) return;
 
-        // Smooth interpolation for position updates
-        const target = {
-            x: playerData.x,
-            y: playerData.y || 5,
-            z: playerData.z
-        };
+              // Smooth interpolation for position updates
+              const target = {
+                  x: playerData.x,
+                  y: playerData.y || 5,
+                  z: playerData.z
+              };
 
-        // Lerp to new position for smooth movement
-        if (player.ship) {
-            const lerpFactor = 0.3;
-            player.ship.position.lerp(target, lerpFactor);
-            player.ship.rotation.y = playerData.rotation || 0;
-        }
+              // Lerp to new position for smooth movement
+              if (player.ship) {
+                  const lerpFactor = 0.3;
+                  player.ship.position.lerp(target, lerpFactor);
+                  player.ship.rotation.y = playerData.rotation || 0;
+              }
 
-        // Update other data
-        Object.assign(player, playerData);
-        player.lastUpdate = Date.now();
-    }
+              // Update other data
+              Object.assign(player, playerData);
+              player.lastUpdate = Date.now();
+          }
 
-    handlePlayerLeave(peerId) {
-        const player = this.players.get(peerId);
-        if (player) {
-            if (player.ship) {
-                this.game.scene.remove(player.ship);
-            }
-            this.players.delete(peerId);
-            
-            // Log player leave locally only (don't broadcast as they might not receive it)
-            this.game.eventLogger?.logSystem(`👋 ${peerId.substring(0, 8)} salió del juego`);
-        }
-        
-        this.connections.delete(peerId);
-        
-        // Update localStorage
-        const storageKey = `mp_room_${this.roomId}`;
-        const peers = JSON.parse(localStorage.getItem(storageKey) || '[]');
-        const updatedPeers = peers.filter(id => id !== peerId);
-        localStorage.setItem(storageKey, JSON.stringify(updatedPeers));
-    }
+          handlePlayerLeave(peerId) {
+              const player = this.players.get(peerId);
+              if (player) {
+                  if (player.ship) {
+                      this.game.scene.remove(player.ship);
+                  }
+                  this.players.delete(peerId);
+                  
+                  // Log player leave locally only (don't broadcast as they might not receive it)
+                  this.game.eventLogger?.logSystem(`👋 ${peerId.substring(0, 8)} salió del juego`);
+              }
+              
+              this.connections.delete(peerId);
+              
+              // Update localStorage
+              const storageKey = `mp_room_${this.roomId}`;
+              const peers = JSON.parse(localStorage.getItem(storageKey) || '[]');
+              const updatedPeers = peers.filter(id => id !== peerId);
+              localStorage.setItem(storageKey, JSON.stringify(updatedPeers));
+          }
 
-    handleRemoteEvent(event) {
-        // Handle events from other players
-        if (this.game.eventLogger) {
-            this.game.eventLogger.logEvent(event.message, event.type);
-        }
-    }
+          handleRemoteEvent(event) {
+              // Handle events from other players
+              if (this.game.eventLogger) {
+                  this.game.eventLogger.logEvent(event.message, event.type);
+              }
+          }
 
-    createRemotePlayerShip(playerData) {
-        // Create a ship using the same factory but with different colors
-        const ship = ShipFactory.create(playerData.shipType || 'fighter');
-        
-        // Make it visually distinct (different color/transparency)
-        ship.traverse((child) => {
-            if (child.isMesh) {
-                child.material = child.material.clone();
-                child.material.transparent = true;
-                child.material.opacity = 0.8;
-                
-                // Tint with a different color
-                const hue = this.hashStringToHue(playerData.id || 'default');
-                child.material.color.multiplyScalar(0.7);
-                child.material.emissive = new THREE.Color().setHSL(hue, 0.5, 0.3);
-            }
-        });
+          createRemotePlayerShip(playerData) {
+              // Create a ship using the same factory but with different colors
+              const ship = ShipFactory.create(playerData.shipType || 'fighter');
+              
+              // Make it visually distinct (different color/transparency)
+              ship.traverse((child) => {
+                  if (child.isMesh) {
+                      child.material = child.material.clone();
+                      child.material.transparent = true;
+                      child.material.opacity = 0.8;
+                      
+                      // Tint with a different color
+                      const hue = this.hashStringToHue(playerData.id || 'default');
+                      child.material.color.multiplyScalar(0.7);
+                      child.material.emissive = new THREE.Color().setHSL(hue, 0.5, 0.3);
+                  }
+              });
 
-        return ship;
-    }
+              return ship;
+          }
 
-    hashStringToHue(str) {
-        let hash = 0;
-        for (let i = 0; i < str.length; i++) {
-            hash = str.charCodeAt(i) + ((hash << 5) - hash);
-        }
-        return (hash % 360) / 360;
-    }
+          hashStringToHue(str) {
+              let hash = 0;
+              for (let i = 0; i < str.length; i++) {
+                  hash = str.charCodeAt(i) + ((hash << 5) - hash);
+              }
+              return (hash % 360) / 360;
+          }
 
-    getMyPlayerData() {
-        if (!this.game.playerShip) return {};
-        
-        return {
-            id: this.myId,
-            x: this.game.playerShip.position.x,
-            y: this.game.playerShip.position.y,
-            z: this.game.playerShip.position.z,
-            rotation: this.game.playerShip.rotation.y,
-            health: this.game.player.health,
-            shipType: this.game.selectedShipType,
-            score: this.game.player.score
-        };
-    }
+          getMyPlayerData() {
+              if (!this.game.playerShip) return {};
+              
+              return {
+                  id: this.myId,
+                  x: this.game.playerShip.position.x,
+                  y: this.game.playerShip.position.y,
+                  z: this.game.playerShip.position.z,
+                  rotation: this.game.playerShip.rotation.y,
+                  health: this.game.player.health,
+                  shipType: this.game.selectedShipType,
+                  score: this.game.player.score
+              };
+          }
 
-    startSyncLoop() {
-        this.syncInterval = setInterval(() => {
-            if (this.connections.size > 0 && this.game.gameStarted && this.game.playerShip) {
-                this.broadcastPlayerUpdate();
-            }
-            this.cleanupStaleePlayers();
-            this.logConnectionStatus();
-        }, this.syncRate);
-    }
+          startSyncLoop() {
+              this.syncInterval = setInterval(() => {
+                  if (this.connections.size > 0 && this.game.gameStarted && this.game.playerShip) {
+                      this.broadcastPlayerUpdate();
+                  }
+                  this.cleanupStaleePlayers();
+                  this.logConnectionStatus();
+              }, this.syncRate);
+          }
 
-    // Log connection status every 30 seconds
-    logConnectionStatus() {
-        if (Date.now() % 30000 < this.syncRate) { // Every ~30 seconds
-            if (this.connections.size > 0) {
-                this.game.eventLogger?.logSystem(`📊 ${this.connections.size + 1} jugadores conectados`);
-            }
-        }
-    }
+          // Log connection status every 30 seconds
+          logConnectionStatus() {
+              if (Date.now() % 30000 < this.syncRate) { // Every ~30 seconds
+                  if (this.connections.size > 0) {
+                      this.game.eventLogger?.logSystem(`📊 ${this.connections.size + 1} jugadores conectados`);
+                  }
+              }
+          }
 
-    broadcastPlayerUpdate() {
-        const playerData = this.getMyPlayerData();
-        
-        if (this.websocketMode) {
-            this.sendWebSocketMessage({
-                type: 'player_update',
-                player: playerData
-            });
-        } else {
-            this.broadcast({
-                type: 'player_update',
-                player: playerData
-            });
-        }
-    }
+          broadcastPlayerUpdate() {
+              const playerData = this.getMyPlayerData();
+              
+              if (this.websocketMode) {
+                  this.sendWebSocketMessage({
+                      type: 'player_update',
+                      player: playerData
+                  });
+              } else {
+                  this.broadcast({
+                      type: 'player_update',
+                      player: playerData
+                  });
+              }
+          }
 
-    broadcast(message) {
-        if (this.websocketMode) {
-            this.sendWebSocketMessage(message);
-        } else {
-            this.connections.forEach((conn) => {
-                if (conn.open) {
-                    try {
-                        conn.send(message);
-                    } catch (err) {
-                        console.warn('Failed to send to peer:', conn.peer, err);
-                    }
-                }
-            });
-        }
-    }
+          broadcast(message) {
+              if (this.websocketMode) {
+                  this.sendWebSocketMessage(message);
+              } else {
+                  this.connections.forEach((conn) => {
+                      if (conn.open) {
+                          try {
+                              conn.send(message);
+                          } catch (err) {
+                              console.warn('Failed to send to peer:', conn.peer, err);
+                          }
+                      }
+                  });
+              }
+          }
 
-    broadcastEvent(message, type = 'system') {
-        if (this.websocketMode) {
-            this.sendWebSocketMessage({
-                type: 'event',
-                event: { message, type }
-            });
-        } else {
-            this.broadcast({
-                type: 'event',
-                event: { message, type }
-            });
-        }
-    }
+          broadcastEvent(message, type = 'system') {
+              if (this.websocketMode) {
+                  this.sendWebSocketMessage({
+                      type: 'event',
+                      event: { message, type }
+                  });
+              } else {
+                  this.broadcast({
+                      type: 'event',
+                      event: { message, type }
+                  });
+              }
+          }
 
-    // Get connection diagnostics
-    getDiagnostics() {
-        return {
-            myId: this.myId,
-            roomId: this.roomId,
-            connections: this.connections.size,
-            players: this.players.size,
-            peerState: this.peer ? this.peer._open : 'closed',
-            websocketMode: this.websocketMode,
-            websocketState: this.websocketFallback ? this.websocketFallback.readyState : 'none'
-        };
-    }
+          // Get connection diagnostics
+          getDiagnostics() {
+              return {
+                  myId: this.myId,
+                  roomId: this.roomId,
+                  connections: this.connections.size,
+                  players: this.players.size,
+                  peerState: this.peer ? this.peer._open : 'closed',
+                  websocketMode: this.websocketMode,
+                  websocketState: this.websocketFallback ? this.websocketFallback.readyState : 'none'
+              };
+          }
 
-    sendToPlayer(peerId, message) {
-        const conn = this.connections.get(peerId);
-        if (conn && conn.open) {
-            try {
-                conn.send(message);
-            } catch (err) {
-                console.warn('Failed to send to player:', peerId, err);
-            }
-        }
-    }
+          sendToPlayer(peerId, message) {
+              const conn = this.connections.get(peerId);
+              if (conn && conn.open) {
+                  try {
+                      conn.send(message);
+                  } catch (err) {
+                      console.warn('Failed to send to player:', peerId, err);
+                  }
+              }
+          }
 
-    broadcastEvent(message, type = 'system') {
-        this.broadcast({
-            type: 'event',
-            event: { message, type }
-        });
-    }
+          broadcastEvent(message, type = 'system') {
+              this.broadcast({
+                  type: 'event',
+                  event: { message, type }
+              });
+          }
 
-    cleanupStaleePlayers() {
-        const now = Date.now();
-        const timeout = 10000; // 10 seconds
+          cleanupStaleePlayers() {
+              const now = Date.now();
+              const timeout = 10000; // 10 seconds
 
-        this.players.forEach((player, peerId) => {
-            if (now - player.lastUpdate > timeout) {
-                this.game.eventLogger?.logSystem(`⏰ ${peerId.substring(0, 8)} desconectado (timeout)`);
-                this.handlePlayerLeave(peerId);
-            }
-        });
-    }
+              this.players.forEach((player, peerId) => {
+                  if (now - player.lastUpdate > timeout) {
+                      this.game.eventLogger?.logSystem(`⏰ ${peerId.substring(0, 8)} desconectado (timeout)`);
+                      this.handlePlayerLeave(peerId);
+                  }
+              });
+          }
 
-    cleanupPeers() {
-        const storageKey = `mp_room_${this.roomId}`;
-        const peers = JSON.parse(localStorage.getItem(storageKey) || '[]');
-        
-        // Keep only connected peers and ourselves
-        const activePeers = [this.myId, ...Array.from(this.connections.keys())];
-        const cleanedPeers = peers.filter(id => activePeers.includes(id));
-        
-        localStorage.setItem(storageKey, JSON.stringify(cleanedPeers));
-    }
+          cleanupPeers() {
+              const storageKey = `mp_room_${this.roomId}`;
+              const peers = JSON.parse(localStorage.getItem(storageKey) || '[]');
+              
+              // Keep only connected peers and ourselves
+              const activePeers = [this.myId, ...Array.from(this.connections.keys())];
+              const cleanedPeers = peers.filter(id => activePeers.includes(id));
+              
+              localStorage.setItem(storageKey, JSON.stringify(cleanedPeers));
+          }
 
-    // Public methods for game integration
-    getConnectedPlayers() {
-        return Array.from(this.players.values());
-    }
+          // Public methods for game integration
+          getConnectedPlayers() {
+              return Array.from(this.players.values());
+          }
 
-    getPlayerPositions() {
-        const positions = [];
-        this.players.forEach((player) => {
-            if (player.ship) {
-                positions.push({
-                    id: player.id,
-                    position: player.ship.position,
-                    health: player.health || 100
-                });
-            }
-        });
-        return positions;
-    }
+          getPlayerPositions() {
+              const positions = [];
+              this.players.forEach((player) => {
+                  if (player.ship) {
+                      positions.push({
+                          id: player.id,
+                          position: player.ship.position,
+                          health: player.health || 100
+                      });
+                  }
+              });
+              return positions;
+          }
 
-    shutdown() {
-        if (this.syncInterval) {
-            clearInterval(this.syncInterval);
-        }
-        
-        if (this.roomBroadcastInterval) {
-            clearInterval(this.roomBroadcastInterval);
-        }
+          shutdown() {
+              if (this.syncInterval) {
+                  clearInterval(this.syncInterval);
+              }
+              
+              if (this.roomBroadcastInterval) {
+                  clearInterval(this.roomBroadcastInterval);
+              }
 
-        // Notify others we're leaving
-        this.broadcast({
-            type: 'player_leave'
-        });
+              // Notify others we're leaving
+              this.broadcast({
+                  type: 'player_leave'
+              });
 
-        // Close WebSocket fallback
-        if (this.websocketFallback) {
-            this.sendWebSocketMessage({
-                type: 'player_leave'
-            });
-            this.websocketFallback.close();
-            this.websocketFallback = null;
-        }
+              // Close WebSocket fallback
+              if (this.websocketFallback) {
+                  this.sendWebSocketMessage({
+                      type: 'player_leave'
+                  });
+                  this.websocketFallback.close();
+                  this.websocketFallback = null;
+              }
 
-        // Close all WebRTC connections
-        this.connections.forEach((conn) => {
-            conn.close();
-        });
+              // Close all WebRTC connections
+              this.connections.forEach((conn) => {
+                  conn.close();
+              });
 
-        // Clean up our peer
-        if (this.peer) {
-            this.peer.destroy();
-        }
+              // Clean up our peer
+              if (this.peer) {
+                  this.peer.destroy();
+              }
 
-        // Remove from localStorage
-        const storageKey = `mp_room_${this.roomId}`;
-        const peers = JSON.parse(localStorage.getItem(storageKey) || '[]');
-        const updatedPeers = peers.filter(id => id !== this.myId);
-        localStorage.setItem(storageKey, JSON.stringify(updatedPeers));
-        
-        // Clean up presence
-        const presenceKey = `mp_presence_${this.roomId}`;
-        const presence = JSON.parse(localStorage.getItem(presenceKey) || '{}');
-        delete presence[this.myId];
-        localStorage.setItem(presenceKey, JSON.stringify(presence));
-        
-        this.game.eventLogger?.logSystem(`👋 Desconectado del multijugador`);
-    }
-}
+              // Remove from localStorage
+              const storageKey = `mp_room_${this.roomId}`;
+              const peers = JSON.parse(localStorage.getItem(storageKey) || '[]');
+              const updatedPeers = peers.filter(id => id !== this.myId);
+              localStorage.setItem(storageKey, JSON.stringify(updatedPeers));
+              
+              // Clean up presence
+              const presenceKey = `mp_presence_${this.roomId}`;
+              const presence = JSON.parse(localStorage.getItem(presenceKey) || '{}');
+              delete presence[this.myId];
+              localStorage.setItem(presenceKey, JSON.stringify(presence));
+              
+              this.game.eventLogger?.logSystem(`👋 Desconectado del multijugador`);
+          }
+      }
       class MinimapManager {
         constructor() {
           this.canvas = document.getElementById('minimapCanvas');
@@ -2330,663 +2327,662 @@ clearWaypoint() {
     this.waypoint = null;
 }
       }
+      class AudioManager {
+          constructor() {
+              this.initialized = false;
+              this.audioContext = null;
+              this.audioBuffer = null;
+              this.masterGain = null;
+              this.lastDamageTime=0;
+              // Sprite definitions (start time in seconds, duration in seconds)
+              this.spriteMap = {
+                  blaster: [0, 0.132],
+                  enemyShot: [0.392, 0.628],
+                  scatter: [0.630, 1.372],
+                  shotgun: [0.242, 0.553],
+                  laser: [4.252, 4.425],
+                  explosion: [1.996, 2.527],
+                  damage: [3.092, 3.542],
+                  collision: [6.144, 6.530],
+                  enemyHit: [2.538, 3.034],
+                  weaponSwitch: [5.278, 5.573],
+                  powerUp: [5.278, 5.573],
+                  mine: [5.278, 5.573],
+                  landing: [5.607, 7.007],
+                  takeoff: [7.112, 8.414]
+              };
+              
+              // Sound management
+              this.activeSounds = new Map();
+              this.maxConcurrentSounds = {
+                  blaster: 3,
+                  enemyShot: 4,
+                  explosion: 2,
+                  collision: 1
+              };
+              
+              // Timing constraints
+              this.lastCollisionTime = 0;
+              this.lastBlasterTime = 0;
+              this.lastEnemyShotTime = 0;
+              
+              // Laser state
+              this.laserActive = false;
+              this.laserSource = null;
+              this.laserGain = null;
+              
+              // Volume settings
+              this.masterVolume = 0.7;
+              this.sfxVolume = 0.7;
+              
+              this.setup();
+          }
+          
+          async setup() {
+              try {
+                  // Initialize Web Audio Context
+                  this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                  
+                  // Create master gain node
+                  this.masterGain = this.audioContext.createGain();
+                  this.masterGain.gain.value = this.masterVolume;
+                  this.masterGain.connect(this.audioContext.destination);
+                  
+                  // Load audio file
+                  await this.loadAudioFile('sfx-sprite.mp3');
+                  
+              } catch (error) {
+                  console.warn('Audio setup failed:', error);
+              }
+          }
+          
+          async loadAudioFile(url) {
+              try {
+                  const response = await fetch(url);
+                  const arrayBuffer = await response.arrayBuffer();
+                  this.audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+              } catch (error) {
+                  console.warn('Failed to load audio file:', error);
+                  throw error;
+              }
+          }
+          
+          async start() {
+              if (!this.initialized) {
+                  try {
+                      // Resume context if suspended (required for mobile)
+                      if (this.audioContext.state === 'suspended') {
+                          await this.audioContext.resume();
+                      }
+                      this.initialized = true;
+                  } catch (error) {
+                      console.warn('Audio start failed:', error);
+                  }
+              }
+          }
+          
+          createSpatialAudioSource(spriteName, sourcePos = null, listenerPos = null, baseVolume = 1.0) {
+              if (!this.audioBuffer || !this.initialized) return null;
+              
+              const sprite = this.spriteMap[spriteName];
+              if (!sprite) {
+                  console.warn(`Sprite '${spriteName}' not found`);
+                  return null;
+              }
+              
+              // Create audio nodes
+              const source = this.audioContext.createBufferSource();
+              const gainNode = this.audioContext.createGain();
+              const pannerNode = this.audioContext.createPanner();
+              
+              // Configure source
+              source.buffer = this.audioBuffer;
+              
+              // Configure panner for 3D spatial audio
+              pannerNode.panningModel = 'HRTF';
+              pannerNode.distanceModel = 'inverse';
+              pannerNode.refDistance = 10;
+              pannerNode.maxDistance = 200;
+              pannerNode.rolloffFactor = 2;
+              pannerNode.coneInnerAngle = 360;
+              pannerNode.coneOuterAngle = 0;
+              pannerNode.coneOuterGain = 0;
+              
+              // Calculate spatial positioning and volume
+              let finalVolume = baseVolume * this.sfxVolume;
+              
+              if (sourcePos && listenerPos) {
+                  // Set 3D position
+                  pannerNode.positionX.value = sourcePos.x;
+                  pannerNode.positionY.value = sourcePos.y;
+                  pannerNode.positionZ.value = sourcePos.z;
+                  
+                  // Calculate distance-based volume
+                  const distance = sourcePos.distanceTo(listenerPos);
+                  const maxDistance = 100;
+                  if (distance >= maxDistance) {
+                      finalVolume = 0;
+                  } else {
+                      const spatialVolume = Math.max(0, 1 - (distance / maxDistance));
+                      finalVolume *= spatialVolume;
+                  }
+                  
+                  // Set listener position (assuming listener is always at origin in local space)
+                  if (this.audioContext.listener.positionX) {
+                      this.audioContext.listener.positionX.value = listenerPos.x;
+                      this.audioContext.listener.positionY.value = listenerPos.y;
+                      this.audioContext.listener.positionZ.value = listenerPos.z;
+                  } else {
+                      // Fallback for older browsers
+                      this.audioContext.listener.setPosition(listenerPos.x, listenerPos.y, listenerPos.z);
+                  }
+              }
+              
+              // Set volume
+              gainNode.gain.value = finalVolume;
+              
+              // Connect nodes
+              if (sourcePos && listenerPos) {
+                  source.connect(pannerNode);
+                  pannerNode.connect(gainNode);
+              } else {
+                  source.connect(gainNode);
+              }
+              gainNode.connect(this.masterGain);
+              
+              return { source, gainNode, pannerNode };
+          }
+          
+          playSprite(spriteName, sourcePos = null, listenerPos = null, baseVolume = 1.0, loop = false) {
+              if (!this.initialized || !this.audioBuffer) return null;
+              
+              const sprite = this.spriteMap[spriteName];
+              if (!sprite) return null;
+              
+              // Check concurrent sound limits
+              if (!this.canPlaySound(spriteName)) return null;
+              
+              const audioNodes = this.createSpatialAudioSource(spriteName, sourcePos, listenerPos, baseVolume);
+              if (!audioNodes) return null;
+              
+              const { source, gainNode } = audioNodes;
+              const [startTime, endTime] = sprite;
+      const duration = endTime - startTime;
+              
+              // Configure playback
+              source.loop = loop;
+              if (loop) {
+                  source.loopStart = startTime;
+                  source.loopEnd = startTime + duration;
+              }
+              
+              // Start playback
+              source.start(0, startTime, loop ? undefined : duration);
+              
+              // Track the sound
+              const soundId = this.generateSoundId();
+              this.trackSound(spriteName, soundId);
+              
+              // Clean up when sound ends
+              if (!loop) {
+                  source.onended = () => {
+                      this.removeSoundFromTracking(spriteName, soundId);
+                  };
+              }
+              
+              return { source, gainNode, soundId };
+          }
+          
+          generateSoundId() {
+              return Date.now() + Math.random();
+          }
+          
+          canPlaySound(soundType) {
+              const maxConcurrent = this.maxConcurrentSounds[soundType] || 1;
+              const activeSoundsOfType = this.activeSounds.get(soundType) || [];
+              return activeSoundsOfType.length < maxConcurrent;
+          }
+          
+          trackSound(soundType, soundId) {
+              if (!this.activeSounds.has(soundType)) {
+                  this.activeSounds.set(soundType, []);
+              }
+              this.activeSounds.get(soundType).push(soundId);
+          }
+          
+          removeSoundFromTracking(soundType, soundId) {
+              const sounds = this.activeSounds.get(soundType);
+              if (sounds) {
+                  const index = sounds.indexOf(soundId);
+                  if (index > -1) {
+                      sounds.splice(index, 1);
+                  }
+              }
+          }
+          
+          // Public API methods (maintaining compatibility with existing code)
+          playBlaster(sourcePos = null, listenerPos = null) {
+              if (!this.initialized) return;
+              
+              const currentTime = Date.now();
+              if (currentTime - this.lastBlasterTime < 50) return;
+              this.lastBlasterTime = currentTime;
+              
+              this.playSprite('blaster', sourcePos, listenerPos, 0.7);
+          }
+          
+          playEnemyShot(sourcePos = null, listenerPos = null) {
+              if (!this.initialized) return;
+              
+              const currentTime = Date.now();
+              if (currentTime - this.lastEnemyShotTime < 30) return;
+              this.lastEnemyShotTime = currentTime;
+              
+              this.playSprite('enemyShot', sourcePos, listenerPos, 0.6);
+          }
+          
+          playExplosion(size = 1, sourcePos = null, listenerPos = null) {
+              if (!this.initialized) return;
+              
+              const volume = Math.min(size * 0.7, 1.0);
+              this.playSprite('explosion', sourcePos, listenerPos, volume);
+          }
+          
+          playCollision(sourcePos=null,listenerPos=null){
+          if(!this.initialized)return;
+          const currentTime=Date.now();
+          if(currentTime-this.lastCollisionTime<300)return;
+          this.lastCollisionTime=currentTime;
+          this.playSprite('collision',sourcePos,listenerPos,0.8)
+      }
+      playDamage(sourcePos=null,listenerPos=null){
+          if(!this.initialized)return;
+          const currentTime=Date.now();
+          if(currentTime-this.lastDamageTime<200)return;  // Changed from lastCollisionTime
+          this.lastDamageTime=currentTime;                // Changed from lastCollisionTime
+          this.playSprite('damage',sourcePos,listenerPos,0.7)
+      }
+          
+          playLaser() {
+              if (!this.initialized || this.laserActive) return;
+              
+              try {
+                  const audioNodes = this.playSprite('laser', null, null, 0.5, true);
+                  if (audioNodes) {
+                      this.laserActive = true;
+                      this.laserSource = audioNodes.source;
+                      this.laserGain = audioNodes.gainNode;
+                  }
+              } catch (e) {
+                  this.laserActive = false;
+              }
+          }
+          
+          stopLaser() {
+              if (!this.initialized || !this.laserActive || !this.laserSource) return;
+              
+              try {
+                  this.laserSource.stop();
+                  this.laserActive = false;
+                  this.laserSource = null;
+                  this.laserGain = null;
+              } catch (e) {
+                  this.laserActive = false;
+              }
+          }
+          
+          playScatter() {
+              if (this.initialized) {
+                  this.playSprite('scatter', null, null, 0.6);
+              }
+          }
+          
+          playShotgun() {
+              if (this.initialized) {
+                  this.playSprite('shotgun', null, null, 0.7);
+              }
+          }
+          
+          playEnemyHit() {
+              if (this.initialized) {
+                  this.playSprite('enemyHit', null, null, 0.5);
+              }
+          }
+          
+          playWeaponSwitch() {
+              if (this.initialized) {
+                  this.playSprite('weaponSwitch', null, null, 0.6);
+              }
+          }
+          
+          playPowerUp() {
+              if (this.initialized) {
+                  this.playSprite('powerUp', null, null, 0.6);
+              }
+          }
+          
+          playMine() {
+              if (this.initialized) {
+                  this.playSprite('mine', null, null, 0.5);
+              }
+          }
+          
+          playLanding() {
+              if (this.initialized) {
+                  this.playSprite('landing', null, null, 0.7);
+              }
+          }
+          
+          playTakeoff() {
+              if (this.initialized) {
+                  this.playSprite('takeoff', null, null, 0.7);
+              }
+          }
+          
+          // Volume controls
+          setMasterVolume(volume) {
+              this.masterVolume = Math.max(0, Math.min(1, volume));
+              if (this.masterGain) {
+                  this.masterGain.gain.value = this.masterVolume;
+              }
+          }
+          
+          setSFXVolume(volume) {
+              this.sfxVolume = Math.max(0, Math.min(1, volume));
+          }
+          
+          mute() {
+              if (this.masterGain) {
+                  this.masterGain.gain.value = 0;
+              }
+          }
+          
+          unmute() {
+              if (this.masterGain) {
+                  this.masterGain.gain.value = this.masterVolume;
+              }
+          }
+          
+          // Legacy compatibility methods (empty implementations to maintain interface)
+          startBackgroundMusic() {}
+          stopBackgroundMusic() {}
+          pauseBackgroundMusic() {}
+          resumeBackgroundMusic() {}
+          startEngine() {}
+          stopEngine() {}
+          setMusicVolume(volume) {}
+          setEngineVolume(volume) {}
+          
+          dispose() {
+              try {
+                  this.stopLaser();
+                  
+                  // Stop all active sounds
+                  this.activeSounds.clear();
+                  
+                  if (this.audioContext && this.audioContext.state !== 'closed') {
+                      this.audioContext.close();
+                  }
+                  
+                  this.audioContext = null;
+                  this.audioBuffer = null;
+                  this.masterGain = null;
+                  this.initialized = false;
+              } catch (error) {
+                  console.warn('Audio disposal error:', error);
+              }
+          }
+      }
+      class EventLogger {
+          constructor() {
+              this.events = [];
+              this.maxEvents = 50; // Keep last 50 events
+              this.visible = false;
+              this.createEventPanel();
+          }
 
-class AudioManager {
-    constructor() {
-        this.initialized = false;
-        this.audioContext = null;
-        this.audioBuffer = null;
-        this.masterGain = null;
-        this.lastDamageTime=0;
-        // Sprite definitions (start time in seconds, duration in seconds)
-        this.spriteMap = {
-            blaster: [0, 0.132],
-            enemyShot: [0.392, 0.628],
-            scatter: [0.630, 1.372],
-            shotgun: [0.242, 0.553],
-            laser: [4.252, 4.425],
-            explosion: [1.996, 2.527],
-            damage: [3.092, 3.542],
-            collision: [6.144, 6.530],
-            enemyHit: [2.538, 3.034],
-            weaponSwitch: [5.278, 5.573],
-            powerUp: [5.278, 5.573],
-            mine: [5.278, 5.573],
-            landing: [5.607, 7.007],
-            takeoff: [7.112, 8.414]
-        };
-        
-        // Sound management
-        this.activeSounds = new Map();
-        this.maxConcurrentSounds = {
-            blaster: 3,
-            enemyShot: 4,
-            explosion: 2,
-            collision: 1
-        };
-        
-        // Timing constraints
-        this.lastCollisionTime = 0;
-        this.lastBlasterTime = 0;
-        this.lastEnemyShotTime = 0;
-        
-        // Laser state
-        this.laserActive = false;
-        this.laserSource = null;
-        this.laserGain = null;
-        
-        // Volume settings
-        this.masterVolume = 0.7;
-        this.sfxVolume = 0.7;
-        
-        this.setup();
-    }
-    
-    async setup() {
-        try {
-            // Initialize Web Audio Context
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            
-            // Create master gain node
-            this.masterGain = this.audioContext.createGain();
-            this.masterGain.gain.value = this.masterVolume;
-            this.masterGain.connect(this.audioContext.destination);
-            
-            // Load audio file
-            await this.loadAudioFile('sfx-sprite.mp3');
-            
-        } catch (error) {
-            console.warn('Audio setup failed:', error);
-        }
-    }
-    
-    async loadAudioFile(url) {
-        try {
-            const response = await fetch(url);
-            const arrayBuffer = await response.arrayBuffer();
-            this.audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
-        } catch (error) {
-            console.warn('Failed to load audio file:', error);
-            throw error;
-        }
-    }
-    
-    async start() {
-        if (!this.initialized) {
-            try {
-                // Resume context if suspended (required for mobile)
-                if (this.audioContext.state === 'suspended') {
-                    await this.audioContext.resume();
-                }
-                this.initialized = true;
-            } catch (error) {
-                console.warn('Audio start failed:', error);
-            }
-        }
-    }
-    
-    createSpatialAudioSource(spriteName, sourcePos = null, listenerPos = null, baseVolume = 1.0) {
-        if (!this.audioBuffer || !this.initialized) return null;
-        
-        const sprite = this.spriteMap[spriteName];
-        if (!sprite) {
-            console.warn(`Sprite '${spriteName}' not found`);
-            return null;
-        }
-        
-        // Create audio nodes
-        const source = this.audioContext.createBufferSource();
-        const gainNode = this.audioContext.createGain();
-        const pannerNode = this.audioContext.createPanner();
-        
-        // Configure source
-        source.buffer = this.audioBuffer;
-        
-        // Configure panner for 3D spatial audio
-        pannerNode.panningModel = 'HRTF';
-        pannerNode.distanceModel = 'inverse';
-        pannerNode.refDistance = 10;
-        pannerNode.maxDistance = 200;
-        pannerNode.rolloffFactor = 2;
-        pannerNode.coneInnerAngle = 360;
-        pannerNode.coneOuterAngle = 0;
-        pannerNode.coneOuterGain = 0;
-        
-        // Calculate spatial positioning and volume
-        let finalVolume = baseVolume * this.sfxVolume;
-        
-        if (sourcePos && listenerPos) {
-            // Set 3D position
-            pannerNode.positionX.value = sourcePos.x;
-            pannerNode.positionY.value = sourcePos.y;
-            pannerNode.positionZ.value = sourcePos.z;
-            
-            // Calculate distance-based volume
-            const distance = sourcePos.distanceTo(listenerPos);
-            const maxDistance = 100;
-            if (distance >= maxDistance) {
-                finalVolume = 0;
-            } else {
-                const spatialVolume = Math.max(0, 1 - (distance / maxDistance));
-                finalVolume *= spatialVolume;
-            }
-            
-            // Set listener position (assuming listener is always at origin in local space)
-            if (this.audioContext.listener.positionX) {
-                this.audioContext.listener.positionX.value = listenerPos.x;
-                this.audioContext.listener.positionY.value = listenerPos.y;
-                this.audioContext.listener.positionZ.value = listenerPos.z;
-            } else {
-                // Fallback for older browsers
-                this.audioContext.listener.setPosition(listenerPos.x, listenerPos.y, listenerPos.z);
-            }
-        }
-        
-        // Set volume
-        gainNode.gain.value = finalVolume;
-        
-        // Connect nodes
-        if (sourcePos && listenerPos) {
-            source.connect(pannerNode);
-            pannerNode.connect(gainNode);
-        } else {
-            source.connect(gainNode);
-        }
-        gainNode.connect(this.masterGain);
-        
-        return { source, gainNode, pannerNode };
-    }
-    
-    playSprite(spriteName, sourcePos = null, listenerPos = null, baseVolume = 1.0, loop = false) {
-        if (!this.initialized || !this.audioBuffer) return null;
-        
-        const sprite = this.spriteMap[spriteName];
-        if (!sprite) return null;
-        
-        // Check concurrent sound limits
-        if (!this.canPlaySound(spriteName)) return null;
-        
-        const audioNodes = this.createSpatialAudioSource(spriteName, sourcePos, listenerPos, baseVolume);
-        if (!audioNodes) return null;
-        
-        const { source, gainNode } = audioNodes;
-        const [startTime, endTime] = sprite;
-const duration = endTime - startTime;
-        
-        // Configure playback
-        source.loop = loop;
-        if (loop) {
-            source.loopStart = startTime;
-            source.loopEnd = startTime + duration;
-        }
-        
-        // Start playback
-        source.start(0, startTime, loop ? undefined : duration);
-        
-        // Track the sound
-        const soundId = this.generateSoundId();
-        this.trackSound(spriteName, soundId);
-        
-        // Clean up when sound ends
-        if (!loop) {
-            source.onended = () => {
-                this.removeSoundFromTracking(spriteName, soundId);
-            };
-        }
-        
-        return { source, gainNode, soundId };
-    }
-    
-    generateSoundId() {
-        return Date.now() + Math.random();
-    }
-    
-    canPlaySound(soundType) {
-        const maxConcurrent = this.maxConcurrentSounds[soundType] || 1;
-        const activeSoundsOfType = this.activeSounds.get(soundType) || [];
-        return activeSoundsOfType.length < maxConcurrent;
-    }
-    
-    trackSound(soundType, soundId) {
-        if (!this.activeSounds.has(soundType)) {
-            this.activeSounds.set(soundType, []);
-        }
-        this.activeSounds.get(soundType).push(soundId);
-    }
-    
-    removeSoundFromTracking(soundType, soundId) {
-        const sounds = this.activeSounds.get(soundType);
-        if (sounds) {
-            const index = sounds.indexOf(soundId);
-            if (index > -1) {
-                sounds.splice(index, 1);
-            }
-        }
-    }
-    
-    // Public API methods (maintaining compatibility with existing code)
-    playBlaster(sourcePos = null, listenerPos = null) {
-        if (!this.initialized) return;
-        
-        const currentTime = Date.now();
-        if (currentTime - this.lastBlasterTime < 50) return;
-        this.lastBlasterTime = currentTime;
-        
-        this.playSprite('blaster', sourcePos, listenerPos, 0.7);
-    }
-    
-    playEnemyShot(sourcePos = null, listenerPos = null) {
-        if (!this.initialized) return;
-        
-        const currentTime = Date.now();
-        if (currentTime - this.lastEnemyShotTime < 30) return;
-        this.lastEnemyShotTime = currentTime;
-        
-        this.playSprite('enemyShot', sourcePos, listenerPos, 0.6);
-    }
-    
-    playExplosion(size = 1, sourcePos = null, listenerPos = null) {
-        if (!this.initialized) return;
-        
-        const volume = Math.min(size * 0.7, 1.0);
-        this.playSprite('explosion', sourcePos, listenerPos, volume);
-    }
-    
-    playCollision(sourcePos=null,listenerPos=null){
-    if(!this.initialized)return;
-    const currentTime=Date.now();
-    if(currentTime-this.lastCollisionTime<300)return;
-    this.lastCollisionTime=currentTime;
-    this.playSprite('collision',sourcePos,listenerPos,0.8)
-}
-playDamage(sourcePos=null,listenerPos=null){
-    if(!this.initialized)return;
-    const currentTime=Date.now();
-    if(currentTime-this.lastDamageTime<200)return;  // Changed from lastCollisionTime
-    this.lastDamageTime=currentTime;                // Changed from lastCollisionTime
-    this.playSprite('damage',sourcePos,listenerPos,0.7)
-}
-    
-    playLaser() {
-        if (!this.initialized || this.laserActive) return;
-        
-        try {
-            const audioNodes = this.playSprite('laser', null, null, 0.5, true);
-            if (audioNodes) {
-                this.laserActive = true;
-                this.laserSource = audioNodes.source;
-                this.laserGain = audioNodes.gainNode;
-            }
-        } catch (e) {
-            this.laserActive = false;
-        }
-    }
-    
-    stopLaser() {
-        if (!this.initialized || !this.laserActive || !this.laserSource) return;
-        
-        try {
-            this.laserSource.stop();
-            this.laserActive = false;
-            this.laserSource = null;
-            this.laserGain = null;
-        } catch (e) {
-            this.laserActive = false;
-        }
-    }
-    
-    playScatter() {
-        if (this.initialized) {
-            this.playSprite('scatter', null, null, 0.6);
-        }
-    }
-    
-    playShotgun() {
-        if (this.initialized) {
-            this.playSprite('shotgun', null, null, 0.7);
-        }
-    }
-    
-    playEnemyHit() {
-        if (this.initialized) {
-            this.playSprite('enemyHit', null, null, 0.5);
-        }
-    }
-    
-    playWeaponSwitch() {
-        if (this.initialized) {
-            this.playSprite('weaponSwitch', null, null, 0.6);
-        }
-    }
-    
-    playPowerUp() {
-        if (this.initialized) {
-            this.playSprite('powerUp', null, null, 0.6);
-        }
-    }
-    
-    playMine() {
-        if (this.initialized) {
-            this.playSprite('mine', null, null, 0.5);
-        }
-    }
-    
-    playLanding() {
-        if (this.initialized) {
-            this.playSprite('landing', null, null, 0.7);
-        }
-    }
-    
-    playTakeoff() {
-        if (this.initialized) {
-            this.playSprite('takeoff', null, null, 0.7);
-        }
-    }
-    
-    // Volume controls
-    setMasterVolume(volume) {
-        this.masterVolume = Math.max(0, Math.min(1, volume));
-        if (this.masterGain) {
-            this.masterGain.gain.value = this.masterVolume;
-        }
-    }
-    
-    setSFXVolume(volume) {
-        this.sfxVolume = Math.max(0, Math.min(1, volume));
-    }
-    
-    mute() {
-        if (this.masterGain) {
-            this.masterGain.gain.value = 0;
-        }
-    }
-    
-    unmute() {
-        if (this.masterGain) {
-            this.masterGain.gain.value = this.masterVolume;
-        }
-    }
-    
-    // Legacy compatibility methods (empty implementations to maintain interface)
-    startBackgroundMusic() {}
-    stopBackgroundMusic() {}
-    pauseBackgroundMusic() {}
-    resumeBackgroundMusic() {}
-    startEngine() {}
-    stopEngine() {}
-    setMusicVolume(volume) {}
-    setEngineVolume(volume) {}
-    
-    dispose() {
-        try {
-            this.stopLaser();
-            
-            // Stop all active sounds
-            this.activeSounds.clear();
-            
-            if (this.audioContext && this.audioContext.state !== 'closed') {
-                this.audioContext.close();
-            }
-            
-            this.audioContext = null;
-            this.audioBuffer = null;
-            this.masterGain = null;
-            this.initialized = false;
-        } catch (error) {
-            console.warn('Audio disposal error:', error);
-        }
-    }
-}
-class EventLogger {
-    constructor() {
-        this.events = [];
-        this.maxEvents = 50; // Keep last 50 events
-        this.visible = false;
-        this.createEventPanel();
-    }
+          createEventPanel() {
+              // Create the events panel HTML
+              const eventsPanel = document.createElement('div');
+              eventsPanel.id = 'eventsPanel';
+              eventsPanel.innerHTML = `
+                  <div id="eventsHeader">
+                      <span>EVENTOS</span>
+                      <button id="eventsToggle">×</button>
+                  </div>
+                  <div id="eventsContent"></div>
+              `;
+              
+              // Add CSS styles
+              const style = document.createElement('style');
+              style.textContent = `
+                  #eventsPanel {
+                      position: fixed;
+                      top: 20px;
+                      right: -320px;
+                      width: 300px;
+                      height: 400px;
+                      background: rgba(0, 0, 0, 0.9);
+                      border: 2px solid rgba(0, 242, 254, 0.6);
+                      border-radius: 10px;
+                      z-index: 1000;
+                      transition: right 0.3s ease;
+                      font-family: 'Courier New', monospace;
+                      overflow: hidden;
+                      backdrop-filter: blur(5px);
+                  }
 
-    createEventPanel() {
-        // Create the events panel HTML
-        const eventsPanel = document.createElement('div');
-        eventsPanel.id = 'eventsPanel';
-        eventsPanel.innerHTML = `
-            <div id="eventsHeader">
-                <span>EVENTOS</span>
-                <button id="eventsToggle">×</button>
-            </div>
-            <div id="eventsContent"></div>
-        `;
-        
-        // Add CSS styles
-        const style = document.createElement('style');
-        style.textContent = `
-            #eventsPanel {
-                position: fixed;
-                top: 20px;
-                right: -320px;
-                width: 300px;
-                height: 400px;
-                background: rgba(0, 0, 0, 0.9);
-                border: 2px solid rgba(0, 242, 254, 0.6);
-                border-radius: 10px;
-                z-index: 1000;
-                transition: right 0.3s ease;
-                font-family: 'Courier New', monospace;
-                overflow: hidden;
-                backdrop-filter: blur(5px);
-            }
+                  #eventsPanel.visible {
+                      right: 20px;
+                  }
 
-            #eventsPanel.visible {
-                right: 20px;
-            }
+                  #eventsHeader {
+                      background: rgba(0, 242, 254, 0.2);
+                      padding: 10px;
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: center;
+                      color: #00f2fe;
+                      font-weight: bold;
+                      font-size: 14px;
+                  }
 
-            #eventsHeader {
-                background: rgba(0, 242, 254, 0.2);
-                padding: 10px;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                color: #00f2fe;
-                font-weight: bold;
-                font-size: 14px;
-            }
+                  #eventsToggle {
+                      background: none;
+                      border: none;
+                      color: #00f2fe;
+                      font-size: 18px;
+                      cursor: pointer;
+                      width: 20px;
+                      height: 20px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                  }
 
-            #eventsToggle {
-                background: none;
-                border: none;
-                color: #00f2fe;
-                font-size: 18px;
-                cursor: pointer;
-                width: 20px;
-                height: 20px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
+                  #eventsContent {
+                      height: calc(100% - 44px);
+                      overflow-y: auto;
+                      padding: 10px;
+                      scrollbar-width: thin;
+                      scrollbar-color: rgba(0, 242, 254, 0.6) transparent;
+                  }
 
-            #eventsContent {
-                height: calc(100% - 44px);
-                overflow-y: auto;
-                padding: 10px;
-                scrollbar-width: thin;
-                scrollbar-color: rgba(0, 242, 254, 0.6) transparent;
-            }
+                  #eventsContent::-webkit-scrollbar {
+                      width: 6px;
+                  }
 
-            #eventsContent::-webkit-scrollbar {
-                width: 6px;
-            }
+                  #eventsContent::-webkit-scrollbar-track {
+                      background: transparent;
+                  }
 
-            #eventsContent::-webkit-scrollbar-track {
-                background: transparent;
-            }
+                  #eventsContent::-webkit-scrollbar-thumb {
+                      background: rgba(0, 242, 254, 0.6);
+                      border-radius: 3px;
+                  }
 
-            #eventsContent::-webkit-scrollbar-thumb {
-                background: rgba(0, 242, 254, 0.6);
-                border-radius: 3px;
-            }
+                  .event-entry {
+                      margin-bottom: 8px;
+                      padding: 6px 8px;
+                      border-left: 3px solid #00f2fe;
+                      background: rgba(0, 242, 254, 0.1);
+                      border-radius: 4px;
+                      font-size: 12px;
+                      line-height: 1.4;
+                      color: #e0e0e0;
+                      animation: eventFadeIn 0.3s ease-in;
+                  }
 
-            .event-entry {
-                margin-bottom: 8px;
-                padding: 6px 8px;
-                border-left: 3px solid #00f2fe;
-                background: rgba(0, 242, 254, 0.1);
-                border-radius: 4px;
-                font-size: 12px;
-                line-height: 1.4;
-                color: #e0e0e0;
-                animation: eventFadeIn 0.3s ease-in;
-            }
+                  .event-timestamp {
+                      color: #888;
+                      font-size: 10px;
+                      display: block;
+                      margin-bottom: 2px;
+                  }
 
-            .event-timestamp {
-                color: #888;
-                font-size: 10px;
-                display: block;
-                margin-bottom: 2px;
-            }
+                  .event-content {
+                      color: #fff;
+                  }
 
-            .event-content {
-                color: #fff;
-            }
+                  .event-planet-destroyed {
+                      border-left-color: #ff4757;
+                      background: rgba(255, 71, 87, 0.1);
+                  }
 
-            .event-planet-destroyed {
-                border-left-color: #ff4757;
-                background: rgba(255, 71, 87, 0.1);
-            }
+                  .event-enemy-defeated {
+                      border-left-color: #feca57;
+                      background: rgba(254, 202, 87, 0.1);
+                  }
 
-            .event-enemy-defeated {
-                border-left-color: #feca57;
-                background: rgba(254, 202, 87, 0.1);
-            }
+                  .event-system {
+                      border-left-color: #a55eea;
+                      background: rgba(165, 94, 234, 0.1);
+                  }
 
-            .event-system {
-                border-left-color: #a55eea;
-                background: rgba(165, 94, 234, 0.1);
-            }
+                  @keyframes eventFadeIn {
+                      from { opacity: 0; transform: translateX(10px); }
+                      to { opacity: 1; transform: translateX(0); }
+                  }
 
-            @keyframes eventFadeIn {
-                from { opacity: 0; transform: translateX(10px); }
-                to { opacity: 1; transform: translateX(0); }
-            }
+                  /* Toggle button when panel is closed */
+                  #eventsOpenBtn {
+                      position: fixed;
+                      top: 20px;
+                      right: 20px;
+                      background: rgba(0, 242, 254, 0.2);
+                      border: 2px solid rgba(0, 242, 254, 0.6);
+                      color: #00f2fe;
+                      padding: 8px 12px;
+                      border-radius: 5px;
+                      cursor: pointer;
+                      font-family: 'Courier New', monospace;
+                      font-size: 12px;
+                      z-index: 999;
+                      transition: all 0.3s ease;
+                  }
 
-            /* Toggle button when panel is closed */
-            #eventsOpenBtn {
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: rgba(0, 242, 254, 0.2);
-                border: 2px solid rgba(0, 242, 254, 0.6);
-                color: #00f2fe;
-                padding: 8px 12px;
-                border-radius: 5px;
-                cursor: pointer;
-                font-family: 'Courier New', monospace;
-                font-size: 12px;
-                z-index: 999;
-                transition: all 0.3s ease;
-            }
+                  #eventsOpenBtn:hover {
+                      background: rgba(0, 242, 254, 0.4);
+                      transform: scale(1.05);
+                  }
 
-            #eventsOpenBtn:hover {
-                background: rgba(0, 242, 254, 0.4);
-                transform: scale(1.05);
-            }
+                  #eventsOpenBtn.hidden {
+                      display: none;
+                  }
+              `;
 
-            #eventsOpenBtn.hidden {
-                display: none;
-            }
-        `;
+              document.head.appendChild(style);
+              document.body.appendChild(eventsPanel);
 
-        document.head.appendChild(style);
-        document.body.appendChild(eventsPanel);
+              // Create open button
+              const openBtn = document.createElement('button');
+              openBtn.id = 'eventsOpenBtn';
+              openBtn.textContent = 'EVENTOS';
+              document.body.appendChild(openBtn);
 
-        // Create open button
-        const openBtn = document.createElement('button');
-        openBtn.id = 'eventsOpenBtn';
-        openBtn.textContent = 'EVENTOS';
-        document.body.appendChild(openBtn);
+              // Setup event listeners
+              this.setupEventListeners();
+          }
 
-        // Setup event listeners
-        this.setupEventListeners();
-    }
+          setupEventListeners() {
+              const panel = document.getElementById('eventsPanel');
+              const toggleBtn = document.getElementById('eventsToggle');
+              const openBtn = document.getElementById('eventsOpenBtn');
 
-    setupEventListeners() {
-        const panel = document.getElementById('eventsPanel');
-        const toggleBtn = document.getElementById('eventsToggle');
-        const openBtn = document.getElementById('eventsOpenBtn');
+              toggleBtn.addEventListener('click', () => this.togglePanel());
+              openBtn.addEventListener('click', () => this.togglePanel());
+          }
 
-        toggleBtn.addEventListener('click', () => this.togglePanel());
-        openBtn.addEventListener('click', () => this.togglePanel());
-    }
+          togglePanel() {
+              this.visible = !this.visible;
+              const panel = document.getElementById('eventsPanel');
+              const openBtn = document.getElementById('eventsOpenBtn');
+              
+              panel.classList.toggle('visible', this.visible);
+              openBtn.classList.toggle('hidden', this.visible);
+          }
 
-    togglePanel() {
-        this.visible = !this.visible;
-        const panel = document.getElementById('eventsPanel');
-        const openBtn = document.getElementById('eventsOpenBtn');
-        
-        panel.classList.toggle('visible', this.visible);
-        openBtn.classList.toggle('hidden', this.visible);
-    }
+          logEvent(message, type = 'system') {
+              const timestamp = new Date().toLocaleTimeString();
+              const event = {
+                  id: Date.now() + Math.random(),
+                  message,
+                  type,
+                  timestamp
+              };
 
-    logEvent(message, type = 'system') {
-        const timestamp = new Date().toLocaleTimeString();
-        const event = {
-            id: Date.now() + Math.random(),
-            message,
-            type,
-            timestamp
-        };
+              this.events.unshift(event);
+              
+              // Limit events array size
+              if (this.events.length > this.maxEvents) {
+                  this.events = this.events.slice(0, this.maxEvents);
+              }
 
-        this.events.unshift(event);
-        
-        // Limit events array size
-        if (this.events.length > this.maxEvents) {
-            this.events = this.events.slice(0, this.maxEvents);
-        }
+              this.updateDisplay();
+          }
 
-        this.updateDisplay();
-    }
+          updateDisplay() {
+              const content = document.getElementById('eventsContent');
+              if (!content) return;
 
-    updateDisplay() {
-        const content = document.getElementById('eventsContent');
-        if (!content) return;
+              content.innerHTML = this.events.map(event => `
+                  <div class="event-entry event-${event.type}">
+                      <span class="event-timestamp">${event.timestamp}</span>
+                      <div class="event-content">${event.message}</div>
+                  </div>
+              `).join('');
 
-        content.innerHTML = this.events.map(event => `
-            <div class="event-entry event-${event.type}">
-                <span class="event-timestamp">${event.timestamp}</span>
-                <div class="event-content">${event.message}</div>
-            </div>
-        `).join('');
+              // Auto-scroll to top (newest events)
+              content.scrollTop = 0;
+          }
 
-        // Auto-scroll to top (newest events)
-        content.scrollTop = 0;
-    }
+          // Convenience methods for different event types
+          logPlanetDestroyed(planetName) {
+              this.logEvent(`🔥 Planeta destruido: ${planetName}`, 'planet-destroyed');
+          }
 
-    // Convenience methods for different event types
-    logPlanetDestroyed(planetName) {
-        this.logEvent(`🔥 Planeta destruido: ${planetName}`, 'planet-destroyed');
-    }
+          logEnemyDefeated(enemyType, count = 1) {
+              const shipNames = {
+                  'f': 'Caza',
+                  'i': 'Interceptor', 
+                  's': 'Explorador',
+                  'd': 'Doradito',
+                  'p': 'Diamante Púrpura',
+                  'h': 'Pesado'
+              };
+              const shipName = shipNames[enemyType] || 'Enemigo';
+              
+              if (count === 1) {
+                  this.logEvent(`⚡ ${shipName} eliminado`, 'enemy-defeated');
+              } else {
+                  this.logEvent(`⚡ ${count} ${shipName}s eliminados`, 'enemy-defeated');
+              }
+          }
 
-    logEnemyDefeated(enemyType, count = 1) {
-        const shipNames = {
-            'f': 'Caza',
-            'i': 'Interceptor', 
-            's': 'Explorador',
-            'd': 'Doradito',
-            'p': 'Diamante Púrpura',
-            'h': 'Pesado'
-        };
-        const shipName = shipNames[enemyType] || 'Enemigo';
-        
-        if (count === 1) {
-            this.logEvent(`⚡ ${shipName} eliminado`, 'enemy-defeated');
-        } else {
-            this.logEvent(`⚡ ${count} ${shipName}s eliminados`, 'enemy-defeated');
-        }
-    }
-
-    logSystem(message) {
-        this.logEvent(`📡 ${message}`, 'system');
-    }
-}
+          logSystem(message) {
+              this.logEvent(`📡 ${message}`, 'system');
+          }
+      }
       class SpaceShooter {
         constructor() {
           this.initializeRenderer();

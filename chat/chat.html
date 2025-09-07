@@ -658,7 +658,7 @@ const r=await fetchTo(`${API}/api/moderators`);
 const d=await r.json();
 if(r.ok){
 const mods=d.moderators||[];
-showNotif(`Moderators: ${mods.join(', ')||'None'}`, 'success')
+showNotif('Moderators: ${mods.join(', ')||'None'}','success')
 }else throw new Error(d.error)
 }catch(e){
 showNotif('Failed to get moderators','error')

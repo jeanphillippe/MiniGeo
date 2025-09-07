@@ -1,568 +1,521 @@
-<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MiniGeo Chat</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,sans-serif;background:#f5f7fa;min-height:100vh;display:flex;flex-direction:column}.hdr{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:1rem;display:flex;justify-content:space-between;align-items:center}.hdr h1{font-size:1.5rem}.back{color:#fff;text-decoration:none;padding:.5rem 1rem;border:2px solid rgba(255,255,255,.3);border-radius:8px}.back:hover{background:rgba(255,255,255,.2)}.app{flex:1;display:flex;max-width:1200px;margin:2rem auto;background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.1);overflow:hidden;height:calc(100vh-120px)}.side{width:320px;background:#2c3e50;color:#fff;display:flex;flex-direction:column}.user{padding:1.5rem;border-bottom:1px solid #34495e;background:#34495e}.user h3{margin-bottom:1rem}.inp{margin-bottom:.75rem}.inp label{display:block;margin-bottom:.25rem;font-size:.85rem;color:#bdc3c7}.ui{width:100%;padding:.75rem;border:none;border-radius:8px;background:#2c3e50;color:#fff;border:2px solid transparent}.ui:focus{outline:none;border-color:#3498db;background:#1a252f}.btn{padding:.75rem 1rem;border:none;border-radius:8px;cursor:pointer;font-weight:600;width:100%;margin-top:.5rem}.bp{background:#3498db;color:#fff}.bp:hover:not(:disabled){background:#2980b9}.bs{background:#27ae60;color:#fff}.bs:hover:not(:disabled){background:#229954}.br{background:#e74c3c;color:#fff}.br:hover:not(:disabled){background:#c0392b}.by{background:#f39c12;color:#fff}.by:hover:not(:disabled){background:#e67e22}.btn:disabled{opacity:.6;cursor:not-allowed}.rooms{padding:1.5rem;flex:1;overflow-y:auto}.rhdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}.rhdr h4{font-size:1rem}.ref{background:none;border:none;color:#95a5a6;cursor:pointer;padding:.5rem;border-radius:6px}.ref:hover{color:#ecf0f1;background:#34495e}.rl{list-style:none;margin-bottom:1rem}.ri{padding:.75rem;margin:.5rem 0;background:#34495e;border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}.ri:hover{background:#3498db}.ri.active{background:#27ae60}.ri.orphan{background:#8e44ad;border-left:4px solid #9b59b6}.rn{font-weight:500}.ru{font-size:.75rem;color:#bdc3c7;background:rgba(0,0,0,.2);padding:.25rem.5rem;border-radius:12px}.cr{padding:1.5rem;border-top:1px solid #34495e;background:#34495e}.main{flex:1;display:flex;flex-direction:column}.chdr{padding:1.5rem;background:#ecf0f1;border-bottom:1px solid #bdc3c7;display:flex;justify-content:space-between;align-items:center}.chdr h2{color:#2c3e50;font-size:1.3rem}.stat{padding:.5rem 1rem;border-radius:20px;font-size:.8rem;font-weight:600;text-transform:uppercase}.stat.online{background:#d5f4e6;color:#27ae60}.stat.offline{background:#fadbd8;color:#e74c3c}.stat.connecting{background:#fef9e7;color:#f39c12}.msgs{flex:1;padding:1.5rem;overflow-y:auto;background:#f8f9fa}.msg{margin-bottom:1rem;padding:1rem;background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.1);max-width:80%}.msg.own{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;margin-left:auto}.mhdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem}.mu{font-weight:600;color:#2c3e50;font-size:.9rem}.mt{font-size:.75rem;color:#7f8c8d}.mc{color:#2c3e50;line-height:1.5;word-wrap:break-word}.msg.own.mu,.msg.own.mc{color:#fff}.msg.own.mt{color:rgba(255,255,255,.7)}.minp{padding:1.5rem;background:#fff;border-top:1px solid #ecf0f1;display:flex;gap:1rem;align-items:flex-end}.mi{flex:1;padding:1rem;border:2px solid #ecf0f1;border-radius:20px;resize:none;min-height:50px;max-height:120px;font-family:inherit}.mi:focus{outline:none;border-color:#3498db}.send{padding:1rem 1.5rem;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:20px;cursor:pointer;font-weight:600}.send:hover:not(:disabled){box-shadow:0 4px 12px rgba(102,126,234,.4)}.send:disabled{background:#bdc3c7;cursor:not-allowed}.notif{position:fixed;top:2rem;right:2rem;padding:1rem 1.5rem;border-radius:12px;color:#fff;font-weight:600;z-index:1000;max-width:320px}.notif.success{background:#27ae60}.notif.error{background:#e74c3c}.notif.warning{background:#f39c12}.empty{text-align:center;color:#7f8c8d;padding:3rem 2rem}.empty h3{color:#2c3e50;margin-bottom:1rem}.load{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,.95);display:none;justify-content:center;align-items:center;z-index:1000;font-weight:600}.load.show{display:flex}.modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);display:none;justify-content:center;align-items:center;z-index:2000}.modal.show{display:flex}.modal-content{background:#fff;padding:2rem;border-radius:12px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto}.modal h3{margin-bottom:1rem;color:#2c3e50}.modal.inp{margin-bottom:1rem}.modal.btn{margin-top:1rem}.mbtn{display:flex;gap:.25rem;margin-left:.5rem}.mb{padding:.125rem.25rem;border:none;border-radius:3px;cursor:pointer;font-size:.6rem;color:#fff}.mb.mute{background:#f39c12}.mb.mute:hover{background:#e67e22}.mb.kick{background:#e74c3c}.mb.kick:hover{background:#c0392b}.admin-badge{background:#8e44ad;color:#fff;padding:.25rem.5rem;border-radius:12px;font-size:.7rem;margin-left:.5rem}.mod-badge{background:#e67e22;color:#fff;padding:.25rem.5rem;border-radius:12px;font-size:.7rem;margin-left:.5rem}
-/* Estilos para el sistema de karma */
-.karma{display:flex;align-items:center;gap:.5rem;margin-top:.5rem;padding-top:.5rem;border-top:1px solid #ecf0f1}.karma.own{border-top:1px solid rgba(255,255,255,.2)}.vote-btn{background:none;border:none;padding:.25rem.5rem;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:.25rem;font-size:.75rem;transition:all .2s}.vote-btn:hover{transform:scale(1.1)}.vote-btn.up{color:#27ae60}.vote-btn.up:hover{background:rgba(39,174,96,.1)}.vote-btn.up.active{background:#27ae60;color:#fff}.vote-btn.down{color:#e74c3c}.vote-btn.down:hover{background:rgba(231,76,60,.1)}.vote-btn.down.active{background:#e74c3c;color:#fff}.karma-score{font-weight:600;color:#7f8c8d;min-width:1.5rem;text-align:center}.karma-score.positive{color:#27ae60}.karma-score.negative{color:#e74c3c}.msg.own .vote-btn,.msg.own .karma-score{color:rgba(255,255,255,.7)}.msg.own .vote-btn.up.active,.msg.own .vote-btn.down.active{color:#fff}
-/* Estilos para archivos */
-.archive-list{max-height:300px;overflow-y:auto;margin:1rem 0}.archive-item{padding:.75rem;margin:.5rem 0;background:#f8f9fa;border-radius:8px;border-left:4px solid #3498db;cursor:pointer}.archive-item:hover{background:#e9ecef}.archive-meta{font-size:.8rem;color:#666;margin-top:.25rem}.archive-date{font-weight:600;color:#2c3e50}.archive-count{color:#7f8c8d}
-@media(max-width:768px){.app{margin:1rem;height:calc(100vh-80px);flex-direction:column}.side{width:100%;height:300px}.msg{max-width:90%}.msg.own{margin-left:10%}.modal-content{padding:1rem;max-width:95%}.karma{gap:.25rem}.vote-btn{padding:.125rem.25rem;font-size:.7rem}}</style></head><body><header class="hdr"><h1>🌐 MiniGeo</h1><a href="../index.html" class="back">← Back</a></header><div class="app"><div class="load" id="load"><div>Connecting...</div></div><div class="side"><div class="user"><h3>👤 Profile</h3><div class="inp"><label>Name</label><input type="text" id="uname" class="ui" placeholder="Your name" maxlength="50"></div><div class="inp"><label>Role</label><input type="text" id="ulabel" class="ui" placeholder="Explorer, Geographer..." maxlength="50"></div><button class="btn bp" id="upd" onclick="updUser()">Update</button><button class="btn by" id="adminBtn" onclick="showAdminLogin()">Admin Login</button><button class="btn by" id="modBtn" onclick="toggleMod()" style="display:none">Mod Panel</button></div><div class="rooms"><div class="rhdr"><h4>💬 Rooms</h4><button class="ref" onclick="loadRooms()">⟳</button></div><ul class="rl" id="rl"></ul></div><div class="cr"><div class="inp"><label>New Room</label><input type="text" id="nroom" class="ui" placeholder="Room name" maxlength="30"></div><button class="btn bs" onclick="createRoom()">Create</button><button class="btn by" onclick="showArchives()" style="margin-top:.5rem">📁 Archives</button></div></div><div class="main"><div class="chdr"><h2 id="crname">Select a room</h2><div class="stat connecting" id="stat">Connecting</div></div><div class="msgs" id="msgs"><div class="empty"><h3>Welcome! 🗺️</h3><p>Select a room to start chatting.</p></div></div><div class="minp"><textarea id="minp" class="mi" placeholder="Type message..." disabled maxlength="1000"></textarea><button class="send" id="send" onclick="sendMsg()" disabled>Send 📤</button></div></div></div>
+<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MiniGeo Chat</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,sans-serif;background:#f5f7fa;min-height:100vh;display:flex;flex-direction:column}.hdr{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:1rem;display:flex;justify-content:space-between;align-items:center}.hdr h1{font-size:1.5rem}.back{color:#fff;text-decoration:none;padding:.5rem 1rem;border:2px solid rgba(255,255,255,.3);border-radius:8px}.back:hover{background:rgba(255,255,255,.2)}.app{flex:1;display:flex;max-width:1200px;margin:2rem auto;background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.1);overflow:hidden;height:calc(100vh - 120px)}.side{width:320px;background:#2c3e50;color:#fff;display:flex;flex-direction:column}.user{padding:1.5rem;border-bottom:1px solid #34495e;background:#34495e}.user h3{margin-bottom:1rem}.inp{margin-bottom:.75rem}.inp label{display:block;margin-bottom:.25rem;font-size:.85rem;color:#bdc3c7}.ui{width:100%;padding:.75rem;border:none;border-radius:8px;background:#2c3e50;color:#fff;border:2px solid transparent}.ui:focus{outline:none;border-color:#3498db;background:#1a252f}.btn{padding:.75rem 1rem;border:none;border-radius:8px;cursor:pointer;font-weight:600;width:100%;margin-top:.5rem}.bp{background:#3498db;color:#fff}.bp:hover:not(:disabled){background:#2980b9}.bs{background:#27ae60;color:#fff}.bs:hover:not(:disabled){background:#229954}.br{background:#e74c3c;color:#fff}.br:hover:not(:disabled){background:#c0392b}.by{background:#f39c12;color:#fff}.by:hover:not(:disabled){background:#e67e22}.btn:disabled{opacity:.6;cursor:not-allowed}.rooms{padding:1.5rem;flex:1;overflow-y:auto}.rhdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}.rhdr h4{font-size:1rem}.ref{background:none;border:none;color:#95a5a6;cursor:pointer;padding:.5rem;border-radius:6px}.ref:hover{color:#ecf0f1;background:#34495e}.rl{list-style:none;margin-bottom:1rem}.ri{padding:.75rem;margin:.5rem 0;background:#34495e;border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}.ri:hover{background:#3498db}.ri.active{background:#27ae60}.ri.orphan{background:#8e44ad;border-left:4px solid #9b59b6}.rn{font-weight:500}.ru{font-size:.75rem;color:#bdc3c7;background:rgba(0,0,0,.2);padding:.25rem .5rem;border-radius:12px}.cr{padding:1.5rem;border-top:1px solid #34495e;background:#34495e}.main{flex:1;display:flex;flex-direction:column}.chdr{padding:1.5rem;background:#ecf0f1;border-bottom:1px solid #bdc3c7;display:flex;justify-content:space-between;align-items:center}.chdr h2{color:#2c3e50;font-size:1.3rem}.stat{padding:.5rem 1rem;border-radius:20px;font-size:.8rem;font-weight:600;text-transform:uppercase}.stat.online{background:#d5f4e6;color:#27ae60}.stat.offline{background:#fadbd8;color:#e74c3c}.stat.connecting{background:#fef9e7;color:#f39c12}.msgs{flex:1;padding:1.5rem;overflow-y:auto;background:#f8f9fa}.msg{margin-bottom:1rem;padding:1rem;background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.1);max-width:80%}.msg.own{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;margin-left:auto}.mhdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem}.mu{font-weight:600;color:#2c3e50;font-size:.9rem}.mt{font-size:.75rem;color:#7f8c8d}.mc{color:#2c3e50;line-height:1.5;word-wrap:break-word}.msg.own .mu,.msg.own .mc{color:#fff}.msg.own .mt{color:rgba(255,255,255,.7)}.minp{padding:1.5rem;background:#fff;border-top:1px solid #ecf0f1;display:flex;gap:1rem;align-items:flex-end}.mi{flex:1;padding:1rem;border:2px solid #ecf0f1;border-radius:20px;resize:none;min-height:50px;max-height:120px;font-family:inherit}.mi:focus{outline:none;border-color:#3498db}.send{padding:1rem 1.5rem;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:20px;cursor:pointer;font-weight:600}.send:hover:not(:disabled){box-shadow:0 4px 12px rgba(102,126,234,.4)}.send:disabled{background:#bdc3c7;cursor:not-allowed}.notif{position:fixed;top:2rem;right:2rem;padding:1rem 1.5rem;border-radius:12px;color:#fff;font-weight:600;z-index:1000;max-width:320px}.notif.success{background:#27ae60}.notif.error{background:#e74c3c}.notif.warning{background:#f39c12}.empty{text-align:center;color:#7f8c8d;padding:3rem 2rem}.empty h3{color:#2c3e50;margin-bottom:1rem}.load{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,.95);display:none;justify-content:center;align-items:center;z-index:1000;font-weight:600}.load.show{display:flex}.modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);display:none;justify-content:center;align-items:center;z-index:2000}.modal.show{display:flex}.modal-content{background:#fff;padding:2rem;border-radius:12px;max-width:400px;width:90%}.modal h3{margin-bottom:1rem;color:#2c3e50}.modal .inp{margin-bottom:1rem}.modal .btn{margin-top:1rem}.mbtn{display:flex;gap:.25rem;margin-left:.5rem}.mb{padding:.125rem .25rem;border:none;border-radius:3px;cursor:pointer;font-size:.6rem;color:#fff}.mb.mute{background:#f39c12}.mb.mute:hover{background:#e67e22}.mb.kick{background:#e74c3c}.mb.kick:hover{background:#c0392b}.admin-badge{background:#8e44ad;color:#fff;padding:.25rem .5rem;border-radius:12px;font-size:.7rem;margin-left:.5rem}.mod-badge{background:#e67e22;color:#fff;padding:.25rem .5rem;border-radius:12px;font-size:.7rem;margin-left:.5rem}@media(max-width:768px){.app{margin:1rem;height:calc(100vh - 80px);flex-direction:column}.side{width:100%;height:300px}.msg{max-width:90%}.msg.own{margin-left:10%}.modal-content{padding:1rem}}</style></head><body><header class="hdr"><h1>🌍 MiniGeo</h1><a href="../index.html" class="back">← Back</a></header><div class="app"><div class="load" id="load"><div>Connecting...</div></div><div class="side"><div class="user"><h3>👤 Profile</h3><div class="inp"><label>Name</label><input type="text" id="uname" class="ui" placeholder="Your name" maxlength="50"></div><div class="inp"><label>Role</label><input type="text" id="ulabel" class="ui" placeholder="Explorer, Geographer..." maxlength="50"></div><button class="btn bp" id="upd" onclick="updUser()">Update</button><button class="btn by" id="adminBtn" onclick="showAdminLogin()">Admin Login</button><button class="btn by" id="modBtn" onclick="toggleMod()" style="display:none">Mod Panel</button></div><div class="rooms"><div class="rhdr"><h4>💬 Rooms</h4><button class="ref" onclick="loadRooms()">⟳</button></div><ul class="rl" id="rl"></ul></div><div class="cr"><div class="inp"><label>New Room</label><input type="text" id="nroom" class="ui" placeholder="Room name" maxlength="30"></div><button class="btn bs" onclick="createRoom()">Create</button></div></div><div class="main"><div class="chdr"><h2 id="crname">Select a room</h2><div class="stat connecting" id="stat">Connecting</div></div><div class="msgs" id="msgs"><div class="empty"><h3>Welcome! 🗺️</h3><p>Select a room to start chatting.</p></div></div><div class="minp"><textarea id="minp" class="mi" placeholder="Type message..." disabled maxlength="1000"></textarea><button class="send" id="send" onclick="sendMsg()" disabled>Send 📤</button></div></div></div>
 
 <!-- Admin Login Modal -->
-<div class="modal" id="adminModal"><div class="modal-content"><h3>🔒 Admin Login</h3><div class="inp"><label>Admin Password</label><input type="password" id="adminPass" class="ui" placeholder="Enter admin password"></div><button class="btn bp" onclick="adminLogin()">Login</button><button class="btn br" onclick="closeModal('adminModal')">Cancel</button></div></div>
+<div class="modal" id="adminModal">
+<div class="modal-content">
+<h3>🔐 Admin Login</h3>
+<div class="inp">
+<label>Admin Password</label>
+<input type="password" id="adminPass" class="ui" placeholder="Enter admin password">
+</div>
+<button class="btn bp" onclick="adminLogin()">Login</button>
+<button class="btn br" onclick="closeModal('adminModal')">Cancel</button>
+</div>
+</div>
 
 <!-- Mod Panel Modal -->
-<div class="modal" id="modModal"><div class="modal-content"><h3>🛡️ Moderator Panel</h3><h4 style="margin-top:1rem">Manage Users</h4><div class="inp"><label>User ID to Mute</label><input type="text" id="muteUser" class="ui" placeholder="User ID"></div><div class="inp"><label>Mute Duration (minutes)</label><input type="number" id="muteTime" class="ui" placeholder="10" value="10"></div><button class="btn by" onclick="muteUser()">Mute User</button><h4 style="margin-top:1rem">Manage Rooms</h4><div class="inp"><label>Room Name to Delete</label><input type="text" id="delRoom" class="ui" placeholder="room-name"></div><button class="btn br" onclick="delRoom()">Delete Room</button><h4 style="margin-top:1rem">Maintenance</h4><button class="btn by" onclick="cleanupAllRooms()">🧹 Clean All Rooms</button><div id="adminSection" style="display:none"><h4 style="margin-top:1rem">Admin Functions</h4><div class="inp"><label>User ID to Promote</label><input type="text" id="promoteUser" class="ui" placeholder="User ID"></div><button class="btn bs" onclick="promoteUser()">Make Moderator</button><div class="inp"><label>User ID to Demote</label><input type="text" id="demoteUser" class="ui" placeholder="User ID"></div><button class="btn br" onclick="demoteUser()">Remove Moderator</button><button class="btn by" onclick="listModerators()">List Moderators</button></div><button class="btn bp" onclick="closeModal('modModal')">Close</button></div></div>
+<div class="modal" id="modModal">
+<div class="modal-content">
+<h3>🛡️ Moderator Panel</h3>
+
+<h4 style="margin-top:1rem">Manage Users</h4>
+<div class="inp">
+<label>User ID to Mute</label>
+<input type="text" id="muteUser" class="ui" placeholder="User ID">
+</div>
+<div class="inp">
+<label>Mute Duration (minutes)</label>
+<input type="number" id="muteTime" class="ui" placeholder="10" value="10">
+</div>
+<button class="btn by" onclick="muteUser()">Mute User</button>
+
+<h4 style="margin-top:1rem">Manage Rooms</h4>
+<div class="inp">
+<label>Room Name to Delete</label>
+<input type="text" id="delRoom" class="ui" placeholder="room-name">
+</div>
+<button class="btn br" onclick="delRoom()">Delete Room</button>
+
+<div id="adminSection" style="display:none">
+<h4 style="margin-top:1rem">Admin Functions</h4>
+<div class="inp">
+<label>User ID to Promote</label>
+<input type="text" id="promoteUser" class="ui" placeholder="User ID">
+</div>
+<button class="btn bs" onclick="promoteUser()">Make Moderator</button>
+
+<div class="inp">
+<label>User ID to Demote</label>
+<input type="text" id="demoteUser" class="ui" placeholder="User ID">
+</div>
+<button class="btn br" onclick="demoteUser()">Remove Moderator</button>
+
+<button class="btn by" onclick="listModerators()">List Moderators</button>
+</div>
+
+<button class="btn bp" onclick="closeModal('modModal')">Close</button>
+</div>
+</div>
 
 <!-- Room Recovery Modal -->
-<div class="modal" id="recoveryModal"><div class="modal-content"><h3>🔄 Room Recovery</h3><p>Found existing rooms that aren't in the main list. Would you like to recover them?</p><div id="orphanRooms"></div><button class="btn bs" onclick="recoverAllRooms()">Recover All</button><button class="btn br" onclick="closeModal('recoveryModal')">Skip</button></div></div>
-
-<!-- Archive Modal -->
-<div class="modal" id="archiveModal"><div class="modal-content"><h3>📁 Message Archives</h3><div class="inp"><label>Select Room</label><select id="archiveRoomSelect" class="ui"><option value="">Select a room...</option></select></div><div id="archiveList" class="archive-list"></div><button class="btn bp" onclick="closeModal('archiveModal')">Close</button></div></div>
-
-<!-- Archive Viewer Modal -->
-<div class="modal" id="archiveViewModal"><div class="modal-content"><h3 id="archiveViewTitle">Archive Viewer</h3><div id="archiveMessages" style="max-height:400px;overflow-y:auto;padding:1rem;background:#f8f9fa;border-radius:8px"></div><button class="btn bp" onclick="closeModal('archiveViewModal')">Close</button></div></div>
+<div class="modal" id="recoveryModal">
+<div class="modal-content">
+<h3>🔄 Room Recovery</h3>
+<p>Found existing rooms that aren't in the main list. Would you like to recover them?</p>
+<div id="orphanRooms"></div>
+<button class="btn bs" onclick="recoverAllRooms()">Recover All</button>
+<button class="btn br" onclick="closeModal('recoveryModal')">Skip</button>
+</div>
+</div>
 
 <script>
 const API='https://chat.minigeo.org';
-let u = { id: genId(), name: '', label: '', isMod: false, isAdmin: false, token: '' };
-let cr = null, rooms = [], msgs = [], poll = null, lastMsg = null, conn = false, retry = 0, orphanRooms = [];
-const MAX_RETRY = 5, POLL_INT = 3000, RETRY_DELAY = 5000;
+let u={id:genId(),name:'',label:'',isMod:!1,isAdmin:!1,token:''},cr=null,rooms=[],msgs=[],poll=null,lastMsg=null,conn=!1,retry=0,orphanRooms=[];
+const MAX_RETRY=5,POLL_INT=3e3,RETRY_DELAY=5e3;
 
-document.addEventListener('DOMContentLoaded', async () => {
-  showLoad(true);
-  try {
-    await loadUser();
-    setupEvents();
-    await checkForOrphanRooms();
-    const exist = await checkRooms();
-    if (!exist && orphanRooms.length === 0) showSetup();
-    else {
-      await loadRooms();
-      await testConn();
-      startPoll();
-      updateStat('online');
-    }
-    retry = 0;
-  } catch (e) {
-    console.error(e);
-    updateStat('offline');
-    scheduleRetry();
-  } finally {
-    showLoad(false);
-  }
+document.addEventListener('DOMContentLoaded',async()=>{
+showLoad(!0);
+try{
+await loadUser();
+setupEvents();
+await checkForOrphanRooms();
+const exist=await checkRooms();
+if(!exist&&orphanRooms.length===0)showSetup();
+else{
+await loadRooms();
+await testConn();
+startPoll();
+updateStat('online')
+}
+retry=0
+}catch(e){
+console.error(e);
+updateStat('offline');
+scheduleRetry()
+}finally{
+showLoad(!1)
+}
 });
 
-function genId() {
-  const t = Date.now().toString(36), r = Math.random().toString(36).substr(2, 9);
-  const b = (navigator.userAgent + navigator.language).split('').reduce((a, b) => {
-    a = ((a << 5) - a) + b.charCodeAt(0);
-    return a & a;
-  }, 0).toString(36);
-  return `user_${t}_${r}_${Math.abs(b)}`.substr(0, 32);
+function genId(){
+const t=Date.now().toString(36),r=Math.random().toString(36).substr(2,9);
+const b=(navigator.userAgent+navigator.language).split('').reduce((a,b)=>{
+a=((a<<5)-a)+b.charCodeAt(0);return a&a
+},0).toString(36);
+return `user_${t}_${r}_${Math.abs(b)}`.substr(0,32)
 }
 
-async function loadUser() {
-  const s = localStorage.getItem('minigeoUser');
-  if (s) {
-    try {
-      const p = JSON.parse(s);
-      u = { ...u, ...p };
-      document.getElementById('uname').value = u.name || '';
-      document.getElementById('ulabel').value = u.label || '';
-      updateUIFromUser();
-    } catch (e) {
-      localStorage.removeItem('minigeoUser');
-    }
-  }
+async function loadUser(){
+const s=localStorage.getItem('minigeoUser');
+if(s){
+try{
+const p=JSON.parse(s);
+u={...u,...p};
+document.getElementById('uname').value=u.name||'';
+document.getElementById('ulabel').value=u.label||'';
+updateUIFromUser()
+}catch(e){localStorage.removeItem('minigeoUser')}
+}
 }
 
-function saveUser() {
-  try {
-    localStorage.setItem('minigeoUser', JSON.stringify(u));
-  } catch (e) {
-    console.error(e);
-  }
+function saveUser(){
+try{
+localStorage.setItem('minigeoUser',JSON.stringify(u))
+}catch(e){console.error(e)}
 }
 
-function updateUIFromUser() {
-  if (u.isMod || u.isAdmin) {
-    document.getElementById('modBtn').style.display = 'block';
-  }
-  if (u.isAdmin) {
-    document.getElementById('adminBtn').textContent = 'Admin Panel';
-    document.getElementById('adminBtn').onclick = () => toggleMod();
-    document.getElementById('adminSection').style.display = 'block';
-  }
+function updateUIFromUser(){
+if(u.isMod||u.isAdmin){
+document.getElementById('modBtn').style.display='block'
+}
+if(u.isAdmin){
+document.getElementById('adminBtn').textContent='Admin Panel';
+document.getElementById('adminBtn').onclick=()=>toggleMod();
+document.getElementById('adminSection').style.display='block'
+}
 }
 
-function setupEvents() {
-  const mi = document.getElementById('minp');
-  mi.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMsg();
-    }
-  });
-  mi.addEventListener('input', e => {
-    e.target.style.height = 'auto';
-    e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
-  });
-  document.getElementById('nroom').addEventListener('keypress', e => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      createRoom();
-    }
-  });
-  document.getElementById('adminPass').addEventListener('keypress', e => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      adminLogin();
-    }
-  });
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-      if (poll) {
-        clearInterval(poll);
-        poll = setInterval(pollMsgs, POLL_INT * 2);
-      }
-    } else {
-      if (poll) {
-        clearInterval(poll);
-        poll = setInterval(pollMsgs, POLL_INT);
-      }
-      if (cr) pollMsgs();
-    }
-  });
+function setupEvents(){
+const mi=document.getElementById('minp');
+mi.addEventListener('keydown',e=>{
+if(e.key==='Enter'&&!e.shiftKey){
+e.preventDefault();sendMsg()
+}
+});
+mi.addEventListener('input',e=>{
+e.target.style.height='auto';
+e.target.style.height=Math.min(e.target.scrollHeight,120)+'px'
+});
+document.getElementById('nroom').addEventListener('keypress',e=>{
+if(e.key==='Enter'){e.preventDefault();createRoom()}
+});
+document.getElementById('adminPass').addEventListener('keypress',e=>{
+if(e.key==='Enter'){e.preventDefault();adminLogin()}
+});
+document.addEventListener('visibilitychange',()=>{
+if(document.hidden){
+if(poll){clearInterval(poll);poll=setInterval(pollMsgs,POLL_INT*2)}
+}else{
+if(poll){clearInterval(poll);poll=setInterval(pollMsgs,POLL_INT)}
+if(cr)pollMsgs()
+}
+})
 }
 
-async function checkForOrphanRooms() {
-  try {
-    const r = await fetchTo(`${API}/api/check-orphans`);
-    const d = await r.json();
-    if (r.ok && d.orphans && d.orphans.length > 0) {
-      orphanRooms = d.orphans;
-      if (orphanRooms.length > 0) {
-        showRecoveryModal();
-      }
-    }
-  } catch (e) {
-    console.error('Orphan check failed:', e);
-  }
+async function checkForOrphanRooms(){
+try{
+const r=await fetchTo(`${API}/api/check-orphans`);
+const d=await r.json();
+if(r.ok&&d.orphans&&d.orphans.length>0){
+orphanRooms=d.orphans;
+if(orphanRooms.length>0){
+showRecoveryModal()
+}
+}
+}catch(e){console.error('Orphan check failed:',e)}
 }
 
-function showRecoveryModal() {
-  const modal = document.getElementById('recoveryModal');
-  const container = document.getElementById('orphanRooms');
-  container.innerHTML = '';
-  orphanRooms.forEach(room => {
-    const div = document.createElement('div');
-    div.style.cssText = 'margin:.5rem 0;padding:.5rem;background:#f8f9fa;border-radius:4px';
-    div.innerHTML = `
+function showRecoveryModal(){
+const modal=document.getElementById('recoveryModal');
+const container=document.getElementById('orphanRooms');
+container.innerHTML='';
+orphanRooms.forEach(room=>{
+const div=document.createElement('div');
+div.style.cssText='margin:.5rem 0;padding:.5rem;background:#f8f9fa;border-radius:4px';
+div.innerHTML=`
 <strong>${room.name}</strong>
-<small style="color:#666">(${room.messageCount || 0} messages, last: ${room.lastActivity ? new Date(room.lastActivity).toLocaleDateString() : 'unknown'})</small>
+<small style="color:#666">(${room.messageCount||0} messages, last: ${room.lastActivity?new Date(room.lastActivity).toLocaleDateString():'unknown'})</small>
 `;
-    container.appendChild(div);
-  });
-  modal.classList.add('show');
+container.appendChild(div)
+});
+modal.classList.add('show')
 }
 
-async function recoverAllRooms() {
-  try {
-    const r = await fetchTo(`${API}/api/recover-rooms`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orphans: orphanRooms })
-    });
-    const d = await r.json();
-    if (r.ok) {
-      showNotif('Rooms recovered successfully!', 'success');
-      await loadRooms();
-      closeModal('recoveryModal');
-    } else {
-      throw new Error(d.error);
-    }
-  } catch (e) {
-    console.error(e);
-    showNotif('Recovery failed', 'error');
-  }
+async function recoverAllRooms(){
+try{
+const r=await fetchTo(`${API}/api/recover-rooms`,{
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({orphans:orphanRooms})
+});
+const d=await r.json();
+if(r.ok){
+showNotif('Rooms recovered successfully!','success');
+await loadRooms();
+closeModal('recoveryModal')
+}else{
+throw new Error(d.error)
+}
+}catch(e){
+console.error(e);
+showNotif('Recovery failed','error')
+}
 }
 
-async function testConn() {
-  try {
-    const r = await fetchTo(`${API}/api/health`, {}, 5000);
-    const d = await r.json();
-    if (r.ok) {
-      conn = true;
-      return true;
-    }
-  } catch (e) {
-    console.error(e);
-  }
-  conn = false;
-  return false;
+async function testConn(){
+try{
+const r=await fetchTo(`${API}/api/health`,{},5e3);
+const d=await r.json();
+if(r.ok){conn=!0;return!0}
+}catch(e){console.error(e)}
+conn=!1;return!1
 }
 
-function scheduleRetry() {
-  if (retry < MAX_RETRY) {
-    retry++;
-    setTimeout(async () => {
-      updateStat('connecting');
-      if (await testConn()) {
-        updateStat('online');
-        retry = 0;
-        if (!poll) startPoll();
-      } else {
-        updateStat('offline');
-        scheduleRetry();
-      }
-    }, RETRY_DELAY * retry);
-  } else {
-    updateStat('offline');
-    showNotif('Connection failed', 'error');
-  }
+function scheduleRetry(){
+if(retry<MAX_RETRY){
+retry++;
+setTimeout(async()=>{
+updateStat('connecting');
+if(await testConn()){
+updateStat('online');retry=0;
+if(!poll)startPoll()
+}else{
+updateStat('offline');scheduleRetry()
+}
+},RETRY_DELAY*retry)
+}else{
+updateStat('offline');
+showNotif('Connection failed','error')
+}
 }
 
-async function fetchTo(url, opt = {}, timeout = 10000) {
-  const ctrl = new AbortController();
-  const id = setTimeout(() => ctrl.abort(), timeout);
-  try {
-    const headers = opt.headers || {};
-    if (u.token) headers.Authorization = `Bearer ${u.token}`;
-    const r = await fetch(url, { ...opt, headers, signal: ctrl.signal });
-    clearTimeout(id);
-    return r;
-  } catch (e) {
-    clearTimeout(id);
-    throw e;
-  }
+async function fetchTo(url,opt={},timeout=1e4){
+const ctrl=new AbortController();
+const id=setTimeout(()=>ctrl.abort(),timeout);
+try{
+const headers=opt.headers||{};
+if(u.token)headers['Authorization']=`Bearer ${u.token}`;
+const r=await fetch(url,{...opt,headers,signal:ctrl.signal});
+clearTimeout(id);return r
+}catch(e){
+clearTimeout(id);throw e
+}
 }
 
-async function checkRooms() {
-  try {
-    const r = await fetchTo(`${API}/api/rooms`);
-    const d = await r.json();
-    return r.ok && d.rooms && d.rooms.length > 0;
-  } catch (e) {
-    return false;
-  }
+async function checkRooms(){
+try{
+const r=await fetchTo(`${API}/api/rooms`);
+const d=await r.json();
+return r.ok&&d.rooms&&d.rooms.length>0
+}catch(e){return!1}
 }
 
-function showSetup() {
-  document.getElementById('msgs').innerHTML = `
+function showSetup(){
+document.getElementById('msgs').innerHTML=`
 <div class="empty">
 <h3>🚀 Setup</h3>
 <p>First time? Create default rooms.</p>
 <button class="btn bp" onclick="initRooms()" style="margin-top:1rem">Create Rooms</button>
-</div>`;
+</div>`
 }
 
-async function initRooms() {
-  const btn = document.querySelector('#msgs button');
-  btn.disabled = true;
-  btn.textContent = 'Creating...';
-  try {
-    const r = await fetchTo(`${API}/api/initialize-default-rooms`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ adminKey: 'minigeo-setup-2024' })
-    });
-    const d = await r.json();
-    if (r.ok) {
-      await loadRooms();
-      startPoll();
-      showNotif('Rooms created!', 'success');
-    } else throw new Error(d.error);
-  } catch (e) {
-    console.error(e);
-    showNotif('Error creating rooms', 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Create Rooms';
-  }
+async function initRooms(){
+const btn=document.querySelector('#msgs button');
+btn.disabled=!0;btn.textContent='Creating...';
+try{
+const r=await fetchTo(`${API}/api/initialize-default-rooms`,{
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({adminKey:'minigeo-setup-2024'})
+});
+const d=await r.json();
+if(r.ok){
+await loadRooms();startPoll();
+showNotif('Rooms created!','success')
+}else throw new Error(d.error)
+}catch(e){
+console.error(e);
+showNotif('Error creating rooms','error')
+}finally{
+btn.disabled=!1;btn.textContent='Create Rooms'
+}
 }
 
-function showAdminLogin() {
-  document.getElementById('adminModal').classList.add('show');
+function showAdminLogin(){
+document.getElementById('adminModal').classList.add('show')
 }
 
-async function adminLogin() {
-  const pass = document.getElementById('adminPass').value;
-  if (!pass) {
-    showNotif('Enter password', 'error');
-    return;
-  }
-  try {
-    const r = await fetchTo(`${API}/api/admin-login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: pass })
-    });
-    const d = await r.json();
-    if (r.ok) {
-      u.isAdmin = true;
-      u.isMod = true;
-      u.token = d.token;
-      saveUser();
-      updateUIFromUser();
-      closeModal('adminModal');
-      showNotif('Admin access granted', 'success');
-    } else {
-      throw new Error(d.error);
-    }
-  } catch (e) {
-    console.error(e);
-    showNotif('Invalid password', 'error');
-  }
+async function adminLogin(){
+const pass=document.getElementById('adminPass').value;
+if(!pass){
+showNotif('Enter password','error');return
+}
+try{
+const r=await fetchTo(`${API}/api/admin-login`,{
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({password:pass})
+});
+const d=await r.json();
+if(r.ok){
+u.isAdmin=!0;u.isMod=!0;u.token=d.token;
+saveUser();updateUIFromUser();
+closeModal('adminModal');
+showNotif('Admin access granted','success')
+}else{
+throw new Error(d.error)
+}
+}catch(e){
+console.error(e);
+showNotif('Invalid password','error')
+}
 }
 
-async function updUser() {
-  const name = document.getElementById('uname').value.trim();
-  const label = document.getElementById('ulabel').value.trim();
-  if (!name) {
-    showNotif('Enter name', 'error');
-    return;
-  }
-  if (name.length < 2) {
-    showNotif('Name too short', 'error');
-    return;
-  }
-  const btn = document.getElementById('upd');
-  btn.disabled = true;
-  btn.textContent = 'Updating...';
-  try {
-    const r = await fetchTo(`${API}/api/users`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: u.id, name, label })
-    });
-    const d = await r.json();
-    if (r.ok) {
-      u.name = name;
-      u.label = label;
-      if (d.user.isMod !== undefined) u.isMod = d.user.isMod;
-      saveUser();
-      updateUIFromUser();
-      showNotif('Updated!', 'success');
-    } else throw new Error(d.error);
-  } catch (e) {
-    console.error(e);
-    showNotif('Update failed', 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Update';
-  }
+async function updUser(){
+const name=document.getElementById('uname').value.trim(),label=document.getElementById('ulabel').value.trim();
+if(!name){showNotif('Enter name','error');return}
+if(name.length<2){showNotif('Name too short','error');return}
+const btn=document.getElementById('upd');
+btn.disabled=!0;btn.textContent='Updating...';
+try{
+const r=await fetchTo(`${API}/api/users`,{
+method:'PUT',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({userId:u.id,name,label})
+});
+const d=await r.json();
+if(r.ok){
+u.name=name;u.label=label;
+if(d.user.isMod!==undefined)u.isMod=d.user.isMod;
+saveUser();updateUIFromUser();
+showNotif('Updated!','success')
+}else throw new Error(d.error)
+}catch(e){
+console.error(e);
+showNotif('Update failed','error')
+}finally{
+btn.disabled=!1;btn.textContent='Update'
+}
 }
 
-async function loadRooms() {
-  try {
-    const r = await fetchTo(`${API}/api/rooms`);
-    const d = await r.json();
-    if (r.ok) {
-      rooms = d.rooms || [];
-      renderRooms();
-    } else throw new Error(d.error);
-  } catch (e) {
-    console.error(e);
-    if (conn) showNotif('Failed to load rooms', 'error');
-  }
+async function loadRooms(){
+try{
+const r=await fetchTo(`${API}/api/rooms`);
+const d=await r.json();
+if(r.ok){
+rooms=d.rooms||[];
+renderRooms()
+}else throw new Error(d.error)
+}catch(e){
+console.error(e);
+if(conn)showNotif('Failed to load rooms','error')
+}
 }
 
-function renderRooms() {
-  const rl = document.getElementById('rl');
-  rl.innerHTML = '';
-  if (!rooms.length) {
-    rl.innerHTML = '<li style="color:#95a5a6;padding:1rem">No rooms</li>';
-    return;
-  }
-  rooms.forEach(r => {
-    const li = document.createElement('li');
-    li.className = `ri ${cr === r.name ? 'active' : ''}${r.isOrphan ? ' orphan' : ''}`;
-    li.innerHTML = `
-<span class="rn" title="${r.displayName || r.name}">
-${(r.displayName || r.name).substring(0, 25)}
-${r.isOrphan ? '🔄' : ''}
+function renderRooms(){
+const rl=document.getElementById('rl');
+rl.innerHTML='';
+if(!rooms.length){
+rl.innerHTML='<li style="color:#95a5a6;padding:1rem">No rooms</li>';
+return
+}
+rooms.forEach(r=>{
+const li=document.createElement('li');
+li.className=`ri ${cr===r.name?'active':''}${r.isOrphan?' orphan':''}`;
+li.innerHTML=`
+<span class="rn" title="${r.displayName||r.name}">
+${(r.displayName||r.name).substring(0,25)}
+${r.isOrphan?'🔄':''}
 </span>
-<span class="ru">${r.userCount || 0}</span>
+<span class="ru">${r.userCount||0}</span>
 `;
-    li.onclick = () => joinRoom(r.name, r.displayName);
-    rl.appendChild(li);
-  });
+li.onclick=()=>joinRoom(r.name,r.displayName);
+rl.appendChild(li)
+})
 }
 
-async function createRoom() {
-  const inp = document.getElementById('nroom');
-  const name = inp.value.trim();
-  if (!name || name.length < 2) {
-    showNotif('Invalid name', 'error');
-    return;
-  }
-  const btn = document.querySelector('.cr .btn');
-  btn.disabled = true;
-  btn.textContent = 'Creating...';
-  try {
-    const r = await fetchTo(`${API}/api/rooms`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roomName: name, createdBy: u.name || 'Anonymous' })
-    });
-    const d = await r.json();
-    if (r.ok) {
-      inp.value = '';
-      await loadRooms();
-      await joinRoom(d.roomName, d.displayName);
-      showNotif('Room created!', 'success');
-    } else throw new Error(d.error);
-  } catch (e) {
-    console.error(e);
-    showNotif('Create failed', 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Create';
-  }
+async function createRoom(){
+const inp=document.getElementById('nroom'),name=inp.value.trim();
+if(!name||name.length<2){
+showNotif('Invalid name','error');return
+}
+const btn=document.querySelector('.cr .btn');
+btn.disabled=!0;btn.textContent='Creating...';
+try{
+const r=await fetchTo(`${API}/api/rooms`,{
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({roomName:name,createdBy:u.name||'Anonymous'})
+});
+const d=await r.json();
+if(r.ok){
+inp.value='';await loadRooms();
+await joinRoom(d.roomName,d.displayName);
+showNotif('Room created!','success')
+}else throw new Error(d.error)
+}catch(e){
+console.error(e);
+showNotif('Create failed','error')
+}finally{
+btn.disabled=!1;btn.textContent='Create'
+}
 }
 
-async function joinRoom(name, disp) {
-  if (cr === name) return;
-  if (!u.name) {
-    showNotif('Set name first', 'error');
-    return;
-  }
-  showLoad(true);
-  try {
-    if (cr) await leaveRoom(cr);
-    const r = await fetchTo(`${API}/api/join-room`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: u.id, roomName: name, userName: u.name })
-    });
-    const d = await r.json();
-    if (r.ok) {
-      cr = name;
-      document.getElementById('crname').textContent = disp || name;
-      document.getElementById('minp').disabled = false;
-      document.getElementById('send').disabled = false;
-      clearMsgs();
-      await loadMsgs();
-      renderRooms();
-      showNotif(`Joined ${disp || name}`, 'success');
-    } else throw new Error(d.error);
-  } catch (e) {
-    console.error(e);
-    showNotif('Join failed', 'error');
-  } finally {
-    showLoad(false);
-  }
+async function joinRoom(name,disp){
+if(cr===name)return;
+if(!u.name){
+showNotif('Set name first','error');return
+}
+showLoad(!0);
+try{
+if(cr)await leaveRoom(cr);
+const r=await fetchTo(`${API}/api/join-room`,{
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({userId:u.id,roomName:name,userName:u.name})
+});
+const d=await r.json();
+if(r.ok){
+cr=name;
+document.getElementById('crname').textContent=disp||name;
+document.getElementById('minp').disabled=!1;
+document.getElementById('send').disabled=!1;
+clearMsgs();await loadMsgs();renderRooms();
+showNotif(`Joined ${disp||name}`,'success')
+}else throw new Error(d.error)
+}catch(e){
+console.error(e);
+showNotif('Join failed','error')
+}finally{showLoad(!1)}
 }
 
-async function leaveRoom(name) {
-  try {
-    await fetchTo(`${API}/api/leave-room`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: u.id, roomName: name })
-    });
-  } catch (e) {
-    console.error(e);
-  }
+async function leaveRoom(name){
+try{
+await fetchTo(`${API}/api/leave-room`,{
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({userId:u.id,roomName:name})
+})
+}catch(e){console.error(e)}
 }
 
-async function loadMsgs() {
-  if (!cr || !conn) return;
-  try {
-    let url = `${API}/api/messages?room=${cr}&limit=50&userId=${u.id}`;
-    if (lastMsg) url += `&since=${lastMsg}`;
-    const r = await fetchTo(url, {}, 5000);
-    const d = await r.json();
-    if (r.ok && d.messages) {
-      if (d.messages.length > 0) {
-        addMsgs(d.messages);
-        lastMsg = d.messages[d.messages.length - 1].timestamp;
-      }
-      if (!conn) {
-        conn = true;
-        updateStat('online');
-        retry = 0;
-      }
-    } else throw new Error(d.error);
-  } catch (e) {
-    console.error(e);
-    if (conn) {
-      conn = false;
-      updateStat('offline');
-      scheduleRetry();
-    }
-  }
+async function loadMsgs(){
+if(!cr||!conn)return;
+try{
+let url=`${API}/api/messages?room=${cr}&limit=50`;
+if(lastMsg)url+=`&since=${lastMsg}`;
+const r=await fetchTo(url,{},5e3);
+const d=await r.json();
+if(r.ok&&d.messages){
+if(d.messages.length>0){
+addMsgs(d.messages);
+lastMsg=d.messages[d.messages.length-1].timestamp
+}
+if(!conn){
+conn=!0;updateStat('online');retry=0
+}
+}else throw new Error(d.error)
+}catch(e){
+console.error(e);
+if(conn){
+conn=!1;updateStat('offline');scheduleRetry()
+}
+}
 }
 
-function addMsgs(newMsgs) {
-  const had = msgs.length > 0;
-  newMsgs.forEach(m => {
-    const existingIndex = msgs.findIndex(x => x.id === m.id);
-    if (existingIndex !== -1) {
-      msgs[existingIndex] = m;
-    } else {
-      msgs.push(m);
-    }
-  });
-  if (msgs.length > 200) msgs = msgs.slice(-200);
-  renderMsgs();
-  const cont = document.getElementById('msgs');
-  if (!had || (cont.scrollTop + cont.clientHeight >= cont.scrollHeight - 100)) scrollBot();
+function addMsgs(newMsgs){
+const had=msgs.length>0;
+newMsgs.forEach(m=>{
+if(!msgs.find(x=>x.id===m.id))msgs.push(m)
+});
+if(msgs.length>200)msgs=msgs.slice(-200);
+renderMsgs();
+const cont=document.getElementById('msgs');
+if(!had||(cont.scrollTop+cont.clientHeight>=cont.scrollHeight-100))scrollBot()
 }
 
-function clearMsgs() {
-  msgs = [];
-  lastMsg = null;
-  renderMsgs();
+function clearMsgs(){
+msgs=[];lastMsg=null;renderMsgs()
 }
 
-function renderMsgs() {
-  const cont = document.getElementById('msgs');
-  if (!msgs.length) {
-    cont.innerHTML = `
+function renderMsgs(){
+const cont=document.getElementById('msgs');
+if(!msgs.length){
+cont.innerHTML=`
 <div class="empty">
-<h3>Welcome to ${cr || 'Chat'}! 🗺️</h3>
+<h3>Welcome to ${cr||'Chat'}! 🗺️</h3>
 <p>Start the conversation!</p>
 </div>`;
-    return;
-  }
-  cont.innerHTML = '';
-  msgs.forEach(m => {
-    const div = document.createElement('div');
-    div.className = `msg ${m.userId === u.id ? 'own' : ''}`;
-    const time = new Date(m.timestamp).toLocaleTimeString();
-    
-    let modBtns = '';
-    if (m.userId !== u.id && (u.isMod || u.isAdmin)) {
-      modBtns = `
+return
+}
+cont.innerHTML='';
+msgs.forEach(m=>{
+const div=document.createElement('div');
+div.className=`msg ${m.userId===u.id?'own':''}`;
+const time=new Date(m.timestamp).toLocaleTimeString();
+let modBtns='';
+if(m.userId!==u.id&&(u.isMod||u.isAdmin)){
+modBtns=`
 <div class="mbtn">
 <button class="mb mute" onclick="quickMute('${m.userId}')">M</button>
 <button class="mb kick" onclick="kickUser('${m.userId}')">K</button>
-</div>`;
-    }
-    
-    let badges = '';
-    if (m.isAdmin) badges += '<span class="admin-badge">ADMIN</span>';
-    else if (m.isMod) badges += '<span class="mod-badge">MOD</span>';
-    
-    let karmaSection = '';
-    if (m.userId !== u.id) {
-      const karmaScore = (m.karma.up || 0) - (m.karma.down || 0);
-      const scoreClass = karmaScore > 0 ? 'positive' : karmaScore < 0 ? 'negative' : '';
-      const upActive = m.userVote === 'up' ? 'active' : '';
-      const downActive = m.userVote === 'down' ? 'active' : '';
-      
-      karmaSection = `
-<div class="karma ${m.userId === u.id ? 'own' : ''}">
-<button class="vote-btn up ${upActive}" onclick="vote('${m.id}', 'up')">
-👍 <span>${m.karma.up || 0}</span>
-</button>
-<span class="karma-score ${scoreClass}">${karmaScore > 0 ? '+' : ''}${karmaScore}</span>
-<button class="vote-btn down ${downActive}" onclick="vote('${m.id}', 'down')">
-👎 <span>${m.karma.down || 0}</span>
-</button>
-</div>`;
-    }
-    
-    div.innerHTML = `
+</div>`
+}
+let badges='';
+if(m.isAdmin)badges+='<span class="admin-badge">ADMIN</span>';
+else if(m.isMod)badges+='<span class="mod-badge">MOD</span>';
+
+div.innerHTML=`
 <div class="mhdr">
 <span class="mu">${esc(m.userName)}${badges}</span>
 <div style="display:flex;align-items:center">
@@ -571,376 +524,225 @@ ${modBtns}
 </div>
 </div>
 <div class="mc">${esc(m.message)}</div>
-${karmaSection}
 `;
-    cont.appendChild(div);
-  });
+cont.appendChild(div)
+})
 }
 
-async function vote(messageId, voteType) {
-  if (!cr || !u.id) return;
-  
-  try {
-    const r = await fetchTo(`${API}/api/vote`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messageId,
-        roomName: cr,
-        vote: voteType,
-        userId: u.id
-      })
-    });
-    
-    const d = await r.json();
-    if (r.ok) {
-      const msgIndex = msgs.findIndex(m => m.id === messageId);
-      if (msgIndex !== -1) {
-        msgs[msgIndex].karma = d.karma;
-        msgs[msgIndex].userVote = d.userVote;
-        renderMsgs();
-      }
-    } else {
-      showNotif(d.error || 'Vote failed', 'error');
-    }
-  } catch (e) {
-    console.error(e);
-    showNotif('Vote failed', 'error');
-  }
+async function sendMsg(){
+const inp=document.getElementById('minp'),msg=inp.value.trim();
+if(!msg||!cr||!u.name)return;
+if(msg.length>1e3){
+showNotif('Too long','error');return
+}
+const btn=document.getElementById('send');
+btn.disabled=!0;btn.textContent='Sending...';
+try{
+const r=await fetchTo(`${API}/api/messages`,{
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({roomName:cr,userId:u.id,userName:u.name,message:msg})
+});
+const d=await r.json();
+if(r.ok){
+inp.value='';inp.style.height='auto'
+}else throw new Error(d.error)
+}catch(e){
+console.error(e);
+showNotif('Send failed','error')
+}finally{
+btn.disabled=!1;btn.textContent='Send 📤'
+}
 }
 
-async function sendMsg() {
-  const inp = document.getElementById('minp');
-  const msg = inp.value.trim();
-  if (!msg || !cr || !u.name) return;
-  if (msg.length > 1000) {
-    showNotif('Too long', 'error');
-    return;
-  }
-  const btn = document.getElementById('send');
-  btn.disabled = true;
-  btn.textContent = 'Sending...';
-  try {
-    const r = await fetchTo(`${API}/api/messages`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roomName: cr, userId: u.id, userName: u.name, message: msg })
-    });
-    const d = await r.json();
-    if (r.ok) {
-      inp.value = '';
-      inp.style.height = 'auto';
-    } else throw new Error(d.error);
-  } catch (e) {
-    console.error(e);
-    showNotif('Send failed', 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Send 📤';
-  }
+function toggleMod(){
+document.getElementById('modModal').classList.add('show')
 }
 
-function toggleMod() {
-  document.getElementById('modModal').classList.add('show');
+async function muteUser(){
+const userId=document.getElementById('muteUser').value.trim(),time=parseInt(document.getElementById('muteTime').value);
+if(!userId||!time){
+showNotif('Enter user ID and time','error');return
+}
+try{
+const r=await fetchTo(`${API}/api/moderate`,{
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({action:'mute',userId,duration:time,moderatorId:u.id})
+});
+const d=await r.json();
+if(r.ok){
+showNotif('User muted','success');
+document.getElementById('muteUser').value='';
+document.getElementById('muteTime').value='10'
+}else throw new Error(d.error)
+}catch(e){
+showNotif('Mute failed','error')
+}
 }
 
-async function muteUser() {
-  const userId = document.getElementById('muteUser').value.trim();
-  const time = parseInt(document.getElementById('muteTime').value);
-  if (!userId || !time) {
-    showNotif('Enter user ID and time', 'error');
-    return;
-  }
-  try {
-    const r = await fetchTo(`${API}/api/moderate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'mute', userId, duration: time, moderatorId: u.id })
-    });
-    const d = await r.json();
-    if (r.ok) {
-      showNotif('User muted', 'success');
-      document.getElementById('muteUser').value = '';
-      document.getElementById('muteTime').value = '10';
-    } else throw new Error(d.error);
-  } catch (e) {
-    showNotif('Mute failed', 'error');
-  }
+async function delRoom(){
+const name=document.getElementById('delRoom').value.trim();
+if(!name){
+showNotif('Enter room name','error');return
+}
+if(!confirm(`Delete room "${name}"?`))return;
+try{
+const r=await fetchTo(`${API}/api/rooms/${name}`,{
+method:'DELETE',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({moderatorId:u.id})
+});
+const d=await r.json();
+if(r.ok){
+showNotif('Room deleted','success');
+document.getElementById('delRoom').value='';
+await loadRooms();
+if(cr===name){
+cr=null;
+document.getElementById('crname').textContent='Select a room';
+clearMsgs()
+}
+}else throw new Error(d.error)
+}catch(e){
+showNotif('Delete failed','error')
+}
 }
 
-async function delRoom() {
-  const name = document.getElementById('delRoom').value.trim();
-  if (!name) {
-    showNotif('Enter room name', 'error');
-    return;
-  }
-  if (!confirm(`Delete room "${name}"?`)) return;
-  try {
-    const r = await fetchTo(`${API}/api/rooms/${name}`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ moderatorId: u.id })
-    });
-    const d = await r.json();
-    if (r.ok) {
-      showNotif('Room deleted', 'success');
-      document.getElementById('delRoom').value = '';
-      await loadRooms();
-      if (cr === name) {
-        cr = null;
-        document.getElementById('crname').textContent = 'Select a room';
-        clearMsgs();
-      }
-    } else throw new Error(d.error);
-  } catch (e) {
-    showNotif('Delete failed', 'error');
-  }
+async function promoteUser(){
+const userId=document.getElementById('promoteUser').value.trim();
+if(!userId){
+showNotif('Enter user ID','error');return
+}
+try{
+const r=await fetchTo(`${API}/api/promote-user`,{
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({userId,adminId:u.id})
+});
+const d=await r.json();
+if(r.ok){
+showNotif('User promoted to moderator','success');
+document.getElementById('promoteUser').value=''
+}else throw new Error(d.error)
+}catch(e){
+showNotif('Promotion failed','error')
+}
 }
 
-async function cleanupAllRooms() {
-  if (!confirm('This will archive all messages and clean all rooms. Continue?')) return;
-  try {
-    const r = await fetchTo(`${API}/api/cleanup`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ adminKey: 'minigeo-cleanup-2024' })
-    });
-    const d = await r.json();
-    if (r.ok) {
-      showNotif(`Cleanup completed: ${d.message}`, 'success');
-      clearMsgs();
-      await loadMsgs();
-    } else throw new Error(d.error);
-  } catch (e) {
-    showNotif('Cleanup failed', 'error');
-  }
+async function demoteUser(){
+const userId=document.getElementById('demoteUser').value.trim();
+if(!userId){
+showNotif('Enter user ID','error');return
+}
+if(!confirm('Remove moderator privileges?'))return;
+try{
+const r=await fetchTo(`${API}/api/demote-user`,{
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({userId,adminId:u.id})
+});
+const d=await r.json();
+if(r.ok){
+showNotif('User demoted','success');
+document.getElementById('demoteUser').value=''
+}else throw new Error(d.error)
+}catch(e){
+showNotif('Demotion failed','error')
+}
 }
 
-async function promoteUser() {
-  const userId = document.getElementById('promoteUser').value.trim();
-  if (!userId) {
-    showNotif('Enter user ID', 'error');
-    return;
-  }
-  try {
-    const r = await fetchTo(`${API}/api/promote-user`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, adminId: u.id })
-    });
-    const d = await r.json();
-    if (r.ok) {
-      showNotif('User promoted to moderator', 'success');
-      document.getElementById('promoteUser').value = '';
-    } else throw new Error(d.error);
-  } catch (e) {
-    showNotif('Promotion failed', 'error');
-  }
+async function listModerators(){
+try{
+const r=await fetchTo(`${API}/api/moderators`);
+const d=await r.json();
+if(r.ok){
+const mods=d.moderators||[];
+showNotif(`Moderators: ${mods.join(', ')||'None'}`, 'success')
+}else throw new Error(d.error)
+}catch(e){
+showNotif('Failed to get moderators','error')
+}
 }
 
-async function demoteUser() {
-  const userId = document.getElementById('demoteUser').value.trim();
-  if (!userId) {
-    showNotif('Enter user ID', 'error');
-    return;
-  }
-  if (!confirm('Remove moderator privileges?')) return;
-  try {
-    const r = await fetchTo(`${API}/api/demote-user`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, adminId: u.id })
-    });
-    const d = await r.json();
-    if (r.ok) {
-      showNotif('User demoted', 'success');
-      document.getElementById('demoteUser').value = '';
-    } else throw new Error(d.error);
-  } catch (e) {
-    showNotif('Demotion failed', 'error');
-  }
+async function quickMute(userId){
+if(!confirm('Mute user for 10 minutes?'))return;
+try{
+const r=await fetchTo(`${API}/api/moderate`,{
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({action:'mute',userId,duration:10,moderatorId:u.id})
+});
+if(r.ok)showNotif('User muted','success');
+else showNotif('Mute failed','error')
+}catch(e){
+showNotif('Error','error')
+}
 }
 
-async function listModerators() {
-  try {
-    const r = await fetchTo(`${API}/api/moderators`);
-    const d = await r.json();
-    if (r.ok) {
-      const mods = d.moderators || [];
-      showNotif(`Moderators: ${mods.join(', ') || 'None'}`, 'success');
-    } else throw new Error(d.error);
-  } catch (e) {
-    showNotif('Failed to get moderators', 'error');
-  }
+async function kickUser(userId){
+if(!confirm('Kick user from room?'))return;
+try{
+const r=await fetchTo(`${API}/api/moderate`,{
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({action:'kick',userId,roomName:cr,moderatorId:u.id})
+});
+if(r.ok)showNotif('User kicked','success');
+else showNotif('Kick failed','error')
+}catch(e){
+showNotif('Error','error')
+}
 }
 
-async function quickMute(userId) {
-  if (!confirm('Mute user for 10 minutes?')) return;
-  try {
-    const r = await fetchTo(`${API}/api/moderate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'mute', userId, duration: 10, moderatorId: u.id })
-    });
-    if (r.ok) showNotif('User muted', 'success');
-    else showNotif('Mute failed', 'error');
-  } catch (e) {
-    showNotif('Error', 'error');
-  }
+function startPoll(){
+if(poll)clearInterval(poll);
+poll=setInterval(pollMsgs,POLL_INT)
 }
 
-async function kickUser(userId) {
-  if (!confirm('Kick user from room?')) return;
-  try {
-    const r = await fetchTo(`${API}/api/moderate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'kick', userId, roomName: cr, moderatorId: u.id })
-    });
-    if (r.ok) showNotif('User kicked', 'success');
-    else showNotif('Kick failed', 'error');
-  } catch (e) {
-    showNotif('Error', 'error');
-  }
+async function pollMsgs(){
+if(cr)await loadMsgs();
+await loadRooms()
 }
 
-async function showArchives() {
-  const modal = document.getElementById('archiveModal');
-  const select = document.getElementById('archiveRoomSelect');
-  
-  select.innerHTML = '<option value="">Select a room...</option>';
-  rooms.forEach(room => {
-    const option = document.createElement('option');
-    option.value = room.name;
-    option.textContent = room.displayName || room.name;
-    select.appendChild(option);
-  });
-  
-  select.onchange = async () => {
-    if (select.value) {
-      await loadArchiveList(select.value);
-    }
-  };
-  
-  modal.classList.add('show');
+function updateStat(stat){
+const el=document.getElementById('stat');
+const map={online:'Online',offline:'Offline',connecting:'Connecting...'};
+el.textContent=map[stat]||stat;
+el.className=`stat ${stat}`;
+conn=stat==='online'
 }
 
-async function loadArchiveList(roomName) {
-  try {
-    const r = await fetchTo(`${API}/api/archive?room=${roomName}`);
-    const d = await r.json();
-    const container = document.getElementById('archiveList');
-    
-    if (r.ok && d.archives && d.archives.length > 0) {
-      container.innerHTML = '';
-      d.archives.forEach(archive => {
-        const div = document.createElement('div');
-        div.className = 'archive-item';
-        div.innerHTML = `
-          <div class="archive-date">${new Date(archive.archivedAt).toLocaleString()}</div>
-          <div class="archive-meta">
-            <span class="archive-count">${archive.messageCount} messages</span>
-            ${archive.dateRange.start ? ` • ${new Date(archive.dateRange.start).toLocaleDateString()} to ${new Date(archive.dateRange.end).toLocaleDateString()}` : ''}
-          </div>
-        `;
-        div.onclick = () => viewArchive(archive.key, roomName);
-        container.appendChild(div);
-      });
-    } else {
-      container.innerHTML = '<p style="text-align:center;color:#666;padding:2rem">No archives found for this room</p>';
-    }
-  } catch (e) {
-    document.getElementById('archiveList').innerHTML = '<p style="text-align:center;color:#e74c3c;padding:2rem">Failed to load archives</p>';
-  }
+function esc(txt){
+const div=document.createElement('div');
+div.textContent=txt;return div.innerHTML
 }
 
-async function viewArchive(archiveKey, roomName) {
-  try {
-    const r = await fetchTo(`${API}/api/archive?room=${roomName}&id=${archiveKey}`);
-    const d = await r.json();
-    
-    if (r.ok && d.archive) {
-      const modal = document.getElementById('archiveViewModal');
-      const title = document.getElementById('archiveViewTitle');
-      const container = document.getElementById('archiveMessages');
-      
-      title.textContent = `Archive: ${roomName} (${new Date(d.archive.archivedAt).toLocaleDateString()})`;
-      
-      container.innerHTML = '';
-      d.archive.messages.forEach(m => {
-        const div = document.createElement('div');
-        div.style.cssText = 'margin-bottom:1rem;padding:.75rem;background:#fff;border-radius:8px;border-left:3px solid #3498db';
-        const karmaScore = (m.karma.up || 0) - (m.karma.down || 0);
-        div.innerHTML = `
-          <div style="display:flex;justify-content:space-between;margin-bottom:.5rem">
-            <strong>${esc(m.userName)}</strong>
-            <small style="color:#666">${new Date(m.timestamp).toLocaleString()}</small>
-          </div>
-          <div style="margin-bottom:.5rem">${esc(m.message)}</div>
-          <div style="font-size:.8rem;color:#666">
-            Karma: ${karmaScore > 0 ? '+' : ''}${karmaScore} (👍${m.karma.up || 0} 👎${m.karma.down || 0})
-          </div>
-        `;
-        container.appendChild(div);
-      });
-      
-      closeModal('archiveModal');
-      modal.classList.add('show');
-    }
-  } catch (e) {
-    showNotif('Failed to load archive', 'error');
-  }
+function showNotif(msg,type='success'){
+document.querySelectorAll('.notif').forEach(el=>el.remove());
+const n=document.createElement('div');
+n.className=`notif ${type}`;
+n.textContent=msg;
+document.body.appendChild(n);
+setTimeout(()=>n.remove(),5e3)
 }
 
-function startPoll() {
-  if (poll) clearInterval(poll);
-  poll = setInterval(pollMsgs, POLL_INT);
+function showLoad(show){
+document.getElementById('load').classList.toggle('show',show)
 }
 
-async function pollMsgs() {
-  if (cr) await loadMsgs();
-  await loadRooms();
+function scrollBot(){
+const cont=document.getElementById('msgs');
+cont.scrollTop=cont.scrollHeight
 }
 
-function updateStat(stat) {
-  const el = document.getElementById('stat');
-  const map = { online: 'Online', offline: 'Offline', connecting: 'Connecting...' };
-  el.textContent = map[stat] || stat;
-  el.className = `stat ${stat}`;
-  conn = stat === 'online';
+function closeModal(id){
+document.getElementById(id).classList.remove('show')
 }
 
-function esc(txt) {
-  const div = document.createElement('div');
-  div.textContent = txt;
-  return div.innerHTML;
-}
-
-function showNotif(msg, type = 'success') {
-  document.querySelectorAll('.notif').forEach(el => el.remove());
-  const n = document.createElement('div');
-  n.className = `notif ${type}`;
-  n.textContent = msg;
-  document.body.appendChild(n);
-  setTimeout(() => n.remove(), 5000);
-}
-
-function showLoad(show) {
-  document.getElementById('load').classList.toggle('show', show);
-}
-
-function scrollBot() {
-  const cont = document.getElementById('msgs');
-  cont.scrollTop = cont.scrollHeight;
-}
-
-function closeModal(id) {
-  document.getElementById(id).classList.remove('show');
-}
-
-window.addEventListener('beforeunload', () => {
-  if (poll) clearInterval(poll);
-  if (cr) navigator.sendBeacon(`${API}/api/leave-room`, JSON.stringify({ userId: u.id, roomName: cr }));
+window.addEventListener('beforeunload',()=>{
+if(poll)clearInterval(poll);
+if(cr)navigator.sendBeacon(`${API}/api/leave-room`,JSON.stringify({userId:u.id,roomName:cr}))
 });
 </script>
 </body>

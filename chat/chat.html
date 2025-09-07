@@ -594,25 +594,33 @@
         
         // ===== INITIALIZATION =====
         document.addEventListener('DOMContentLoaded', async () => {
-            showLoading(true);
-            
-            try {
-                await loadUserData();
-                setupEventListeners();
-                await loadRooms();
-                await testConnection();
-                startPolling();
-                
-                updateConnectionStatus('online');
-                retryCount = 0;
-            } catch (error) {
-                console.error('Initialization failed:', error);
-                updateConnectionStatus('offline');
-                scheduleRetry();
-            } finally {
-                showLoading(false);
-            }
-        });
+    showLoading(true);
+    
+    try {
+        await loadUserData();
+        setupEventListeners();
+        
+        // Check if we need to initialize default rooms
+        const roomsExist = await checkIfRoomsExist();
+        if (!roomsExist) {
+            // Show setup button
+            showSetupButton();
+        } else {
+            await loadRooms();
+            await testConnection();
+            startPolling();
+            updateConnectionStatus('online');
+        }
+        
+        retryCount = 0;
+    } catch (error) {
+        console.error('Initialization failed:', error);
+        updateConnectionStatus('offline');
+        scheduleRetry();
+    } finally {
+        showLoading(false);
+    }
+});
         
         function generateUserId() {
             const timestamp = Date.now().toString(36);
@@ -745,6 +753,60 @@
             }
         }
         
+async function checkIfRoomsExist() {
+    try {
+        const response = await fetchWithTimeout(`${API_BASE}/api/rooms`);
+        const data = await response.json();
+        return response.ok && data.rooms && data.rooms.length > 0;
+    } catch (error) {
+        return false;
+    }
+}
+
+function showSetupButton() {
+    const container = document.getElementById('messagesContainer');
+    container.innerHTML = `
+        <div class="empty-state">
+            <h3>🚀 Configuración Inicial</h3>
+            <p>Parece que es la primera vez. Haz clic para crear las salas principales.</p>
+            <button class="btn btn-primary" onclick="initializeDefaultRooms()" style="margin-top: 1rem;">
+                Crear Salas Principales
+            </button>
+        </div>
+    `;
+}
+
+async function initializeDefaultRooms() {
+    const setupBtn = document.querySelector('#messagesContainer button');
+    setupBtn.disabled = true;
+    setupBtn.textContent = 'Creando salas...';
+    
+    try {
+        const response = await fetchWithTimeout(`${API_BASE}/api/initialize-default-rooms`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                adminKey: 'minigeo-setup-2024'
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            await loadRooms();
+            startPolling();
+            showNotification('¡Salas creadas correctamente!', 'success');
+        } else {
+            throw new Error(data.error || 'Failed to initialize rooms');
+        }
+    } catch (error) {
+        console.error('Error initializing rooms:', error);
+        showNotification('Error al crear salas', 'error');
+    } finally {
+        setupBtn.disabled = false;
+        setupBtn.textContent = 'Crear Salas Principales';
+    }
+}
         // ===== USER MANAGEMENT =====
         async function updateUserInfo() {
             const name = document.getElementById('userName').value.trim();

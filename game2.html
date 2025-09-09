@@ -202,9 +202,9 @@ function saveUser() {
 
 async function tryJoinMain() {
     try {
-        const mainRoom = rooms.find(room => room.name === 'mainroom');
+        const mainRoom = rooms.find(room => room.name === 'global');
         if (mainRoom) {
-            await joinRoom('mainroom');
+            await joinRoom('global');
         } else {
             console.log('Sala main no encontrada');
             document.getElementById('msgs').innerHTML = '<div class="empty">Selecciona una sala en ⚙ para comenzar</div>';
@@ -224,7 +224,7 @@ function updateUIFromUser() {
 
 async function autoJoinMain() {
     try {
-        await joinRoom('mainroom');
+        await joinRoom('global');
     } catch (e) {
         console.error('No se pudo unir a main:', e);
     }

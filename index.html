@@ -1,1 +1,275 @@
-index.html
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MiniGeo · Cosas divertidas, útiles y gratis</title>
+<meta name="description" content="MiniGeo es una iniciativa de Jean Phillippe Studio: juegos, herramientas y experimentos gratis para la gente de este mundo.">
+<meta name="theme-color" content="#0b1026">
+<meta property="og:title" content="MiniGeo">
+<meta property="og:description" content="Cosas divertidas, útiles y gratis para la gente de este mundo. Una iniciativa de Jean Phillippe Studio.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%230b1026'/%3E%3Ccircle cx='32' cy='32' r='19' fill='none' stroke='%235ad1ff' stroke-width='3' stroke-dasharray='2 6' stroke-linecap='round'/%3E%3Ccircle cx='40' cy='24' r='7' fill='%23b8f34a'/%3E%3C/svg%3E">
+<style>
+:root{--bg:#0b1026;--pn:#141b3c;--pn2:#1b2450;--bd:#2a3468;--tx:#eef1ff;--mu:#9aa3c7;--lime:#b8f34a;--coral:#ff6b5e;--sun:#ffd23f;--sky:#5ad1ff;--r:18px}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--tx);font:17px/1.5 ui-rounded,"SF Pro Rounded","Hiragino Maru Gothic ProN",Nunito,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+.w{max-width:1060px;margin:0 auto;padding:0 22px}
+header{display:flex;align-items:center;gap:14px;height:68px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:900;font-size:1.35em;letter-spacing:-.03em;text-decoration:none}
+.logo i{width:14px;height:14px;border-radius:50%;background:var(--lime);box-shadow:0 0 0 5px #b8f34a33}
+.logo b{color:var(--sky)}
+.sp{flex:1}
+.lang{display:flex;border:1.5px solid var(--bd);border-radius:99px;padding:3px;font-size:.82em;font-weight:800}
+.lang button{padding:5px 12px;border-radius:99px;color:var(--mu)}
+.lang button.on{background:var(--tx);color:var(--bg)}
+.hero{display:grid;grid-template-columns:1.1fr .9fr;align-items:center;gap:20px;padding-top:36px;padding-bottom:30px;min-height:min(78vh,640px)}
+.eyebrow{display:inline-block;padding:6px 14px;border-radius:99px;background:var(--pn2);border:1px solid var(--bd);color:var(--mu);font-size:.85em;font-weight:700;margin-bottom:20px}
+h1{font-size:clamp(2.3em,6.2vw,4.3em);line-height:1.02;font-weight:900;letter-spacing:-.045em;text-wrap:balance}
+h1 .a{color:var(--lime)}h1 .b{color:var(--sun)}h1 .c{color:var(--coral)}
+.sub{font-size:1.16em;color:var(--mu);margin:22px 0 28px;max-width:520px}
+.bt{display:inline-flex;align-items:center;gap:8px;padding:14px 24px;border-radius:99px;font-weight:800;text-decoration:none;transition:transform .12s}
+.bt:hover{transform:translateY(-2px)}
+.bt.p{background:var(--lime);color:#16210a}
+.bt.s{border:1.5px solid var(--bd)}
+.row{display:flex;flex-wrap:wrap;gap:10px}
+.globo{position:relative;justify-self:center;width:min(100%,440px);aspect-ratio:1}
+.globo canvas{width:100%;height:100%;display:block}
+section{padding-top:72px}
+h2{font-size:clamp(1.6em,3.8vw,2.4em);font-weight:900;letter-spacing:-.035em;line-height:1.08}
+.lead{color:var(--mu);font-size:1.08em;margin-top:10px;max-width:640px}
+.tres{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:26px}
+.tres div{border-radius:var(--r);padding:24px;color:#10142b}
+.tres div:nth-child(1){background:var(--coral)}
+.tres div:nth-child(2){background:var(--sky)}
+.tres div:nth-child(3){background:var(--lime)}
+.tres b{display:block;font-size:1.5em;font-weight:900;letter-spacing:-.03em}
+.tres p{margin-top:6px;font-weight:600;opacity:.82}
+.cosas{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:26px}
+.cosa{display:flex;flex-direction:column;gap:8px;background:var(--pn);border:1px solid var(--bd);border-radius:var(--r);padding:22px;text-decoration:none;transition:transform .15s,border-color .15s}
+a.cosa:hover{transform:translateY(-3px);border-color:var(--k,var(--sky))}
+.cosa .ic{width:52px;height:52px;border-radius:15px;display:grid;place-items:center;font-size:1.6em;background:color-mix(in srgb,var(--k,var(--sky)) 20%,transparent)}
+.cosa .tag{font-size:.72em;text-transform:uppercase;letter-spacing:.09em;font-weight:900;color:var(--k,var(--sky))}
+.cosa b{font-size:1.25em;font-weight:900;letter-spacing:-.02em}
+.cosa p{color:var(--mu);font-size:.95em;flex:1}
+.cosa .ir{font-weight:800;font-size:.9em;margin-top:6px}
+.cosa .ir.no{color:var(--mu)}
+.dos{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:26px}
+.caja{background:var(--pn);border:1px solid var(--bd);border-radius:var(--r);padding:28px}
+.caja h3{font-size:1.25em;font-weight:900;letter-spacing:-.02em;margin-bottom:8px}
+.caja p{color:var(--mu)}
+.caja a{color:var(--sky);font-weight:800}
+footer{padding:80px 22px 46px;text-align:center}
+footer img{max-width:230px;width:60%;height:auto;opacity:.9}
+@media(max-width:860px){.hero{grid-template-columns:1fr;min-height:0;padding-top:20px}.globo{order:-1;width:min(74vw,320px)}.cosas{grid-template-columns:1fr 1fr}}
+@media(max-width:620px){.tres,.cosas,.dos{grid-template-columns:1fr}section{padding-top:56px}}
+</style>
+</head>
+<body>
+<div class="w">
+<header>
+  <a class="logo" href="#"><i></i><span>Mini<b>Geo</b></span></a>
+  <span class="sp"></span>
+  <div class="lang" role="group" aria-label="Idioma / Language"><button data-l="es">ES</button><button data-l="en">EN</button></div>
+</header>
+
+<div class="hero">
+  <div>
+    <span class="eyebrow" data-t="eyebrow"></span>
+    <h1 data-t="h1"></h1>
+    <p class="sub" data-t="sub"></p>
+    <div class="row"><a class="bt p" href="#cosas" data-t="cta1"></a><a class="bt s" href="#idea" data-t="cta2"></a></div>
+  </div>
+  <div class="globo" aria-hidden="true"><canvas id="globo"></canvas></div>
+</div>
+
+<section id="idea">
+  <h2 data-t="idea_h"></h2>
+  <p class="lead" data-t="idea_p"></p>
+  <div class="tres">
+    <div><b data-t="t1"></b><p data-t="t1p"></p></div>
+    <div><b data-t="t2"></b><p data-t="t2p"></p></div>
+    <div><b data-t="t3"></b><p data-t="t3p"></p></div>
+  </div>
+</section>
+
+<section id="cosas">
+  <h2 data-t="cosas_h"></h2>
+  <p class="lead" data-t="cosas_p"></p>
+  <div class="cosas" id="lista"></div>
+</section>
+
+<section>
+  <div class="dos">
+    <div class="caja"><h3 data-t="nombre_h"></h3><p data-t="nombre_p"></p></div>
+    <div class="caja"><h3 data-t="jps_h"></h3><p data-t="jps_p"></p><p style="margin-top:12px"><a href="https://jeanphillippe.com" target="_blank" rel="noopener">jeanphillippe.com</a></p></div>
+  </div>
+</section>
+</div>
+
+<footer>
+  <a href="https://jeanphillippe.com" target="_blank" rel="noopener"><img src="https://jeanphillippe.com/madeby-light.png" alt="Hecho en La Pampa por Jean Phillippe Studio" loading="lazy"></a>
+</footer>
+
+<script>
+'use strict';
+/* ------------------------------------------------------------------
+   Textos en español e inglés. Para cambiar algo, se edita acá.
+   ------------------------------------------------------------------ */
+var TXT = {
+  es: {
+    title: 'MiniGeo · Cosas divertidas, útiles y gratis',
+    eyebrow: 'Una iniciativa de Jean Phillippe Studio',
+    h1: 'Cosas <span class="a">divertidas</span>, <span class="b">útiles</span> y <span class="c">gratis</span> para la gente de este mundo.',
+    sub: 'Juegos, herramientas y experimentos que se abren desde un link. No hay que pagar nada.',
+    cta1: 'Ver lo que hay', cta2: 'De qué se trata',
+    idea_h: 'De qué se trata',
+    idea_p: 'En Jean Phillippe Studio hacemos tecnología para clientes. MiniGeo es el lugar donde publicamos lo que hacemos para regalar.',
+    t1: 'Divertido', t1p: 'Juegos y mundos para explorar, solo o con más gente.',
+    t2: 'Útil', t2p: 'Herramientas chicas que resuelven algo concreto.',
+    t3: 'Gratis', t3p: 'Se abren desde el navegador, en el teléfono o en la compu.',
+    cosas_h: 'Lo que hay',
+    cosas_p: 'La lista va creciendo. Cada cosa vive en su propia dirección y se puede usar ahora mismo, salvo las que dicen "Muy pronto".',
+    juego: 'Juego', herramienta: 'Herramienta', comunidad: 'Comunidad',
+    abrir: 'Abrir', pronto: 'Muy pronto',
+    nombre_h: 'Por qué se llama MiniGeo',
+    nombre_p: 'MiniGeo empezó como un experimento de geolocalización: modelos 3D animados puestos sobre lugares reales. De ahí salieron los primeros juegos, y con el tiempo el nombre quedó para todo lo que hacemos para compartir.',
+    jps_h: 'Quién está detrás',
+    jps_p: 'Jean Phillippe Studio es un estudio de tecnología de Santa Rosa, La Pampa, Argentina. Trabaja con municipios, universidades y empresas, y mantiene MiniGeo por su cuenta.',
+    firma: 'Hecho en La Pampa por Jean Phillippe Studio'
+  },
+  en: {
+    title: 'MiniGeo · Fun, useful and free stuff',
+    eyebrow: 'An initiative from Jean Phillippe Studio',
+    h1: '<span class="a">Fun</span>, <span class="b">useful</span> and <span class="c">free</span> stuff for the people of this world.',
+    sub: 'Games, tools and experiments that open from a link. There is nothing to pay.',
+    cta1: 'See what\'s here', cta2: 'What it is about',
+    idea_h: 'What it is about',
+    idea_p: 'At Jean Phillippe Studio we build technology for clients. MiniGeo is where we publish the things we make to give away.',
+    t1: 'Fun', t1p: 'Games and worlds to explore, alone or with other people.',
+    t2: 'Useful', t2p: 'Small tools that solve one specific thing.',
+    t3: 'Free', t3p: 'They open in the browser, on a phone or a computer.',
+    cosas_h: 'What\'s here',
+    cosas_p: 'The list keeps growing. Each thing lives at its own address and can be used right now, except the ones marked "Coming soon".',
+    juego: 'Game', herramienta: 'Tool', comunidad: 'Community',
+    abrir: 'Open', pronto: 'Coming soon',
+    nombre_h: 'Why it is called MiniGeo',
+    nombre_p: 'MiniGeo started as a geolocation experiment: animated 3D models placed on real locations. The first games came out of that, and over time the name stayed for everything we make to share.',
+    jps_h: 'Who is behind it',
+    jps_p: 'Jean Phillippe Studio is a technology studio from Santa Rosa, La Pampa, Argentina. It works with city governments, universities and companies, and runs MiniGeo on its own.',
+    firma: 'Made in La Pampa by Jean Phillippe Studio'
+  }
+};
+
+/* ------------------------------------------------------------------
+   Lo que hay. Para sumar algo: una línea más.
+   url vacía = se muestra como "Muy pronto".
+   ------------------------------------------------------------------ */
+var COSAS = [
+  { ic: '🏝️', k: 'var(--sun)', tipo: 'juego', n: 'Isla Historias', url: 'https://jeanphillippe.github.io/MiniGeo',
+    es: 'Un mundo interactivo geolocalizado para recorrer, con historias populares en cada rincón.',
+    en: 'A geolocated interactive world to walk around, with folk stories in every corner.' },
+  { ic: '🚀', k: 'var(--coral)', tipo: 'juego', n: 'Quantum Frontier', url: 'https://jeanphillippe.github.io/MiniGeo',
+    es: 'Un juego de naves en 3D para jugar con más gente al mismo tiempo.',
+    en: 'A 3D space shooter to play with other people at the same time.' },
+  { ic: '💬', k: 'var(--sky)', tipo: 'comunidad', n: 'Chat MiniGeo', url: 'https://chat.minigeo.org',
+    es: 'Un chat con salas donde los mensajes se votan.',
+    en: 'A chat with rooms where messages get voted on.' },
+  { ic: '🥁', k: 'var(--lime)', tipo: 'herramienta', n: 'GREENPAD', url: 'https://greenpad.jeanphillippe.com',
+    es: 'Para armar música desde el teléfono tocando una grilla, sin saber de escalas.',
+    en: 'Make music on your phone by tapping a grid, no music theory needed.' },
+  { ic: '❤️', k: 'var(--coral)', tipo: 'herramienta', n: 'Vibrameter', url: 'https://vibrameter.com',
+    es: 'Reacciones gratis para poner en cualquier sitio web.',
+    en: 'Free reactions to add to any website.' },
+  { ic: '🍴', k: 'var(--sun)', tipo: 'herramienta', n: 'Fork', url: '',
+    es: 'Pedidos, cocina y entrega para locales gastronómicos, en las pantallas que ya tienen.',
+    en: 'Orders, kitchen and delivery for food places, on the screens they already have.' }
+];
+
+function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+var idioma = 'es';
+function pintar(l) {
+  idioma = TXT[l] ? l : 'es';
+  var t = TXT[idioma];
+  document.documentElement.lang = idioma;
+  document.title = t.title;
+  [].forEach.call(document.querySelectorAll('[data-t]'), function (el) { el.innerHTML = t[el.getAttribute('data-t')]; });
+  [].forEach.call(document.querySelectorAll('.lang button'), function (b) { b.className = b.getAttribute('data-l') === idioma ? 'on' : ''; });
+  document.querySelector('footer img').alt = t.firma;
+  document.getElementById('lista').innerHTML = COSAS.map(function (c) {
+    var dentro = '<span class="ic">' + c.ic + '</span><span class="tag">' + esc(t[c.tipo]) + '</span><b>' + esc(c.n) + '</b><p>' + esc(c[idioma]) + '</p>' +
+      (c.url ? '<span class="ir">' + esc(t.abrir) + ' →</span>' : '<span class="ir no">' + esc(t.pronto) + '</span>');
+    return c.url ? '<a class="cosa" style="--k:' + c.k + '" href="' + esc(c.url) + '" target="_blank" rel="noopener">' + dentro + '</a>'
+      : '<div class="cosa" style="--k:' + c.k + '">' + dentro + '</div>';
+  }).join('');
+}
+var guardado = null;
+try { guardado = localStorage.getItem('minigeo:idioma'); } catch (e) { /* sin almacenamiento */ }
+pintar(guardado || (/^es/i.test(navigator.language || 'es') ? 'es' : 'en'));
+document.querySelector('.lang').addEventListener('click', function (e) {
+  var l = e.target.getAttribute('data-l'); if (!l) return;
+  pintar(l);
+  try { localStorage.setItem('minigeo:idioma', l); } catch (er) { /* sin almacenamiento */ }
+});
+
+/* ------------------------------------------------------------------
+   El globo: una esfera de puntos que gira, con pines de colores.
+   ------------------------------------------------------------------ */
+(function () {
+  var cv = document.getElementById('globo'), cx = cv.getContext('2d');
+  var N = 620, pts = [], gold = Math.PI * (3 - Math.sqrt(5));
+  for (var i = 0; i < N; i++) {
+    var y = 1 - (i / (N - 1)) * 2, r = Math.sqrt(1 - y * y), th = gold * i;
+    pts.push([Math.cos(th) * r, y, Math.sin(th) * r]);
+  }
+  var colores = ['#b8f34a', '#ff6b5e', '#ffd23f', '#5ad1ff', '#b8f34a', '#ffd23f', '#ff6b5e'];
+  var pines = colores.map(function (c, k) {
+    var la = (-0.9 + k * 0.31), lo = k * 2.4;
+    return { p: [Math.cos(la) * Math.cos(lo), Math.sin(la), Math.cos(la) * Math.sin(lo)], c: c, f: k * 0.9 };
+  });
+  var quieto = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var W = 0, visible = true, t0 = 0;
+  function medir() {
+    var d = Math.min(window.devicePixelRatio || 1, 2), w = cv.clientWidth;
+    W = w; cv.width = cv.height = Math.round(w * d); cx.setTransform(d, 0, 0, d, 0, 0);
+  }
+  function rot(p, a) {
+    var c = Math.cos(a), s = Math.sin(a), x = p[0] * c + p[2] * s, z = -p[0] * s + p[2] * c;
+    var ti = 0.38, c2 = Math.cos(ti), s2 = Math.sin(ti);
+    return [x, p[1] * c2 - z * s2, p[1] * s2 + z * c2];
+  }
+  function cuadro(ms) {
+    var a = ms / 9000, R = W * 0.4, o = W / 2;
+    cx.clearRect(0, 0, W, W);
+    var g = cx.createRadialGradient(o - R * 0.3, o - R * 0.3, R * 0.1, o, o, R * 1.05);
+    g.addColorStop(0, '#22307a'); g.addColorStop(1, '#101741');
+    cx.fillStyle = g; cx.beginPath(); cx.arc(o, o, R, 0, 7); cx.fill();
+    for (var i = 0; i < N; i++) {
+      var q = rot(pts[i], a); if (q[2] < 0) continue;
+      cx.globalAlpha = 0.18 + q[2] * 0.6; cx.fillStyle = '#8fb4ff';
+      cx.beginPath(); cx.arc(o + q[0] * R, o - q[1] * R, 1 + q[2] * 0.9, 0, 7); cx.fill();
+    }
+    cx.globalAlpha = 1;
+    pines.map(function (pn) { return { q: rot(pn.p, a), pn: pn }; }).filter(function (x) { return x.q[2] > 0.05; })
+      .sort(function (x, y) { return x.q[2] - y.q[2]; }).forEach(function (x) {
+        var salto = quieto ? 0 : Math.abs(Math.sin(ms / 520 + x.pn.f)) * 0.07;
+        var k = 1.1 + salto, bx = o + x.q[0] * R, by = o - x.q[1] * R, tx = o + x.q[0] * R * k, ty = o - x.q[1] * R * k - 6;
+        cx.globalAlpha = Math.min(1, x.q[2] * 3);
+        cx.strokeStyle = x.pn.c; cx.lineWidth = 2; cx.beginPath(); cx.moveTo(bx, by); cx.lineTo(tx, ty); cx.stroke();
+        cx.fillStyle = x.pn.c; cx.beginPath(); cx.arc(tx, ty, 5 + x.q[2] * 4, 0, 7); cx.fill();
+        cx.fillStyle = '#0b1026'; cx.beginPath(); cx.arc(tx, ty, 2 + x.q[2] * 1.4, 0, 7); cx.fill();
+      });
+    cx.globalAlpha = 1;
+  }
+  function bucle(ms) { if (visible) cuadro(ms); requestAnimationFrame(bucle); }
+  medir();
+  addEventListener('resize', function () { medir(); if (quieto) cuadro(t0); });
+  if ('IntersectionObserver' in window) new IntersectionObserver(function (e) { visible = e[0].isIntersecting; }).observe(cv);
+  if (quieto) cuadro(t0); else requestAnimationFrame(bucle);
+})();
+</script>
+</body>
+</html>
